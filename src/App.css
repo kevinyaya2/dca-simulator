@@ -1118,6 +1118,7 @@
 
 .fighterCard.enemy{
   border-color: rgba(255, 100, 100, 0.35);
+  overflow: visible;
 }
 
 .fighterCard.player{
@@ -1182,6 +1183,55 @@
   height: 100px;
   object-fit: contain;
   transition: transform 0.15s ease;
+}
+
+/* 敵人攻擊技能彈出圖示 */
+.activeSkillPopup{
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  animation: skillPopIn 0.4s ease;
+  z-index: 100;
+}
+
+.activeSkillPopup img{
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 100, 100, 0.8);
+  box-shadow: 
+    0 0 20px rgba(255, 100, 100, 0.6),
+    0 8px 20px rgba(0,0,0,0.3);
+  background: rgba(255, 50, 50, 0.2);
+  animation: skillPulse 0.6s ease infinite alternate;
+}
+
+.activeSkillPopup span{
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255, 80, 80, 0.95);
+  background: rgba(255,255,255,0.9);
+  padding: 3px 6px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  white-space: nowrap;
+}
+
+@keyframes skillPopIn{
+  0%{ opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.5); }
+  60%{ transform: translateX(-50%) translateY(-3px) scale(1.1); }
+  100%{ opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@keyframes skillPulse{
+  0%{ box-shadow: 0 0 15px rgba(255, 100, 100, 0.5), 0 8px 20px rgba(0,0,0,0.3); }
+  100%{ box-shadow: 0 0 25px rgba(255, 100, 100, 0.8), 0 8px 20px rgba(0,0,0,0.3); }
 }
 
 /* 動畫狀態 */

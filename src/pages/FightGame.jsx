@@ -9,6 +9,8 @@ import skillShieldImg from "../assets/skill-shield.png";
 import skillComboImg from "../assets/skill-combo.png";
 import skillHealImg from "../assets/skill-heal.png";
 import skillUltimateImg from "../assets/skill-ultimate.png";
+import effectKpiImg from "../assets/effect-kpi.png";
+import effectAnxietyImg from "../assets/effect-anxiety.png";
 
 // 遊戲常數
 const PLAYER_MAX_HP = 100;
@@ -74,9 +76,9 @@ const SKILLS = [
 
 // 敵人技能
 const ENEMY_SKILLS = [
-  { id: "kpi", name: "KPI 重壓", minDmg: 10, maxDmg: 15, heal: 0, weight: 50 },
-  { id: "anxiety", name: "焦慮爆擊", minDmg: 20, maxDmg: 28, heal: 0, weight: 15 },
-  { id: "drain", name: "情緒吸血", minDmg: 8, maxDmg: 12, heal: 8, weight: 35 },
+  { id: "kpi", name: "KPI 重壓", icon: effectKpiImg, minDmg: 10, maxDmg: 15, heal: 0, weight: 50 },
+  { id: "anxiety", name: "焦慮爆擊", icon: effectAnxietyImg, minDmg: 20, maxDmg: 28, heal: 0, weight: 15 },
+  { id: "drain", name: "情緒吸血", icon: effectAnxietyImg, minDmg: 8, maxDmg: 12, heal: 8, weight: 35 },
 ];
 
 // 根據權重隨機選擇敵人技能
@@ -107,6 +109,7 @@ export default function FightGame() {
   const [playerAnim, setPlayerAnim] = useState("");
   const [enemyAnim, setEnemyAnim] = useState("");
   const [isAnimating, setIsAnimating] = useState(false);
+  const [activeEnemySkill, setActiveEnemySkill] = useState(null); // 敵人當前使用的技能
 
   // 計算 HP 百分比
   const playerHpPercent = useMemo(() => Math.max(0, (playerHp / PLAYER_MAX_HP) * 100), [playerHp]);
@@ -187,6 +190,7 @@ export default function FightGame() {
 
       setIsAnimating(true);
       const skill = getRandomEnemySkill();
+      setActiveEnemySkill(skill); // 顯示敵人技能圖示
       let damage = Math.floor(Math.random() * (skill.maxDmg - skill.minDmg + 1)) + skill.minDmg;
 
       // 護盾減傷
@@ -216,6 +220,7 @@ export default function FightGame() {
         setPlayerAnim("");
         setEnemyAnim("");
         setIsAnimating(false);
+        setActiveEnemySkill(null); // 清除敵人技能顯示
 
         // 減少冷卻
         setSkillCooldowns((prev) => {
@@ -269,6 +274,7 @@ export default function FightGame() {
     setPlayerAnim("");
     setEnemyAnim("");
     setIsAnimating(false);
+    setActiveEnemySkill(null);
   };
 
   return (
@@ -310,6 +316,13 @@ export default function FightGame() {
               </div>
               <div className={`fighterSprite ${enemyAnim}`}>
                 <img src={stressMonsterImg} alt="生活壓力怪" />
+                {/* 敵人技能圖示 */}
+                {activeEnemySkill && (
+                  <div className="activeSkillPopup">
+                    <img src={activeEnemySkill.icon} alt={activeEnemySkill.name} />
+                    <span>{activeEnemySkill.name}</span>
+                  </div>
+                )}
               </div>
             </div>
 
