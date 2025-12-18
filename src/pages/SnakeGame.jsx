@@ -53,11 +53,43 @@ export default function SnakeGame() {
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
+  const [particles, setParticles] = useState([]);
+  const [showScorePopup, setShowScorePopup] = useState(false);
 
   // Refs
   const gameAreaRef = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const gameLoopRef = useRef(null);
+
+  // 產生吃到食物的粒子效果
+  const spawnParticles = useCallback((x, y) => {
+    const newParticles = [];
+    const colors = ['#32cd32', '#90ee90', '#228b22', '#7cfc00', '#00ff00'];
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const speed = 40 + Math.random() * 30;
+      newParticles.push({
+        id: Date.now() + i,
+        x: x * CELL_SIZE + CELL_SIZE / 2,
+        y: y * CELL_SIZE + CELL_SIZE / 2,
+        tx: Math.cos(angle) * speed,
+        ty: Math.sin(angle) * speed,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+    
+    // 0.5秒後清除粒子
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
+    }, 500);
+  }, []);
+
+  // 顯示分數彈出
+  const showScorePop = useCallback(() => {
+    setShowScorePopup(true);
+    setTimeout(() => setShowScorePopup(false), 400);
+  }, []);
 
   // 檢查是否可以改變方向（禁止反向）
   const canChangeDirection = useCallback((current, next) => {
@@ -177,6 +209,8 @@ export default function SnakeGame() {
         setFood((prevFood) => {
           if (newHead.x === prevFood.x && newHead.y === prevFood.y) {
             setScore((s) => s + 1);
+            spawnParticles(prevFood.x, prevFood.y);
+            showScorePop();
             return generateFood(newSnake);
           }
           return prevFood;
@@ -194,7 +228,7 @@ export default function SnakeGame() {
     }, INITIAL_SPEED);
 
     return () => clearInterval(gameLoopRef.current);
-  }, [gameStarted, gameOver, isPaused, nextDirection, food]);
+  }, [gameStarted, gameOver, isPaused, nextDirection, food, spawnParticles, showScorePop]);
 
   // 重新開始遊戲
   const restartGame = useCallback(() => {
@@ -332,6 +366,26 @@ export default function SnakeGame() {
           >
             <img src={foodImg} alt="food" />
           </div>
+
+          {/* 吃到食物的粒子效果 */}
+          {particles.map(p => (
+            <div
+              key={p.id}
+              className="snakeParticle"
+              style={{
+                left: p.x,
+                top: p.y,
+                background: `radial-gradient(circle, ${p.color}, ${p.color}88)`,
+                '--tx': `${p.tx}px`,
+                '--ty': `${p.ty}px`,
+              }}
+            />
+          ))}
+
+          {/* 分數增加提示 */}
+          {showScorePopup && (
+            <div className="snakeScorePop">+1</div>
+          )}
 
           {/* 開始畫面 */}
           {!gameStarted && (

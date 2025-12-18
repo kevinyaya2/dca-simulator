@@ -9,23 +9,17 @@ export default function Home() {
       name: "定期定額",
       subtitle: "DCA Simulator",
       icon: "💰",
-      color: "linear-gradient(135deg, rgba(255, 120, 180, 0.88), rgba(130, 185, 255, 0.88))",
+      color:
+        "linear-gradient(135deg, rgba(255, 120, 180, 0.88), rgba(130, 185, 255, 0.88))",
       route: "/dca",
-    },
-    {
-      id: "game",
-      name: "投資遊戲",
-      subtitle: "Investment Game",
-      icon: "🎮",
-      color: "linear-gradient(135deg, rgba(130, 255, 180, 0.82), rgba(100, 220, 150, 0.82))",
-      route: "/game",
     },
     {
       id: "cards",
       name: "投資卡牌",
       subtitle: "Deck Builder",
       icon: "🃏",
-      color: "linear-gradient(135deg, rgba(255, 200, 100, 0.82), rgba(255, 150, 80, 0.82))",
+      color:
+        "linear-gradient(135deg, rgba(255, 200, 100, 0.82), rgba(255, 150, 80, 0.82))",
       route: "/cards",
     },
     {
@@ -33,7 +27,8 @@ export default function Home() {
       name: "柴剛格鬥",
       subtitle: "Fight Game",
       icon: "⚔️",
-      color: "linear-gradient(135deg, rgba(180, 150, 255, 0.82), rgba(140, 100, 255, 0.82))",
+      color:
+        "linear-gradient(135deg, rgba(180, 150, 255, 0.82), rgba(140, 100, 255, 0.82))",
       route: "/fight",
     },
     {
@@ -41,8 +36,18 @@ export default function Home() {
       name: "柴剛貪吃蛇",
       subtitle: "Snake Game",
       icon: "🐍",
-      color: "linear-gradient(135deg, rgba(100, 200, 150, 0.82), rgba(50, 180, 120, 0.82))",
+      color:
+        "linear-gradient(135deg, rgba(100, 200, 150, 0.82), rgba(50, 180, 120, 0.82))",
       route: "/snake",
+    },
+    {
+      id: "jump",
+      name: "柴剛跳跳",
+      subtitle: "Jump Game",
+      icon: "🦘",
+      color:
+        "linear-gradient(135deg, rgba(255, 180, 100, 0.82), rgba(255, 130, 80, 0.82))",
+      route: "/jump",
     },
   ];
 
@@ -56,8 +61,19 @@ export default function Home() {
     <div className="oneui">
       <div className="homeShell">
         <header className="homeHeader">
-          <div className="homeTime">{new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}</div>
-          <div className="homeDate">{new Date().toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "short" })}</div>
+          <div className="homeTime">
+            {new Date().toLocaleTimeString("zh-TW", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+          <div className="homeDate">
+            {new Date().toLocaleDateString("zh-TW", {
+              month: "long",
+              day: "numeric",
+              weekday: "short",
+            })}
+          </div>
         </header>
 
         <main className="homeContent">

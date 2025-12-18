@@ -1,9 +1,9 @@
 import Home from "./Home";
 import DCA from "./DCA";
-import InvestmentGame from "./InvestmentGame";
 import CardGame from "./CardGame";
 import FightGame from "./FightGame";
 import SnakeGame from "./SnakeGame";
+import JumpGame from "./JumpGame";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -16,11 +16,6 @@ const routes = [
     path: "/dca",
     element: <DCA />,
     title: "定期定額模擬器",
-  },
-  {
-    path: "/game",
-    element: <InvestmentGame />,
-    title: "投資遊戲",
   },
   {
     path: "/cards",
@@ -36,6 +31,11 @@ const routes = [
     path: "/snake",
     element: <SnakeGame />,
     title: "柴剛貪吃蛇",
+  },
+  {
+    path: "/jump",
+    element: <JumpGame />,
+    title: "柴剛跳跳",
   },
 ];
 
