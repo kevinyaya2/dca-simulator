@@ -233,6 +233,14 @@ export default function JumpGame() {
   // 輸入狀態
   const inputRef = useRef({ left: false, right: false });
 
+  // Timeout 集中管理
+  const timeoutsRef = useRef([]);
+  const safeTimeout = useCallback((fn, t) => {
+    const id = setTimeout(fn, t);
+    timeoutsRef.current.push(id);
+    return id;
+  }, []);
+
   // Ref 同步
   const isPausedRef = useRef(false);
   const highScoreRef = useRef(highScore);
@@ -247,6 +255,29 @@ export default function JumpGame() {
   useEffect(() => {
     achievementsRef.current = achievements;
   }, [achievements]);
+
+  // activeEffects 定期同步（避免 game loop 中頻繁 setState）
+  useEffect(() => {
+    if (gameState !== "playing") return;
+    const id = setInterval(() => {
+      const p = playerRef.current;
+      setActiveEffects({
+        jetpack: p.isBoosting,
+        springShoes: p.springJumpCount,
+        shield: p.shieldCount,
+        safetyNet: p.safetyNetCount,
+      });
+    }, 250);
+    return () => clearInterval(id);
+  }, [gameState]);
+
+  // 清理所有 timeouts
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
+    };
+  }, []);
 
   // ============ 成就解鎖 ============
   const unlockAchievement = useCallback((achievementKey) => {
@@ -264,7 +295,7 @@ export default function JumpGame() {
     );
 
     setShowAchievement(achievement);
-    setTimeout(() => setShowAchievement(null), 3000);
+    safeTimeout(() => setShowAchievement(null), 3000);
   }, []);
 
   // ============ 初始化平台 ============
@@ -400,7 +431,6 @@ export default function JumpGame() {
         world.jetpackTime += deltaTime;
         if (player.boostTimer <= 0) {
           player.isBoosting = false;
-          setActiveEffects((e) => ({ ...e, jetpack: false }));
         }
         // 成就檢查
         if (world.jetpackTime >= 10000) {
@@ -434,9 +464,10 @@ export default function JumpGame() {
         const dy = bh.y - (player.y + player.height / 2);
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < 150) {
+          const safeDist = Math.max(dist, 20); // 防止距離過近速度爆炸
           const force = bh.pullStrength * (1 - dist / 150) * timeScale;
           player.vy += force * 2;
-          player.vx += (dx / dist) * force;
+          player.vx += (dx / safeDist) * force;
         }
       }
 
@@ -476,13 +507,12 @@ export default function JumpGame() {
         // 有安全網道具時的額外效果（消耗一次）
         if (player.safetyNetCount > 0) {
           player.safetyNetCount -= 1;
-          setActiveEffects((e) => ({ ...e, safetyNet: player.safetyNetCount }));
 
           // 4. 短暫無敵（200ms）- 僅安全網道具時
           player.wrapInvincibleUntil = currentTime + 200;
           // 5. 視覺效果 - 僅安全網道具時
           player.isWrapping = true;
-          setTimeout(() => {
+          safeTimeout(() => {
             player.isWrapping = false;
           }, 150);
 
@@ -507,7 +537,7 @@ export default function JumpGame() {
           );
           world.platforms.push(safetyPlatform);
           // 移除閃爍效果
-          setTimeout(() => {
+          safeTimeout(() => {
             safetyPlatform.flash = false;
           }, 500);
         }
@@ -517,7 +547,12 @@ export default function JumpGame() {
       for (const plat of world.platforms) {
         if (plat.type === PLATFORM_TYPES.MOVING) {
           plat.x += plat.speed * plat.direction * timeScale;
-          if (plat.x <= 0 || plat.x + plat.width >= GAME_WIDTH) {
+          // 碰到邊界時反轉方向並修正位置
+          if (plat.x <= 0) {
+            plat.x = 0;
+            plat.direction *= -1;
+          } else if (plat.x + plat.width >= GAME_WIDTH) {
+            plat.x = GAME_WIDTH - plat.width;
             plat.direction *= -1;
           }
         }
@@ -564,13 +599,12 @@ export default function JumpGame() {
                 player.vy = JUMP_VELOCITY * player.jumpMultiplier;
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
-                  setActiveEffects(e => ({ ...e, springShoes: player.springJumpCount }));
                   if (player.springJumpCount === 0) {
                     player.jumpMultiplier = 1;
                   }
                 }
                 plat.flash = true;
-                setTimeout(() => {
+                safeTimeout(() => {
                   plat.flash = false;
                 }, 150);
                 break;
@@ -583,13 +617,12 @@ export default function JumpGame() {
                   player.vy = JUMP_VELOCITY * player.jumpMultiplier;
                   if (player.springJumpCount > 0) {
                     player.springJumpCount--;
-                    setActiveEffects(e => ({ ...e, springShoes: player.springJumpCount }));
                     if (player.springJumpCount === 0) {
                       player.jumpMultiplier = 1;
                     }
                   }
                   plat.flash = true;
-                  setTimeout(() => {
+                  safeTimeout(() => {
                     plat.flash = false;
                   }, 150);
                 } else if (plat.state === "cracked") {
@@ -604,26 +637,24 @@ export default function JumpGame() {
                 }
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
-                  setActiveEffects(e => ({ ...e, springShoes: player.springJumpCount }));
                   if (player.springJumpCount === 0) {
                     player.jumpMultiplier = 1;
                   }
                 }
                 plat.flash = true;
-                setTimeout(() => {
+                safeTimeout(() => {
                   plat.flash = false;
                 }, 150);
               } else {
                 player.vy = JUMP_VELOCITY * player.jumpMultiplier;
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
-                  setActiveEffects(e => ({ ...e, springShoes: player.springJumpCount }));
                   if (player.springJumpCount === 0) {
                     player.jumpMultiplier = 1;
                   }
                 }
                 plat.flash = true;
-                setTimeout(() => {
+                safeTimeout(() => {
                   plat.flash = false;
                 }, 150);
               }
@@ -647,20 +678,13 @@ export default function JumpGame() {
           if (pu.type === POWERUP_TYPES.JETPACK) {
             player.isBoosting = true;
             player.boostTimer = JETPACK_DURATION;
-            setActiveEffects((e) => ({ ...e, jetpack: true }));
           } else if (pu.type === POWERUP_TYPES.SPRING_SHOES) {
             player.jumpMultiplier = SPRING_SHOES_MULTIPLIER;
             player.springJumpCount += 5; // 獲得5次加強跳躍
-            setActiveEffects((e) => ({ ...e, springShoes: player.springJumpCount }));
           } else if (pu.type === POWERUP_TYPES.SHIELD) {
             player.shieldCount += 1; // 獲得1次護盾
-            setActiveEffects((e) => ({ ...e, shield: player.shieldCount }));
           } else if (pu.type === POWERUP_TYPES.SAFETY_NET) {
             player.safetyNetCount += 3; // 獲得3次使用機會
-            setActiveEffects((e) => ({
-              ...e,
-              safetyNet: player.safetyNetCount,
-            }));
           }
         }
       }
@@ -684,7 +708,6 @@ export default function JumpGame() {
         ) {
           if (player.shieldCount > 0) {
             player.shieldCount -= 1;
-            setActiveEffects((e) => ({ ...e, shield: player.shieldCount }));
             unlockAchievement("SURVIVOR");
             enemy.x = -1000;
           } else {
@@ -818,7 +841,6 @@ export default function JumpGame() {
       if (player.y > world.cameraY + GAME_HEIGHT + 100) {
         if (player.shieldCount > 0) {
           player.shieldCount -= 1;
-          setActiveEffects((e) => ({ ...e, shield: player.shieldCount }));
           player.y = world.cameraY + GAME_HEIGHT / 2;
           player.vy = JUMP_VELOCITY;
           unlockAchievement("SURVIVOR");
@@ -869,7 +891,7 @@ export default function JumpGame() {
           ) {
             lastTitleMilestone.current = milestone.score;
             setShowTitle(milestone);
-            setTimeout(() => setShowTitle(null), 2500);
+            safeTimeout(() => setShowTitle(null), 2500);
             break;
           }
         }
@@ -919,6 +941,7 @@ export default function JumpGame() {
           const plat = world.platforms[i];
           const el = container.children[i];
           if (el) {
+            el.dataset.id = plat.id; // ID 對齊
             const screenY = plat.y - world.cameraY;
             el.style.transform = `translate(${plat.x}px, ${screenY}px)`;
             el.style.width = `${plat.width}px`; // 動態設定寬度
@@ -962,6 +985,7 @@ export default function JumpGame() {
           const pu = visible[i];
           const el = container.children[i];
           if (el) {
+            el.dataset.id = pu.id; // ID 對齊
             const screenY = pu.y - world.cameraY;
             el.style.transform = `translate(${pu.x}px, ${screenY}px)`;
             el.style.display =
@@ -999,6 +1023,7 @@ export default function JumpGame() {
           const enemy = enemies[i];
           const el = container.children[i];
           if (el) {
+            el.dataset.id = enemy.id; // ID 對齊
             const screenY = enemy.y - world.cameraY;
             // 加入左右翻轉效果表示移動方向
             const scaleX = enemy.direction > 0 ? 1 : -1;
@@ -1027,6 +1052,7 @@ export default function JumpGame() {
           const bh = world.blackholes[i];
           const el = container.children[i];
           if (el) {
+            el.dataset.id = bh.id; // ID 對齊
             const screenY = bh.y - world.cameraY;
             el.style.transform = `translate(${bh.x - bh.radius}px, ${
               screenY - bh.radius
@@ -1171,7 +1197,8 @@ export default function JumpGame() {
             {activeEffects.jetpack && <span className="jumpEffect">🚀</span>}
             {activeEffects.springShoes > 0 && (
               <span className="jumpEffect springShoes">
-                👟<span className="effectCount">{activeEffects.springShoes}</span>
+                👟
+                <span className="effectCount">{activeEffects.springShoes}</span>
               </span>
             )}
             {activeEffects.shield > 0 && (
