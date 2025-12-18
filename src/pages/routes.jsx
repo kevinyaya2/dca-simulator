@@ -3,6 +3,7 @@ import DCA from "./DCA";
 import InvestmentGame from "./InvestmentGame";
 import CardGame from "./CardGame";
 import FightGame from "./FightGame";
+import SnakeGame from "./SnakeGame";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -30,6 +31,11 @@ const routes = [
     path: "/fight",
     element: <FightGame />,
     title: "柴剛格鬥",
+  },
+  {
+    path: "/snake",
+    element: <SnakeGame />,
+    title: "柴剛貪吃蛇",
   },
 ];
 

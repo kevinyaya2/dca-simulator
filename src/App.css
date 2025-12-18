@@ -1477,3 +1477,307 @@
     height: 80px;
   }
 }
+
+/* ========================================
+   貪吃蛇遊戲 Snake Game
+   ======================================== */
+
+.snakeShell{
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 16px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* 頂部導航 */
+.snakeHeader{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.snakeHeader .backBtn{
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: var(--shadowS);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s;
+}
+
+.snakeHeader .backBtn:active{
+  transform: scale(0.95);
+}
+
+.snakeTitle{
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text);
+  margin: 0;
+}
+
+/* 分數卡片 */
+.snakeScoreCard{
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  border-radius: 20px;
+  padding: 12px 32px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadowM);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.snakeScoreLabel{
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.snakeScoreValue{
+  font-size: 36px;
+  font-weight: 950;
+  background: linear-gradient(135deg, #ff78b4, #82b9ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 遊戲區域 */
+.snakeGameArea{
+  position: relative;
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  border-radius: 20px;
+  box-shadow: var(--shadowL);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  box-sizing: content-box;
+}
+
+/* 網格背景 */
+.snakeGrid{
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  grid-template-rows: repeat(18, 1fr);
+  pointer-events: none;
+}
+
+.snakeGridCell{
+  border: 1px solid rgba(100, 180, 120, 0.08);
+}
+
+.snakeGridCell:nth-child(odd){
+  background: rgba(100, 180, 120, 0.03);
+}
+
+/* 蛇身段落 */
+.snakeSegment{
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.05s linear, top 0.05s linear;
+}
+
+.snakeSegment img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.snakeHead{
+  z-index: 10;
+}
+
+.snakeHead img{
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.snakeBody{
+  z-index: 5;
+}
+
+.snakeBody img{
+  opacity: 0.95;
+}
+
+/* 食物 */
+.snakeFood{
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  animation: foodPulse 0.8s ease-in-out infinite alternate;
+}
+
+.snakeFood img{
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(255, 100, 100, 0.6));
+}
+
+@keyframes foodPulse{
+  0%{ transform: scale(0.9); }
+  100%{ transform: scale(1.1); }
+}
+
+/* 遊戲覆蓋層 */
+.snakeOverlay{
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: 20px;
+}
+
+.snakeOverlay.gameOver{
+  background: rgba(255, 200, 200, 0.98);
+}
+
+.snakeOverlayContent{
+  text-align: center;
+  padding: 24px;
+}
+
+.snakeOverlayEmoji{
+  font-size: 64px;
+  margin-bottom: 12px;
+  animation: bounceEmoji 1s ease infinite;
+}
+
+@keyframes bounceEmoji{
+  0%, 100%{ transform: translateY(0); }
+  50%{ transform: translateY(-10px); }
+}
+
+.snakeOverlayContent h2{
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.snakeOverlayContent p{
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 16px 0;
+}
+
+.snakeFinalScore{
+  font-size: 18px !important;
+  font-weight: 800;
+  color: var(--text) !important;
+  background: linear-gradient(135deg, #ff78b4, #82b9ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 開始/重新開始按鈕 */
+.snakeStartBtn{
+  padding: 14px 32px;
+  border-radius: 25px;
+  border: none;
+  background: linear-gradient(135deg, rgba(100, 200, 150, 0.9), rgba(50, 180, 120, 0.9));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 
+    0 8px 24px rgba(50, 180, 120, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.2s;
+}
+
+.snakeStartBtn:active{
+  transform: scale(0.95);
+  box-shadow: 0 4px 12px rgba(50, 180, 120, 0.4);
+}
+
+/* 控制提示 */
+.snakeControlHint{
+  margin-top: 16px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.snakeControlHint span{
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 6px 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+/* 暫停按鈕 */
+.snakePauseBtn{
+  margin-top: 16px;
+  padding: 12px 24px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadowS);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s;
+}
+
+.snakePauseBtn:active{
+  transform: scale(0.95);
+}
+
+/* RWD 調整 */
+@media (max-width: 400px) {
+  .snakeShell{
+    padding: 12px;
+  }
+  
+  .snakeTitle{
+    font-size: 16px;
+  }
+  
+  .snakeScoreCard{
+    padding: 10px 24px;
+  }
+  
+  .snakeScoreValue{
+    font-size: 28px;
+  }
+}

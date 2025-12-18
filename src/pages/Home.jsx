@@ -36,6 +36,14 @@ export default function Home() {
       color: "linear-gradient(135deg, rgba(180, 150, 255, 0.82), rgba(140, 100, 255, 0.82))",
       route: "/fight",
     },
+    {
+      id: "snake",
+      name: "柴剛貪吃蛇",
+      subtitle: "Snake Game",
+      icon: "🐍",
+      color: "linear-gradient(135deg, rgba(100, 200, 150, 0.82), rgba(50, 180, 120, 0.82))",
+      route: "/snake",
+    },
   ];
 
   const handleAppClick = (app) => {
