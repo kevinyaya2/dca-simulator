@@ -64,7 +64,7 @@ export default function SnakeGame() {
   // 產生吃到食物的粒子效果
   const spawnParticles = useCallback((x, y) => {
     const newParticles = [];
-    const colors = ['#32cd32', '#90ee90', '#228b22', '#7cfc00', '#00ff00'];
+    const colors = ["#32cd32", "#90ee90", "#228b22", "#7cfc00", "#00ff00"];
     for (let i = 0; i < 8; i++) {
       const angle = (i / 8) * Math.PI * 2;
       const speed = 40 + Math.random() * 30;
@@ -77,11 +77,13 @@ export default function SnakeGame() {
         color: colors[Math.floor(Math.random() * colors.length)],
       });
     }
-    setParticles(prev => [...prev, ...newParticles]);
-    
+    setParticles((prev) => [...prev, ...newParticles]);
+
     // 0.5秒後清除粒子
     setTimeout(() => {
-      setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
+      setParticles((prev) =>
+        prev.filter((p) => !newParticles.find((np) => np.id === p.id))
+      );
     }, 500);
   }, []);
 
@@ -198,7 +200,11 @@ export default function SnakeGame() {
         }
 
         // 檢查撞自己（跳過頭部）
-        if (prevSnake.some((seg, i) => i > 0 && seg.x === newHead.x && seg.y === newHead.y)) {
+        if (
+          prevSnake.some(
+            (seg, i) => i > 0 && seg.x === newHead.x && seg.y === newHead.y
+          )
+        ) {
           setGameOver(true);
           return prevSnake;
         }
@@ -228,7 +234,15 @@ export default function SnakeGame() {
     }, INITIAL_SPEED);
 
     return () => clearInterval(gameLoopRef.current);
-  }, [gameStarted, gameOver, isPaused, nextDirection, food, spawnParticles, showScorePop]);
+  }, [
+    gameStarted,
+    gameOver,
+    isPaused,
+    nextDirection,
+    food,
+    spawnParticles,
+    showScorePop,
+  ]);
 
   // 重新開始遊戲
   const restartGame = useCallback(() => {
@@ -368,7 +382,7 @@ export default function SnakeGame() {
           </div>
 
           {/* 吃到食物的粒子效果 */}
-          {particles.map(p => (
+          {particles.map((p) => (
             <div
               key={p.id}
               className="snakeParticle"
@@ -376,16 +390,14 @@ export default function SnakeGame() {
                 left: p.x,
                 top: p.y,
                 background: `radial-gradient(circle, ${p.color}, ${p.color}88)`,
-                '--tx': `${p.tx}px`,
-                '--ty': `${p.ty}px`,
+                "--tx": `${p.tx}px`,
+                "--ty": `${p.ty}px`,
               }}
             />
           ))}
 
           {/* 分數增加提示 */}
-          {showScorePopup && (
-            <div className="snakeScorePop">+1</div>
-          )}
+          {showScorePopup && <div className="snakeScorePop">+1</div>}
 
           {/* 開始畫面 */}
           {!gameStarted && (
@@ -407,7 +419,10 @@ export default function SnakeGame() {
               <div className="snakeOverlayContent">
                 <div className="snakeOverlayEmoji">⏸️</div>
                 <h2>遊戲暫停</h2>
-                <button className="snakeStartBtn" onClick={() => setIsPaused(false)}>
+                <button
+                  className="snakeStartBtn"
+                  onClick={() => setIsPaused(false)}
+                >
                   繼續遊戲
                 </button>
               </div>
