@@ -252,21 +252,44 @@ const BASE_SCORE_TITLES = [
 // 動態稱號生成規則
 const DYNAMIC_TITLE_LEVELS = [
   // 10k-100k: 每 +10k
-  { start: 20000, end: 100000, step: 10000, titles: [
-    "重力挑戰者", "高度征服者", "天空探索者", 
-    "雲端支配者", "空域主宰", "無界行者",
-    "天際開拓者", "星空挑戰者"
-  ], icon: "🌊" },
+  {
+    start: 20000,
+    end: 100000,
+    step: 10000,
+    titles: [
+      "重力挑戰者",
+      "高度征服者",
+      "天空探索者",
+      "雲端支配者",
+      "空域主宰",
+      "無界行者",
+      "天際開拓者",
+      "星空挑戰者",
+    ],
+    icon: "🌊",
+  },
   // 100k-1M: 每 ×2 倍
-  { start: 100000, end: 1000000, multiplier: 2, titles: [
-    "維度破壞者", "空間主宰", "現實超越者",
-    "世界邊界行者", "極限追尋者"
-  ], icon: "💎" },
+  {
+    start: 100000,
+    end: 1000000,
+    multiplier: 2,
+    titles: [
+      "維度破壞者",
+      "空間主宰",
+      "現實超越者",
+      "世界邊界行者",
+      "極限追尋者",
+    ],
+    icon: "💎",
+  },
   // 1M+: 每 ×5 倍
-  { start: 1000000, end: Infinity, multiplier: 5, titles: [
-    "宇宙旅人", "時空超越者", "次元主宰",
-    "全能神明", "無限存在"
-  ], icon: "🌌" },
+  {
+    start: 1000000,
+    end: Infinity,
+    multiplier: 5,
+    titles: ["宇宙旅人", "時空超越者", "次元主宰", "全能神明", "無限存在"],
+    icon: "🌌",
+  },
 ];
 
 // 動態計算稱號函數
@@ -297,7 +320,10 @@ const getScoreTitle = (score) => {
         // 倍數增長（每 ×multiplier）
         let current = level.start;
         let index = 0;
-        while (current * level.multiplier <= score && current * level.multiplier < level.end) {
+        while (
+          current * level.multiplier <= score &&
+          current * level.multiplier < level.end
+        ) {
           current *= level.multiplier;
           index++;
         }
@@ -1024,7 +1050,7 @@ export default function JumpGame() {
               // 統計使用次數
               world.powerupUsage.portal += 1;
               checkPowerupAchievements(world.powerupUsage);
-              
+
               // 傳送前視覺效果
               player.isTeleporting = true;
               safeTimeout(() => {
@@ -1052,7 +1078,14 @@ export default function JumpGame() {
               } else {
                 platformsToGenerate = 5; // 超高分：5個平台
               }
-              
+
+              // 先清理傳送目標區域的舊平台（避免重疊）
+              const cleanupRangeStart = targetY - 50;
+              const cleanupRangeEnd = targetY + 500;
+              world.platforms = world.platforms.filter(
+                (p) => p.y < cleanupRangeStart || p.y > cleanupRangeEnd
+              );
+
               for (let i = 0; i < platformsToGenerate; i++) {
                 const platformY = targetY + 100 + i * 80; // 從玩家下方100px開始，每個間隔80px
                 const platformX = Math.random() * (GAME_WIDTH - PLATFORM_WIDTH);
