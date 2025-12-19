@@ -77,10 +77,166 @@ const ACHIEVEMENTS = {
     desc: "達到 2000m",
     icon: "☁️",
   },
+  // 道具使用次數成就
+  // 噴射背包
+  POWERUP_JETPACK_10: {
+    id: "jetpack10",
+    title: "火箭學徒",
+    desc: "使用噴射背包 10 次",
+    icon: "🚀",
+  },
+  POWERUP_JETPACK_20: {
+    id: "jetpack20",
+    title: "火箭專家",
+    desc: "使用噴射背包 20 次",
+    icon: "🚀",
+  },
+  POWERUP_JETPACK_30: {
+    id: "jetpack30",
+    title: "火箭大師",
+    desc: "使用噴射背包 30 次",
+    icon: "🚀",
+  },
+  POWERUP_JETPACK_40: {
+    id: "jetpack40",
+    title: "火箭傳奇",
+    desc: "使用噴射背包 40 次",
+    icon: "🚀",
+  },
+  POWERUP_JETPACK_50: {
+    id: "jetpack50",
+    title: "火箭之神",
+    desc: "使用噴射背包 50 次",
+    icon: "🚀",
+  },
+  // 彈簧鞋
+  POWERUP_SPRINGSHOES_10: {
+    id: "springShoes10",
+    title: "彈跳高手",
+    desc: "使用彈簧鞋 10 次",
+    icon: "👟",
+  },
+  POWERUP_SPRINGSHOES_20: {
+    id: "springShoes20",
+    title: "彈跳專家",
+    desc: "使用彈簧鞋 20 次",
+    icon: "👟",
+  },
+  POWERUP_SPRINGSHOES_30: {
+    id: "springShoes30",
+    title: "彈跳大師",
+    desc: "使用彈簧鞋 30 次",
+    icon: "👟",
+  },
+  POWERUP_SPRINGSHOES_40: {
+    id: "springShoes40",
+    title: "彈跳傳奇",
+    desc: "使用彈簧鞋 40 次",
+    icon: "👟",
+  },
+  POWERUP_SPRINGSHOES_50: {
+    id: "springShoes50",
+    title: "彈跳之神",
+    desc: "使用彈簧鞋 50 次",
+    icon: "👟",
+  },
+  // 護盾
+  POWERUP_SHIELD_10: {
+    id: "shield10",
+    title: "鐵壁守護",
+    desc: "使用護盾擋下 10 次傷害",
+    icon: "🛡️",
+  },
+  POWERUP_SHIELD_20: {
+    id: "shield20",
+    title: "鋼鐵堡壘",
+    desc: "使用護盾擋下 20 次傷害",
+    icon: "🛡️",
+  },
+  POWERUP_SHIELD_30: {
+    id: "shield30",
+    title: "不朽之盾",
+    desc: "使用護盾擋下 30 次傷害",
+    icon: "🛡️",
+  },
+  POWERUP_SHIELD_40: {
+    id: "shield40",
+    title: "傳奇守護",
+    desc: "使用護盾擋下 40 次傷害",
+    icon: "🛡️",
+  },
+  POWERUP_SHIELD_50: {
+    id: "shield50",
+    title: "無敵戰神",
+    desc: "使用護盾擋下 50 次傷害",
+    icon: "🛡️",
+  },
+  // 安全網
+  POWERUP_SAFETYNET_10: {
+    id: "safetyNet10",
+    title: "安全專家",
+    desc: "使用安全網 10 次",
+    icon: "🪢",
+  },
+  POWERUP_SAFETYNET_20: {
+    id: "safetyNet20",
+    title: "穿牆大師",
+    desc: "使用安全網 20 次",
+    icon: "🪢",
+  },
+  POWERUP_SAFETYNET_30: {
+    id: "safetyNet30",
+    title: "空間掌控",
+    desc: "使用安全網 30 次",
+    icon: "🪢",
+  },
+  POWERUP_SAFETYNET_40: {
+    id: "safetyNet40",
+    title: "次元行者",
+    desc: "使用安全網 40 次",
+    icon: "🪢",
+  },
+  POWERUP_SAFETYNET_50: {
+    id: "safetyNet50",
+    title: "時空主宰",
+    desc: "使用安全網 50 次",
+    icon: "🪢",
+  },
+  // 傳送門
+  POWERUP_PORTAL_10: {
+    id: "portal10",
+    title: "空間學徒",
+    desc: "使用傳送門 10 次",
+    icon: "🌀",
+  },
+  POWERUP_PORTAL_20: {
+    id: "portal20",
+    title: "傳送專家",
+    desc: "使用傳送門 20 次",
+    icon: "🌀",
+  },
+  POWERUP_PORTAL_30: {
+    id: "portal30",
+    title: "傳送大師",
+    desc: "使用傳送門 30 次",
+    icon: "🌀",
+  },
+  POWERUP_PORTAL_40: {
+    id: "portal40",
+    title: "時空旅者",
+    desc: "使用傳送門 40 次",
+    icon: "🌀",
+  },
+  POWERUP_PORTAL_50: {
+    id: "portal50",
+    title: "維度之主",
+    desc: "使用傳送門 50 次",
+    icon: "🌀",
+  },
 };
 
-// 分數稱號里程碑
-const SCORE_TITLES = [
+// 分數稱號里程碑 - 基礎稱號（固定）
+const BASE_SCORE_TITLES = [
   { score: 100, title: "新手起步", icon: "🐣" },
   { score: 300, title: "小試身手", icon: "🌱" },
   { score: 500, title: "初出茅廬", icon: "🎯" },
@@ -92,6 +248,78 @@ const SCORE_TITLES = [
   { score: 5000, title: "傳說勇者", icon: "👑" },
   { score: 10000, title: "神級玩家", icon: "🏆" },
 ];
+
+// 動態稱號生成規則
+const DYNAMIC_TITLE_LEVELS = [
+  // 10k-100k: 每 +10k
+  { start: 20000, end: 100000, step: 10000, titles: [
+    "重力挑戰者", "高度征服者", "天空探索者", 
+    "雲端支配者", "空域主宰", "無界行者",
+    "天際開拓者", "星空挑戰者"
+  ], icon: "🌊" },
+  // 100k-1M: 每 ×2 倍
+  { start: 100000, end: 1000000, multiplier: 2, titles: [
+    "維度破壞者", "空間主宰", "現實超越者",
+    "世界邊界行者", "極限追尋者"
+  ], icon: "💎" },
+  // 1M+: 每 ×5 倍
+  { start: 1000000, end: Infinity, multiplier: 5, titles: [
+    "宇宙旅人", "時空超越者", "次元主宰",
+    "全能神明", "無限存在"
+  ], icon: "🌌" },
+];
+
+// 動態計算稱號函數
+const getScoreTitle = (score) => {
+  // 1. 先檢查基礎稱號
+  for (let i = BASE_SCORE_TITLES.length - 1; i >= 0; i--) {
+    if (score >= BASE_SCORE_TITLES[i].score) {
+      return {
+        milestoneScore: BASE_SCORE_TITLES[i].score,
+        title: BASE_SCORE_TITLES[i].title,
+        icon: BASE_SCORE_TITLES[i].icon,
+      };
+    }
+  }
+
+  // 2. 動態稱號（高分段）
+  for (const level of DYNAMIC_TITLE_LEVELS) {
+    if (score >= level.start && score < level.end) {
+      let milestoneScore;
+      let titleIndex;
+
+      if (level.step) {
+        // 線性增長（每 +step）
+        const stepsFromStart = Math.floor((score - level.start) / level.step);
+        milestoneScore = level.start + stepsFromStart * level.step;
+        titleIndex = Math.min(stepsFromStart, level.titles.length - 1);
+      } else if (level.multiplier) {
+        // 倍數增長（每 ×multiplier）
+        let current = level.start;
+        let index = 0;
+        while (current * level.multiplier <= score && current * level.multiplier < level.end) {
+          current *= level.multiplier;
+          index++;
+        }
+        milestoneScore = current;
+        titleIndex = Math.min(index, level.titles.length - 1);
+      }
+
+      return {
+        milestoneScore,
+        title: level.titles[titleIndex],
+        icon: level.icon,
+      };
+    }
+  }
+
+  // 3. 超高分（備用）
+  return {
+    milestoneScore: Math.floor(score / 5000000) * 5000000,
+    title: "超越神話",
+    icon: "🛸",
+  };
+};
 
 // ============ 工具函數 ============
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -310,6 +538,43 @@ export default function JumpGame() {
     [safeTimeout]
   );
 
+  // 檢查道具使用次數成就
+  const checkPowerupAchievements = useCallback(
+    (usage) => {
+      // 噴射背包
+      if (usage.jetpack >= 10) unlockAchievement("POWERUP_JETPACK_10");
+      if (usage.jetpack >= 20) unlockAchievement("POWERUP_JETPACK_20");
+      if (usage.jetpack >= 30) unlockAchievement("POWERUP_JETPACK_30");
+      if (usage.jetpack >= 40) unlockAchievement("POWERUP_JETPACK_40");
+      if (usage.jetpack >= 50) unlockAchievement("POWERUP_JETPACK_50");
+      // 彈簧鞋
+      if (usage.springShoes >= 10) unlockAchievement("POWERUP_SPRINGSHOES_10");
+      if (usage.springShoes >= 20) unlockAchievement("POWERUP_SPRINGSHOES_20");
+      if (usage.springShoes >= 30) unlockAchievement("POWERUP_SPRINGSHOES_30");
+      if (usage.springShoes >= 40) unlockAchievement("POWERUP_SPRINGSHOES_40");
+      if (usage.springShoes >= 50) unlockAchievement("POWERUP_SPRINGSHOES_50");
+      // 護盾
+      if (usage.shield >= 10) unlockAchievement("POWERUP_SHIELD_10");
+      if (usage.shield >= 20) unlockAchievement("POWERUP_SHIELD_20");
+      if (usage.shield >= 30) unlockAchievement("POWERUP_SHIELD_30");
+      if (usage.shield >= 40) unlockAchievement("POWERUP_SHIELD_40");
+      if (usage.shield >= 50) unlockAchievement("POWERUP_SHIELD_50");
+      // 安全網
+      if (usage.safetyNet >= 10) unlockAchievement("POWERUP_SAFETYNET_10");
+      if (usage.safetyNet >= 20) unlockAchievement("POWERUP_SAFETYNET_20");
+      if (usage.safetyNet >= 30) unlockAchievement("POWERUP_SAFETYNET_30");
+      if (usage.safetyNet >= 40) unlockAchievement("POWERUP_SAFETYNET_40");
+      if (usage.safetyNet >= 50) unlockAchievement("POWERUP_SAFETYNET_50");
+      // 傳送門
+      if (usage.portal >= 10) unlockAchievement("POWERUP_PORTAL_10");
+      if (usage.portal >= 20) unlockAchievement("POWERUP_PORTAL_20");
+      if (usage.portal >= 30) unlockAchievement("POWERUP_PORTAL_30");
+      if (usage.portal >= 40) unlockAchievement("POWERUP_PORTAL_40");
+      if (usage.portal >= 50) unlockAchievement("POWERUP_PORTAL_50");
+    },
+    [unlockAchievement]
+  );
+
   // ============ 初始化平台 ============
   const initPlatforms = useCallback(() => {
     const plats = [];
@@ -395,6 +660,14 @@ export default function JumpGame() {
       milestone2000: false,
       springCount: 0,
       jetpackTime: 0,
+      // 道具使用次數統計
+      powerupUsage: {
+        jetpack: 0,
+        springShoes: 0,
+        shield: 0,
+        safetyNet: 0,
+        portal: 0,
+      },
     };
 
     inputRef.current = { left: false, right: false };
@@ -522,6 +795,8 @@ export default function JumpGame() {
         // 有安全網道具時的額外效果（消耗一次）
         if (player.safetyNetCount > 0) {
           player.safetyNetCount -= 1;
+          world.powerupUsage.safetyNet += 1;
+          checkPowerupAchievements(world.powerupUsage);
 
           // 4. 短暫無敵（200ms）- 僅安全網道具時
           player.wrapInvincibleUntil = currentTime + 200;
@@ -614,6 +889,8 @@ export default function JumpGame() {
                 player.vy = JUMP_VELOCITY * player.jumpMultiplier;
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
+                  world.powerupUsage.springShoes += 1;
+                  checkPowerupAchievements(world.powerupUsage);
                   if (player.springJumpCount === 0) {
                     player.jumpMultiplier = 1;
                   }
@@ -632,6 +909,8 @@ export default function JumpGame() {
                   player.vy = JUMP_VELOCITY * player.jumpMultiplier;
                   if (player.springJumpCount > 0) {
                     player.springJumpCount--;
+                    world.powerupUsage.springShoes += 1;
+                    checkPowerupAchievements(world.powerupUsage);
                     if (player.springJumpCount === 0) {
                       player.jumpMultiplier = 1;
                     }
@@ -652,6 +931,8 @@ export default function JumpGame() {
                 }
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
+                  world.powerupUsage.springShoes += 1;
+                  checkPowerupAchievements(world.powerupUsage);
                   if (player.springJumpCount === 0) {
                     player.jumpMultiplier = 1;
                   }
@@ -664,6 +945,8 @@ export default function JumpGame() {
                 player.vy = JUMP_VELOCITY * player.jumpMultiplier;
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
+                  world.powerupUsage.springShoes += 1;
+                  checkPowerupAchievements(world.powerupUsage);
                   if (player.springJumpCount === 0) {
                     player.jumpMultiplier = 1;
                   }
@@ -693,6 +976,8 @@ export default function JumpGame() {
           if (pu.type === POWERUP_TYPES.JETPACK) {
             player.isBoosting = true;
             player.boostTimer = JETPACK_DURATION;
+            world.powerupUsage.jetpack += 1;
+            checkPowerupAchievements(world.powerupUsage);
           } else if (pu.type === POWERUP_TYPES.SPRING_SHOES) {
             player.jumpMultiplier = SPRING_SHOES_MULTIPLIER;
             player.springJumpCount += 5; // 獲得5次加強跳躍
@@ -736,6 +1021,10 @@ export default function JumpGame() {
 
             // 3. 執行傳送（如果安全）
             if (isSafe && teleportDistance > 50) {
+              // 統計使用次數
+              world.powerupUsage.portal += 1;
+              checkPowerupAchievements(world.powerupUsage);
+              
               // 傳送前視覺效果
               player.isTeleporting = true;
               safeTimeout(() => {
@@ -752,7 +1041,18 @@ export default function JumpGame() {
               player.lastPortalTime = currentTime; // 記錄使用時間
 
               // 在傳送目標附近生成安全平台（確保有落腳點）
-              const platformsToGenerate = 5; // 生成5個平台
+              // 根據傳送距離動態調整平台數量（避免前期過密）
+              let platformsToGenerate;
+              if (teleportDistance < 1000) {
+                platformsToGenerate = 2; // 前期：2個平台
+              } else if (teleportDistance < 3000) {
+                platformsToGenerate = 3; // 中期：3個平台
+              } else if (teleportDistance < 8000) {
+                platformsToGenerate = 4; // 高分：4個平台
+              } else {
+                platformsToGenerate = 5; // 超高分：5個平台
+              }
+              
               for (let i = 0; i < platformsToGenerate; i++) {
                 const platformY = targetY + 100 + i * 80; // 從玩家下方100px開始，每個間隔80px
                 const platformX = Math.random() * (GAME_WIDTH - PLATFORM_WIDTH);
@@ -796,6 +1096,8 @@ export default function JumpGame() {
         ) {
           if (player.shieldCount > 0) {
             player.shieldCount -= 1;
+            world.powerupUsage.shield += 1;
+            checkPowerupAchievements(world.powerupUsage);
             unlockAchievement("SURVIVOR");
             enemy.x = -1000;
           } else {
@@ -953,6 +1255,8 @@ export default function JumpGame() {
       if (player.y > world.cameraY + GAME_HEIGHT + 100) {
         if (player.shieldCount > 0) {
           player.shieldCount -= 1;
+          world.powerupUsage.shield += 1;
+          checkPowerupAchievements(world.powerupUsage);
           player.y = world.cameraY + GAME_HEIGHT / 2;
           player.vy = JUMP_VELOCITY;
           unlockAchievement("SURVIVOR");
@@ -995,17 +1299,15 @@ export default function JumpGame() {
         }
 
         // 檢查是否達到新稱號
-        for (let i = SCORE_TITLES.length - 1; i >= 0; i--) {
-          const milestone = SCORE_TITLES[i];
-          if (
-            newScore >= milestone.score &&
-            lastTitleMilestone.current < milestone.score
-          ) {
-            lastTitleMilestone.current = milestone.score;
-            setShowTitle(milestone);
-            safeTimeout(() => setShowTitle(null), 2500);
-            break;
-          }
+        const titleInfo = getScoreTitle(newScore);
+        if (titleInfo.milestoneScore > lastTitleMilestone.current) {
+          lastTitleMilestone.current = titleInfo.milestoneScore;
+          setShowTitle({
+            score: titleInfo.milestoneScore,
+            title: titleInfo.title,
+            icon: titleInfo.icon,
+          });
+          safeTimeout(() => setShowTitle(null), 2500);
         }
       }
 
@@ -1396,7 +1698,7 @@ export default function JumpGame() {
                   <span>👟 彈簧鞋 (5次)</span>
                   <span>🛡️ 護盾 (免死1次)</span>
                   <span>🪢 安全網 (3次穿牆生成平台)</span>
-                  <span>🌀 傳送門 (瞬移距離為目前高度×0.5)</span>
+                  <span>🌀 傳送門 (瞬移到目前1.5倍高度)</span>
                 </div>
                 <button className="jumpStartBtn" onClick={resetGame}>
                   開始遊戲
