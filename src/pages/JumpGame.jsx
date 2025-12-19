@@ -833,10 +833,18 @@ export default function JumpGame() {
           }, 150);
 
           // 6. 生成安全平台
+          const safetyPlatformY = player.y + PLAYER_HEIGHT + 30;
+          
+          // 先清理該位置附近的舊平台（避免重疊）
+          world.platforms = world.platforms.filter((p) => {
+            const distY = Math.abs(p.y - safetyPlatformY);
+            return distY > 50; // 與新平台垂直距離超過50px才保留
+          });
+
           const safetyPlatform = {
             id: generateId(),
             x: player.x - PLATFORM_WIDTH / 2 + PLAYER_WIDTH / 2, // 置中於玩家
-            y: player.y + PLAYER_HEIGHT + 30, // 玩家下方30px
+            y: safetyPlatformY, // 玩家下方30px
             width: PLATFORM_WIDTH * 1.5, // 稍寬一點更容易落地
             height: PLATFORM_HEIGHT,
             type: PLATFORM_TYPES.NORMAL,
