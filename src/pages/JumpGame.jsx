@@ -1491,7 +1491,7 @@ export default function JumpGame() {
       isRunning = false;
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [gameState, unlockAchievement, safeTimeout]);
+  }, [gameState, unlockAchievement, safeTimeout, checkPowerupAchievements]);
 
   // ============ 鍵盤控制 ============
   useEffect(() => {
