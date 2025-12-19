@@ -179,6 +179,7 @@ export default function CardGame() {
   const [currentMarket, setCurrentMarket] = useState(null);
   const [handCards, setHandCards] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [hasPlayedCard, setHasPlayedCard] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   
   // 歷史記錄
@@ -215,6 +216,10 @@ export default function CardGame() {
 
   // 選擇卡牌
   function selectCard(card) {
+    if (hasPlayedCard) {
+      showToast("已出牌，請按下一年");
+      return;
+    }
     if (selectedCard?.id === card.id) {
       setSelectedCard(null);
     } else {
@@ -253,6 +258,7 @@ export default function CardGame() {
     };
     setHistory([...history, record]);
     setUsedCards([...usedCards, selectedCard]);
+    setHasPlayedCard(true);
 
     // 顯示訊息
     showToast("已出牌");
@@ -274,6 +280,7 @@ export default function CardGame() {
     setCurrentMarket(getRandomMarket());
     setHandCards(drawCards(CARD_DECK, 3));
     setSelectedCard(null);
+    setHasPlayedCard(false);
     setActionMessage("");
   }
 
@@ -286,6 +293,7 @@ export default function CardGame() {
     setCurrentMarket(null);
     setHandCards([]);
     setSelectedCard(null);
+    setHasPlayedCard(false);
     setActionMessage("");
     setHistory([]);
     setUsedCards([]);

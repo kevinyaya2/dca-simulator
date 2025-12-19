@@ -380,7 +380,7 @@ const createPlatform = (y, type = PLATFORM_TYPES.NORMAL) => {
   };
 };
 
-const createPowerup = (x, y, type) => {
+const createPowerup = (x, y, type, platformId = null) => {
   const size = type === POWERUP_TYPES.PORTAL ? 45 : 40;
   return {
     id: generateId(),
@@ -390,6 +390,9 @@ const createPowerup = (x, y, type) => {
     height: size,
     type,
     collected: false,
+    platformId, // 關聯的平台 ID（用於跟隨移動）
+    offsetX: 0, // 相對平台的 X 偏移
+    offsetY: -50, // 相對平台的 Y 偏移（預設在平台上方50px）
   };
 };
 
@@ -397,11 +400,18 @@ const createEnemy = (y) => ({
   id: generateId(),
   x: Math.random() * (GAME_WIDTH - 40),
   y,
+  centerY: y, // 中心高度（上下浮動的基準點）
+  floatRange: 30, // 上下浮動範圍（±30px）
+  floatDirection: Math.random() > 0.5 ? 1 : -1, // 浮動方向
+  floatSpeed: 0.3 + Math.random() * 0.2, // 浮動速度 0.3-0.5（很慢）
   width: 40,
   height: 40,
   direction: Math.random() > 0.5 ? 1 : -1,
-  speed: 1.5 + Math.random() * 1,
-  vy: 0.5 + Math.random() * 0.5, // 敵人會緩慢向下移動
+  speed: 2.5 + Math.random() * 2, // 水平移動速度 2.5-4.5
+  vy: 6, // 被踩後的掉落速度
+  isBounced: false,   // 是否已被踩（變成彈跳平台）
+  rotation: 0,        // 旋轉角度
+  rotateSpeed: 8,     // 掉落時旋轉速度
 });
 
 const createBlackhole = (x, y) => ({
@@ -870,6 +880,7 @@ export default function JumpGame() {
       // === 更新移動平台 ===
       for (const plat of world.platforms) {
         if (plat.type === PLATFORM_TYPES.MOVING) {
+          const oldX = plat.x;
           plat.x += plat.speed * plat.direction * timeScale;
           // 碰到邊界時反轉方向並修正位置
           if (plat.x <= 0) {
@@ -879,20 +890,45 @@ export default function JumpGame() {
             plat.x = GAME_WIDTH - plat.width;
             plat.direction *= -1;
           }
+          
+          // 同步移動平台上的道具（X 和 Y 都要更新）
+          const deltaX = plat.x - oldX;
+          for (const pu of world.powerups) {
+            if (pu.platformId === plat.id && !pu.collected) {
+              pu.x += deltaX;
+              // 根據平台當前位置重新計算 Y 座標（保持相對偏移）
+              pu.y = plat.y + pu.offsetY;
+            }
+          }
         }
       }
 
       // === 更新敵人 ===
       for (const enemy of world.enemies) {
-        // 1000分數後敵人才會水平移動
-        if (scoreRef.current >= 1000) {
-          enemy.x += enemy.speed * enemy.direction * timeScale;
-          if (enemy.x <= 0 || enemy.x + enemy.width >= GAME_WIDTH) {
-            enemy.direction *= -1;
+        if (enemy.isBounced) {
+          // 被踩後：旋轉掉落
+          enemy.y += enemy.vy * timeScale;
+          enemy.rotation += enemy.rotateSpeed * timeScale;
+        } else {
+          // 正常敵人：1000分數後才會水平移動
+          if (scoreRef.current >= 1000) {
+            enemy.x += enemy.speed * enemy.direction * timeScale;
+            if (enemy.x <= 0 || enemy.x + enemy.width >= GAME_WIDTH) {
+              enemy.direction *= -1;
+            }
+          }
+          
+          // 上下浮動（很慢的速度）
+          enemy.y += enemy.floatSpeed * enemy.floatDirection * timeScale;
+          const distFromCenter = enemy.y - enemy.centerY;
+          if (distFromCenter > enemy.floatRange) {
+            enemy.floatDirection = -1;
+            enemy.y = enemy.centerY + enemy.floatRange;
+          } else if (distFromCenter < -enemy.floatRange) {
+            enemy.floatDirection = 1;
+            enemy.y = enemy.centerY - enemy.floatRange;
           }
         }
-        // 垂直移動（緩慢向下飄）
-        enemy.y += enemy.vy * timeScale;
       }
 
       // === 碰撞檢測（平台）===
@@ -1120,6 +1156,9 @@ export default function JumpGame() {
 
       // === 碰撞檢測（敵人）===
       for (const enemy of world.enemies) {
+        // 已被踩的敵人不再造成傷害
+        if (enemy.isBounced) continue;
+
         // 只檢測畫面內的敵人
         const enemyScreenY = enemy.y - world.cameraY;
         if (enemyScreenY < -50 || enemyScreenY > GAME_HEIGHT + 50) continue;
@@ -1127,7 +1166,42 @@ export default function JumpGame() {
         // 翻牆無敵期間跳過敵人碰撞
         if (currentTime < player.wrapInvincibleUntil) continue;
 
-        // 碰撞檢測 (加一點容差讓碰撞更合理)
+        const playerBottom = player.y + player.height;
+        const playerLeft = player.x;
+        const playerRight = player.x + player.width;
+
+        // 水平重疊檢查
+        const hasHorizontalOverlap =
+          playerRight > enemy.x && playerLeft < enemy.x + enemy.width;
+
+        // 踩敵判定：玩家從上方接觸敵人頂部
+        const isStompingEnemy =
+          player.vy > 0 && // 玩家正在下落
+          hasHorizontalOverlap &&
+          playerBottom >= enemy.y && // 玩家底部接觸敵人頂部
+          playerBottom <= enemy.y + enemy.height * 0.4; // 接觸範圍：敵人上40%區域
+
+        if (isStompingEnemy) {
+          // 踩敵成功 = 超級彈跳（1.5倍彈簧高度）
+          player.vy = SPRING_VELOCITY * 1.5 * player.jumpMultiplier; // 1.5倍彈簧高度（支援彈簧鞋加乘）
+          
+          // 消耗彈簧鞋次數
+          if (player.springJumpCount > 0) {
+            player.springJumpCount--;
+            world.powerupUsage.springShoes += 1;
+            checkPowerupAchievements(world.powerupUsage);
+            if (player.springJumpCount === 0) {
+              player.jumpMultiplier = 1;
+            }
+          }
+          
+          enemy.isBounced = true; // 敵人進入掉落狀態
+          enemy.vy = 6; // 掉落速度
+          enemy.direction = 0; // 停止水平移動
+          continue; // 跳過後續碰撞檢查
+        }
+
+        // 一般碰撞檢測（側邊或下方）
         const tolerance = 5;
         if (
           player.x + player.width - tolerance > enemy.x + tolerance &&
@@ -1140,7 +1214,7 @@ export default function JumpGame() {
             world.powerupUsage.shield += 1;
             checkPowerupAchievements(world.powerupUsage);
             unlockAchievement("SURVIVOR");
-            enemy.x = -1000;
+            enemy.x = -1000; // 移出畫面
           } else {
             isRunning = false;
             handleGameOver(world);
@@ -1244,23 +1318,52 @@ export default function JumpGame() {
           }
 
           if (puType) {
-            world.powerups.push(createPowerup(puX, puY, puType));
+            const powerup = createPowerup(puX, puY, puType, newPlat.id);
+            powerup.offsetX = puX - newPlat.x; // 記錄相對平台的 X 偏移
+            powerup.offsetY = puY - newPlat.y; // 記錄相對平台的 Y 偏移
+            world.powerups.push(powerup);
           }
         }
       }
 
       // === 生成敵人（500m 後）===
-      // 限制最多1隻敵人，降低生成機率
-      if (heightInMeters >= 50 && world.enemies.length < 1) {
-        if (Math.random() < 0.008) {
-          // 在畫面外上方生成敵人（玩家看不到的地方）
-          const spawnY = world.cameraY - 50;
-          const newEnemy = createEnemy(spawnY);
+      // 隨機生成1-3隻，高度越高生成多隻機率越高
+      if (heightInMeters >= 50 && world.enemies.length < 3) {
+        if (Math.random() < 0.02) {
+          // 根據高度決定生成數量
+          let spawnCount = 1;
+          const rand = Math.random();
+          
+          if (heightInMeters >= 200) {
+            // 2000m+: 20% 1隻, 40% 2隻, 40% 3隻
+            if (rand < 0.2) spawnCount = 1;
+            else if (rand < 0.6) spawnCount = 2;
+            else spawnCount = 3;
+          } else if (heightInMeters >= 100) {
+            // 1000-2000m: 40% 1隻, 40% 2隻, 20% 3隻
+            if (rand < 0.4) spawnCount = 1;
+            else if (rand < 0.8) spawnCount = 2;
+            else spawnCount = 3;
+          } else {
+            // 500-1000m: 70% 1隻, 25% 2隻, 5% 3隻
+            if (rand < 0.7) spawnCount = 1;
+            else if (rand < 0.95) spawnCount = 2;
+            else spawnCount = 3;
+          }
+          
+          // 確保不超過上限
+          spawnCount = Math.min(spawnCount, 3 - world.enemies.length);
+          
+          // 生成指定數量的敵人
+          for (let i = 0; i < spawnCount; i++) {
+            const spawnY = world.cameraY - 50 - i * 80; // 每隻間隔80px
+            const newEnemy = createEnemy(spawnY);
 
-          // 確保敵人不會生成在玩家附近（水平距離至少100px）且不在邊緣安全區
-          const distX = Math.abs(newEnemy.x - player.x);
-          if (distX > 100 && !isInEdgeSafeZone(newEnemy.x)) {
-            world.enemies.push(newEnemy);
+            // 確保敵人不會生成在玩家附近（水平距離至少100px）且不在邊緣安全區
+            const distX = Math.abs(newEnemy.x - player.x);
+            if (distX > 100 && !isInEdgeSafeZone(newEnemy.x)) {
+              world.enemies.push(newEnemy);
+            }
           }
         }
       }
@@ -1283,7 +1386,7 @@ export default function JumpGame() {
       world.powerups = world.powerups.filter(
         (p) => !p.collected && p.y < world.cameraY + GAME_HEIGHT + 100
       );
-      // 敵人：只保留畫面附近的，被消滅的(x=-1000)也移除
+      // 敵人清理：移除掉出畫面的或移出畫面外的
       world.enemies = world.enemies.filter((e) => {
         const screenY = e.y - world.cameraY;
         return e.x > -500 && screenY > -200 && screenY < GAME_HEIGHT + 200;
@@ -1384,7 +1487,9 @@ export default function JumpGame() {
       // 更新平台
       if (platformContainerRef.current) {
         const container = platformContainerRef.current;
-        const needed = world.platforms.length;
+        // 過濾掉已消失的平台（gone 狀態）
+        const visiblePlatforms = world.platforms.filter(p => p.state !== "gone");
+        const needed = visiblePlatforms.length;
 
         while (container.children.length < needed) {
           const div = document.createElement("div");
@@ -1396,8 +1501,8 @@ export default function JumpGame() {
           container.removeChild(container.lastChild);
         }
 
-        for (let i = 0; i < world.platforms.length; i++) {
-          const plat = world.platforms[i];
+        for (let i = 0; i < visiblePlatforms.length; i++) {
+          const plat = visiblePlatforms[i];
           const el = container.children[i];
           if (el) {
             el.dataset.id = plat.id; // ID 對齊
@@ -1485,9 +1590,22 @@ export default function JumpGame() {
           if (el) {
             el.dataset.id = enemy.id; // ID 對齊
             const screenY = enemy.y - world.cameraY;
-            // 加入左右翻轉效果表示移動方向
-            const scaleX = enemy.direction > 0 ? 1 : -1;
-            el.style.transform = `translate(${enemy.x}px, ${screenY}px) scaleX(${scaleX})`;
+            
+            // 根據狀態設置 class
+            if (enemy.isBounced) {
+              el.className = "jumpEnemy bounced";
+              // 被踩後：快速旋轉掉落 + 縮小
+              const scale = Math.max(0.3, 1 - enemy.rotation / 360); // 隨旋轉縮小
+              el.style.transform = `translate(${enemy.x}px, ${screenY}px) rotate(${enemy.rotation}deg) scale(${scale})`;
+              el.style.opacity = Math.max(0.2, 1 - enemy.rotation / 720); // 漸漸透明
+            } else {
+              el.className = "jumpEnemy";
+              el.style.opacity = 1;
+              // 正常敵人：左右翻轉效果
+              const scaleX = enemy.direction > 0 ? 1 : -1;
+              el.style.transform = `translate(${enemy.x}px, ${screenY}px) scaleX(${scaleX})`;
+            }
+            
             el.style.display =
               screenY > -50 && screenY < GAME_HEIGHT + 50 ? "flex" : "none";
           }
