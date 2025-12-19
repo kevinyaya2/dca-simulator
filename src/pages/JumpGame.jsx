@@ -36,6 +36,7 @@ const POWERUP_TYPES = {
   SPRING_SHOES: "springShoes",
   SHIELD: "shield",
   SAFETY_NET: "safetyNet", // 安全網：翻牆時生成安全平台
+  PORTAL: "portal", // 傳送門：瞬移至當前高度的0.5倍
 };
 
 // 成就定義
@@ -125,15 +126,18 @@ const createPlatform = (y, type = PLATFORM_TYPES.NORMAL) => {
   };
 };
 
-const createPowerup = (x, y, type) => ({
-  id: generateId(),
-  x,
-  y,
-  width: 40,
-  height: 40,
-  type,
-  collected: false,
-});
+const createPowerup = (x, y, type) => {
+  const size = type === POWERUP_TYPES.PORTAL ? 45 : 40;
+  return {
+    id: generateId(),
+    x,
+    y,
+    width: size,
+    height: size,
+    type,
+    collected: false,
+  };
+};
 
 const createEnemy = (y) => ({
   id: generateId(),
@@ -170,6 +174,7 @@ export default function JumpGame() {
     springShoes: false,
     shield: 0,
     safetyNet: 0,
+    teleporting: false,
   });
   const [showAchievement, setShowAchievement] = useState(null);
   const [showTitle, setShowTitle] = useState(null);
@@ -212,6 +217,9 @@ export default function JumpGame() {
     wrapGraceJump: false, // 翻牆後安全跳
     wrapInvincibleUntil: 0, // 翻牆後無敵結束時間
     isWrapping: false, // 正在翻牆（用於視覺效果）
+    // 傳送門相關
+    isTeleporting: false, // 傳送中（視覺效果）
+    lastPortalTime: 0, // 上次使用 Portal 的時間（cooldown）
   });
 
   // 世界狀態
@@ -266,6 +274,7 @@ export default function JumpGame() {
         springShoes: p.springJumpCount,
         shield: p.shieldCount,
         safetyNet: p.safetyNetCount,
+        teleporting: p.isTeleporting,
       });
     }, 250);
     return () => clearInterval(id);
@@ -280,23 +289,26 @@ export default function JumpGame() {
   }, []);
 
   // ============ 成就解鎖 ============
-  const unlockAchievement = useCallback((achievementKey) => {
-    const achievement = ACHIEVEMENTS[achievementKey];
-    if (!achievement || achievementsRef.current[achievement.id]) return;
+  const unlockAchievement = useCallback(
+    (achievementKey) => {
+      const achievement = ACHIEVEMENTS[achievementKey];
+      if (!achievement || achievementsRef.current[achievement.id]) return;
 
-    const newAchievements = {
-      ...achievementsRef.current,
-      [achievement.id]: true,
-    };
-    setAchievements(newAchievements);
-    localStorage.setItem(
-      "jumpGameAchievements",
-      JSON.stringify(newAchievements)
-    );
+      const newAchievements = {
+        ...achievementsRef.current,
+        [achievement.id]: true,
+      };
+      setAchievements(newAchievements);
+      localStorage.setItem(
+        "jumpGameAchievements",
+        JSON.stringify(newAchievements)
+      );
 
-    setShowAchievement(achievement);
-    safeTimeout(() => setShowAchievement(null), 3000);
-  }, []);
+      setShowAchievement(achievement);
+      safeTimeout(() => setShowAchievement(null), 3000);
+    },
+    [safeTimeout]
+  );
 
   // ============ 初始化平台 ============
   const initPlatforms = useCallback(() => {
@@ -367,6 +379,9 @@ export default function JumpGame() {
       wrapGraceJump: false,
       wrapInvincibleUntil: 0,
       isWrapping: false,
+      // 傳送門相關
+      isTeleporting: false,
+      lastPortalTime: 0,
     };
 
     worldRef.current = {
@@ -685,6 +700,79 @@ export default function JumpGame() {
             player.shieldCount += 1; // 獲得1次護盾
           } else if (pu.type === POWERUP_TYPES.SAFETY_NET) {
             player.safetyNetCount += 3; // 獲得3次使用機會
+          } else if (pu.type === POWERUP_TYPES.PORTAL) {
+            // === Portal 傳送邏輯 ===
+            // 1. 計算順移距離 = 當前高度 × 0.5
+            const currentHeight = world.maxHeight;
+            const teleportDistance = currentHeight * 0.5;
+            let targetY = player.y - teleportDistance;
+
+            // 2. 安全性檢查
+            let isSafe = true;
+
+            // 不可落在黑洞半徑內（80px）
+            for (const bh of world.blackholes) {
+              const dist = Math.sqrt(
+                Math.pow(player.x + player.width / 2 - bh.x, 2) +
+                  Math.pow(targetY + player.height / 2 - bh.y, 2)
+              );
+              if (dist < bh.radius + 40) {
+                isSafe = false;
+                break;
+              }
+            }
+
+            // 不可落在敵人 ±80px 內
+            if (isSafe) {
+              for (const enemy of world.enemies) {
+                const distY = Math.abs(targetY - enemy.y);
+                const distX = Math.abs(player.x - enemy.x);
+                if (distY < 80 && distX < 80) {
+                  isSafe = false;
+                  break;
+                }
+              }
+            }
+
+            // 3. 執行傳送（如果安全）
+            if (isSafe && teleportDistance > 50) {
+              // 傳送前視覺效果
+              player.isTeleporting = true;
+              safeTimeout(() => {
+                player.isTeleporting = false;
+              }, 150);
+
+              // 執行瞬移
+              player.y = targetY;
+              player.vy = JUMP_VELOCITY * 0.8;
+
+              // 傳送後保護機制
+              player.wrapGraceJump = true; // 一次安全跳
+              player.wrapInvincibleUntil = currentTime + 300; // 300ms 無敵
+              player.lastPortalTime = currentTime; // 記錄使用時間
+
+              // 在傳送目標附近生成安全平台（確保有落腳點）
+              const platformsToGenerate = 5; // 生成5個平台
+              for (let i = 0; i < platformsToGenerate; i++) {
+                const platformY = targetY + 100 + i * 80; // 從玩家下方100px開始，每個間隔80px
+                const platformX = Math.random() * (GAME_WIDTH - PLATFORM_WIDTH);
+
+                const safetyPlat = {
+                  id: generateId(),
+                  x: platformX,
+                  y: platformY,
+                  width: PLATFORM_WIDTH,
+                  height: PLATFORM_HEIGHT,
+                  type: PLATFORM_TYPES.NORMAL,
+                  state: "normal",
+                  direction: 1,
+                  speed: 0,
+                  flash: false,
+                };
+                world.platforms.push(safetyPlat);
+              }
+            }
+            // 如果不安全，Portal 作廢（collected 已設為 true）
           }
         }
       }
@@ -772,25 +860,49 @@ export default function JumpGame() {
         world.platforms.push(newPlat);
 
         // 隨機生成道具（機率提高）
-        if (Math.random() < 0.15) {
+        if (Math.random() < 0.2) {
           let puType;
           const rand = Math.random();
-          if (rand < 0.4) {
-            puType = POWERUP_TYPES.JETPACK; // 40% 火箭
-          } else if (rand < 0.6) {
+          if (rand < 0.2) {
+            puType = POWERUP_TYPES.JETPACK; // 20% 火箭
+          } else if (rand < 0.4) {
             puType = POWERUP_TYPES.SHIELD; // 20% 護盾
-          } else if (rand < 0.8) {
+          } else if (rand < 0.6) {
             puType = POWERUP_TYPES.SPRING_SHOES; // 20% 彈簧鞋
-          } else {
+          } else if (rand < 0.8) {
             puType = POWERUP_TYPES.SAFETY_NET; // 20% 安全網
+          } else {
+            puType = POWERUP_TYPES.PORTAL; // 20% 傳送門
           }
-          world.powerups.push(
-            createPowerup(
-              newPlat.x + PLATFORM_WIDTH / 2 - 20,
-              newY - 50,
-              puType
-            )
-          );
+
+          // 計算道具位置
+          let puX = newPlat.x + PLATFORM_WIDTH / 2 - 20;
+          let puY = newY - 50;
+
+          // Portal 特殊生成規則：不在邊緣安全區，不在玩家正上方100px內
+          if (puType === POWERUP_TYPES.PORTAL) {
+            // 檢查是否在邊緣安全區
+            if (isInEdgeSafeZone(puX)) {
+              // 重新定位到安全區域
+              puX =
+                EDGE_SAFE_ZONE +
+                Math.random() * (GAME_WIDTH - EDGE_SAFE_ZONE * 2 - 45);
+            }
+            // 檢查是否在玩家正上方100px內
+            const distToPlayer = Math.abs(player.y - puY);
+            if (distToPlayer < 100) {
+              // 跳過此次生成
+              puType = null;
+            }
+            // 檢查 cooldown（500ms內不生成）
+            if (currentTime - player.lastPortalTime < 500) {
+              puType = null;
+            }
+          }
+
+          if (puType) {
+            world.powerups.push(createPowerup(puX, puY, puType));
+          }
         }
       }
 
@@ -920,6 +1032,10 @@ export default function JumpGame() {
           player.safetyNetCount > 0
         );
         playerDomRef.current.classList.toggle("wrapping", player.isWrapping);
+        playerDomRef.current.classList.toggle(
+          "teleporting",
+          player.isTeleporting
+        );
       }
 
       // 更新平台
@@ -957,7 +1073,7 @@ export default function JumpGame() {
               plat.type === PLATFORM_TYPES.SPRING &&
               !el.querySelector(".jumpSpring")
             ) {
-              el.innerHTML = '<div class="jumpSpring">🌀</div>';
+              el.innerHTML = '<div class="jumpSpring">⬆️</div>';
             } else if (plat.type !== PLATFORM_TYPES.SPRING) {
               el.innerHTML = "";
             }
@@ -996,6 +1112,7 @@ export default function JumpGame() {
               springShoes: "👟",
               shield: "🛡️",
               safetyNet: "🪢",
+              portal: "🌀",
             };
             el.textContent = icons[pu.type] || "⭐";
           }
@@ -1072,7 +1189,7 @@ export default function JumpGame() {
       isRunning = false;
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [gameState, unlockAchievement]);
+  }, [gameState, unlockAchievement, safeTimeout]);
 
   // ============ 鍵盤控制 ============
   useEffect(() => {
@@ -1279,6 +1396,7 @@ export default function JumpGame() {
                   <span>👟 彈簧鞋 (5次)</span>
                   <span>🛡️ 護盾 (免死1次)</span>
                   <span>🪢 安全網 (3次穿牆生成平台)</span>
+                  <span>🌀 傳送門 (瞬移距離為目前高度×0.5)</span>
                 </div>
                 <button className="jumpStartBtn" onClick={resetGame}>
                   開始遊戲

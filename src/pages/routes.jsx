@@ -2,7 +2,6 @@ import Home from "./Home";
 import DCA from "./DCA";
 import CardGame from "./CardGame";
 import FightGame from "./FightGame";
-import SnakeGame from "./SnakeGame";
 import JumpGame from "./JumpGame";
 
 // 路由配置：集中管理所有頁面路由
@@ -26,11 +25,6 @@ const routes = [
     path: "/fight",
     element: <FightGame />,
     title: "柴剛格鬥",
-  },
-  {
-    path: "/snake",
-    element: <SnakeGame />,
-    title: "柴剛貪吃蛇",
   },
   {
     path: "/jump",

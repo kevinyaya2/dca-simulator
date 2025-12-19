@@ -32,15 +32,6 @@ export default function Home() {
       route: "/fight",
     },
     {
-      id: "snake",
-      name: "柴剛貪吃蛇",
-      subtitle: "Snake Game",
-      icon: "🐍",
-      color:
-        "linear-gradient(135deg, rgba(100, 200, 150, 0.82), rgba(50, 180, 120, 0.82))",
-      route: "/snake",
-    },
-    {
       id: "jump",
       name: "柴剛跳跳",
       subtitle: "Jump Game",
