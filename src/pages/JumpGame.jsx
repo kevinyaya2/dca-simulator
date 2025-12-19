@@ -27,7 +27,6 @@ const PLATFORM_TYPES = {
   NORMAL: "normal",
   SPRING: "spring",
   MOVING: "moving",
-  CRACKED: "cracked",
 };
 
 // 道具類型
@@ -361,11 +360,6 @@ const isInEdgeSafeZone = (x) => {
 const createPlatform = (y, type = PLATFORM_TYPES.NORMAL) => {
   let x = Math.random() * (GAME_WIDTH - PLATFORM_WIDTH);
 
-  // 如果在邊緣安全區，易碎平台改為普通平台
-  if (isInEdgeSafeZone(x) && type === PLATFORM_TYPES.CRACKED) {
-    type = PLATFORM_TYPES.NORMAL;
-  }
-
   return {
     id: generateId(),
     x,
@@ -373,7 +367,6 @@ const createPlatform = (y, type = PLATFORM_TYPES.NORMAL) => {
     width: PLATFORM_WIDTH,
     height: PLATFORM_HEIGHT,
     type,
-    state: "normal", // normal, cracked, gone (易碎平台用)
     direction: Math.random() > 0.5 ? 1 : -1,
     speed: 2,
     flash: false,
@@ -409,9 +402,9 @@ const createEnemy = (y) => ({
   direction: Math.random() > 0.5 ? 1 : -1,
   speed: 2.5 + Math.random() * 2, // 水平移動速度 2.5-4.5
   vy: 6, // 被踩後的掉落速度
-  isBounced: false,   // 是否已被踩（變成彈跳平台）
-  rotation: 0,        // 旋轉角度
-  rotateSpeed: 8,     // 掉落時旋轉速度
+  isBounced: false, // 是否已被踩（變成彈跳平台）
+  rotation: 0, // 旋轉角度
+  rotateSpeed: 8, // 掉落時旋轉速度
 });
 
 const createBlackhole = (x, y) => ({
@@ -458,6 +451,12 @@ export default function JumpGame() {
   const scoreRef = useRef(0);
   const scoreDomRef = useRef(null);
 
+  // DOM Map refs (用於 id 對齊，避免殘影)
+  const platformDomMap = useRef(new Map());
+  const powerupDomMap = useRef(new Map());
+  const enemyDomMap = useRef(new Map());
+  const blackholeDomMap = useRef(new Map());
+
   // 玩家狀態
   const playerRef = useRef({
     x: GAME_WIDTH / 2 - PLAYER_WIDTH / 2,
@@ -484,12 +483,14 @@ export default function JumpGame() {
     // 傳送門相關
     isTeleporting: false, // 傳送中（視覺效果）
     lastPortalTime: 0, // 上次使用 Portal 的時間（cooldown）
+    prevY: GAME_HEIGHT - 150, // 上一幀的 Y 位置（用於踩敵判定）
+    jumpType: "normal", // 當前跳躍類型
   });
 
   // 世界狀態
   const worldRef = useRef({
     cameraY: 0,
-    maxHeight: 0,
+    maxHeightPx: 0, // 最高高度（像素）
     platforms: [],
     powerups: [],
     enemies: [],
@@ -622,7 +623,6 @@ export default function JumpGame() {
       width: PLATFORM_WIDTH,
       height: PLATFORM_HEIGHT,
       type: PLATFORM_TYPES.NORMAL,
-      state: "normal",
       direction: 1,
       speed: 2,
       flash: false,
@@ -638,8 +638,7 @@ export default function JumpGame() {
       let type = PLATFORM_TYPES.NORMAL;
       const rand = Math.random();
       if (rand < 0.08) type = PLATFORM_TYPES.SPRING;
-      else if (rand < 0.15) type = PLATFORM_TYPES.MOVING;
-      else if (rand < 0.22) type = PLATFORM_TYPES.CRACKED;
+      else if (rand < 0.18) type = PLATFORM_TYPES.MOVING;
 
       plats.push(createPlatform(lastY, type));
     }
@@ -654,6 +653,12 @@ export default function JumpGame() {
     if (enemyContainerRef.current) enemyContainerRef.current.innerHTML = "";
     if (blackholeContainerRef.current)
       blackholeContainerRef.current.innerHTML = "";
+
+    // 清空 DOM Map（避免重置遊戲後殘留舊引用）
+    platformDomMap.current.clear();
+    powerupDomMap.current.clear();
+    enemyDomMap.current.clear();
+    blackholeDomMap.current.clear();
   }, []);
 
   // ============ 重置遊戲 ============
@@ -683,11 +688,13 @@ export default function JumpGame() {
       // 傳送門相關
       isTeleporting: false,
       lastPortalTime: 0,
+      prevY: GAME_HEIGHT - 150, // 上一幀的 Y 位置
+      jumpType: "normal",
     };
 
     worldRef.current = {
       cameraY: 0,
-      maxHeight: 0,
+      maxHeightPx: 0,
       platforms: initialPlatforms,
       powerups: [],
       enemies: [],
@@ -747,7 +754,7 @@ export default function JumpGame() {
       const player = playerRef.current;
       const world = worldRef.current;
       const input = inputRef.current;
-      const heightInMeters = Math.floor(world.maxHeight / 10);
+      const scoreMeters = Math.floor(world.maxHeightPx / 10);
 
       // === 更新道具計時器 ===
       if (player.isBoosting) {
@@ -778,6 +785,7 @@ export default function JumpGame() {
       // === 物理更新 ===
       if (player.isBoosting) {
         player.vy = JETPACK_VELOCITY;
+        player.jumpType = "jetpack";
       } else {
         player.vy += GRAVITY * timeScale;
       }
@@ -800,6 +808,9 @@ export default function JumpGame() {
         const centerX = GAME_WIDTH / 2 - player.width / 2;
         player.x += (centerX - player.x) * 0.05 * timeScale;
       }
+
+      // 保存前一幀位置（用於踩敵判定）
+      player.prevY = player.y;
 
       player.x += player.vx * timeScale;
       player.y += player.vy * timeScale;
@@ -844,7 +855,7 @@ export default function JumpGame() {
 
           // 6. 生成安全平台
           const safetyPlatformY = player.y + PLAYER_HEIGHT + 30;
-          
+
           // 先清理該位置附近的舊平台（避免重疊）
           world.platforms = world.platforms.filter((p) => {
             const distY = Math.abs(p.y - safetyPlatformY);
@@ -858,7 +869,6 @@ export default function JumpGame() {
             width: PLATFORM_WIDTH * 1.5, // 稍寬一點更容易落地
             height: PLATFORM_HEIGHT,
             type: PLATFORM_TYPES.NORMAL,
-            state: "normal",
             direction: 1,
             speed: 0,
             flash: true, // 閃爍提示
@@ -890,7 +900,7 @@ export default function JumpGame() {
             plat.x = GAME_WIDTH - plat.width;
             plat.direction *= -1;
           }
-          
+
           // 同步移動平台上的道具（X 和 Y 都要更新）
           const deltaX = plat.x - oldX;
           for (const pu of world.powerups) {
@@ -917,7 +927,7 @@ export default function JumpGame() {
               enemy.direction *= -1;
             }
           }
-          
+
           // 上下浮動（很慢的速度）
           enemy.y += enemy.floatSpeed * enemy.floatDirection * timeScale;
           const distFromCenter = enemy.y - enemy.centerY;
@@ -938,8 +948,6 @@ export default function JumpGame() {
         const playerRight = player.x + player.width;
 
         for (const plat of world.platforms) {
-          if (plat.state === "gone") continue;
-
           const platTop = plat.y;
           const platBottom = plat.y + plat.height;
           const platLeft = plat.x;
@@ -957,6 +965,8 @@ export default function JumpGame() {
               if (player.wrapGraceJump) {
                 player.wrapGraceJump = false;
                 player.vy = JUMP_VELOCITY * player.jumpMultiplier;
+                player.jumpType =
+                  player.springJumpCount > 0 ? "springShoes" : "normal";
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
                   world.powerupUsage.springShoes += 1;
@@ -972,29 +982,9 @@ export default function JumpGame() {
                 break;
               }
 
-              // 易碎平台邏輯
-              if (plat.type === PLATFORM_TYPES.CRACKED) {
-                if (plat.state === "normal") {
-                  plat.state = "cracked";
-                  player.vy = JUMP_VELOCITY * player.jumpMultiplier;
-                  if (player.springJumpCount > 0) {
-                    player.springJumpCount--;
-                    world.powerupUsage.springShoes += 1;
-                    checkPowerupAchievements(world.powerupUsage);
-                    if (player.springJumpCount === 0) {
-                      player.jumpMultiplier = 1;
-                    }
-                  }
-                  plat.flash = true;
-                  safeTimeout(() => {
-                    plat.flash = false;
-                  }, 150);
-                } else if (plat.state === "cracked") {
-                  plat.state = "gone";
-                  continue;
-                }
-              } else if (plat.type === PLATFORM_TYPES.SPRING) {
+              if (plat.type === PLATFORM_TYPES.SPRING) {
                 player.vy = SPRING_VELOCITY * player.jumpMultiplier;
+                player.jumpType = "spring";
                 world.springCount++;
                 if (world.springCount >= 10) {
                   unlockAchievement("SPRING_KING");
@@ -1013,6 +1003,8 @@ export default function JumpGame() {
                 }, 150);
               } else {
                 player.vy = JUMP_VELOCITY * player.jumpMultiplier;
+                player.jumpType =
+                  player.springJumpCount > 0 ? "springShoes" : "normal";
                 if (player.springJumpCount > 0) {
                   player.springJumpCount--;
                   world.powerupUsage.springShoes += 1;
@@ -1030,6 +1022,9 @@ export default function JumpGame() {
             }
           }
         }
+
+        // 立即清理已消失的平台（避免渲染殘影）
+        world.platforms = world.platforms.filter((p) => p.state !== "gone");
       }
 
       // === 碰撞檢測（道具）===
@@ -1058,8 +1053,8 @@ export default function JumpGame() {
           } else if (pu.type === POWERUP_TYPES.PORTAL) {
             // === Portal 傳送邏輯 ===
             // 1. 計算順移距離 = 當前高度 × 0.5
-            const currentHeight = world.maxHeight;
-            const teleportDistance = currentHeight * 0.5;
+            const currentHeightPx = world.maxHeightPx;
+            const teleportDistance = currentHeightPx * 0.5;
             let targetY = player.y - teleportDistance;
 
             // 2. 安全性檢查
@@ -1174,17 +1169,42 @@ export default function JumpGame() {
         const hasHorizontalOverlap =
           playerRight > enemy.x && playerLeft < enemy.x + enemy.width;
 
-        // 踩敵判定：玩家從上方接觸敵人頂部
+        // === 非普通跳躍狀態：碰撞直接擊殺敵人（但不影響玩家）===
+        // 包含：噴射背包、彈簧、彈簧鞋、踩敵彈跳等（速度比普通跳躍 -14 快的都算）
+        const isNotNormalJump =
+          player.isBoosting || player.jumpType !== "normal";
+        if (isNotNormalJump && hasHorizontalOverlap) {
+          const verticalOverlap =
+            playerBottom > enemy.y && player.y < enemy.y + enemy.height;
+          if (verticalOverlap) {
+            enemy.isBounced = true; // 敵人進入掉落狀態
+            enemy.vy = 6; // 掉落速度
+            enemy.direction = 0; // 停止水平移動
+            continue; // 跳過後續碰撞檢查，玩家繼續往上飛
+          }
+        }
+
+        // 踩敵判定：玩家從上方接觸敵人頂部（下落時）
+        // 加入前一幀位置檢查，確保是真的踩到頂部
+        const prevPlayerBottom = player.prevY + player.height;
         const isStompingEnemy =
           player.vy > 0 && // 玩家正在下落
           hasHorizontalOverlap &&
-          playerBottom >= enemy.y && // 玩家底部接觸敵人頂部
-          playerBottom <= enemy.y + enemy.height * 0.4; // 接觸範圍：敵人上40%區域
+          prevPlayerBottom <= enemy.y && // 前一幀在敵人上方
+          playerBottom >= enemy.y && // 當前幀接觸敵人頂部
+          playerBottom <= enemy.y + enemy.height * 0.5; // 接觸範圍：敵人上50%區域
 
         if (isStompingEnemy) {
-          // 踩敵成功 = 超級彈跳（1.5倍彈簧高度）
-          player.vy = SPRING_VELOCITY * 1.5 * player.jumpMultiplier; // 1.5倍彈簧高度（支援彈簧鞋加乘）
-          
+          // 判斷彈簧鞋加成
+          const springShoesMultiplier =
+            player.jumpType === "springShoes" ? SPRING_SHOES_MULTIPLIER : 1;
+          player.vy =
+            SPRING_VELOCITY *
+            1.5 *
+            player.jumpMultiplier *
+            springShoesMultiplier;
+          player.jumpType = "enemy";
+
           // 消耗彈簧鞋次數
           if (player.springJumpCount > 0) {
             player.springJumpCount--;
@@ -1194,7 +1214,7 @@ export default function JumpGame() {
               player.jumpMultiplier = 1;
             }
           }
-          
+
           enemy.isBounced = true; // 敵人進入掉落狀態
           enemy.vy = 6; // 掉落速度
           enemy.direction = 0; // 停止水平移動
@@ -1231,19 +1251,22 @@ export default function JumpGame() {
       }
 
       const currentHeight = -world.cameraY;
-      if (currentHeight > world.maxHeight) {
-        world.maxHeight = currentHeight;
+      if (currentHeight > world.maxHeightPx) {
+        world.maxHeightPx = currentHeight;
       }
 
       // === 里程碑檢查 ===
-      if (heightInMeters >= 50 && !achievementsRef.current.first500) {
+      if (
+        scoreMeters >= 50 &&
+        !achievementsRef.current[ACHIEVEMENTS.FIRST_500.id]
+      ) {
         unlockAchievement("FIRST_500");
       }
-      if (heightInMeters >= 100 && !world.milestone1000) {
+      if (scoreMeters >= 100 && !world.milestone1000) {
         world.milestone1000 = true;
         unlockAchievement("REACH_1000");
       }
-      if (heightInMeters >= 200 && !world.milestone2000) {
+      if (scoreMeters >= 200 && !world.milestone2000) {
         world.milestone2000 = true;
         unlockAchievement("REACH_2000");
       }
@@ -1270,8 +1293,7 @@ export default function JumpGame() {
         let type = PLATFORM_TYPES.NORMAL;
         const rand = Math.random();
         if (rand < 0.08) type = PLATFORM_TYPES.SPRING;
-        else if (rand < 0.15) type = PLATFORM_TYPES.MOVING;
-        else if (rand < 0.25) type = PLATFORM_TYPES.CRACKED;
+        else if (rand < 0.18) type = PLATFORM_TYPES.MOVING;
 
         const newPlat = createPlatform(newY, type);
         world.platforms.push(newPlat);
@@ -1328,18 +1350,18 @@ export default function JumpGame() {
 
       // === 生成敵人（500m 後）===
       // 隨機生成1-3隻，高度越高生成多隻機率越高
-      if (heightInMeters >= 50 && world.enemies.length < 3) {
+      if (scoreMeters >= 50 && world.enemies.length < 3) {
         if (Math.random() < 0.02) {
           // 根據高度決定生成數量
           let spawnCount = 1;
           const rand = Math.random();
-          
-          if (heightInMeters >= 200) {
+
+          if (scoreMeters >= 200) {
             // 2000m+: 20% 1隻, 40% 2隻, 40% 3隻
             if (rand < 0.2) spawnCount = 1;
             else if (rand < 0.6) spawnCount = 2;
             else spawnCount = 3;
-          } else if (heightInMeters >= 100) {
+          } else if (scoreMeters >= 100) {
             // 1000-2000m: 40% 1隻, 40% 2隻, 20% 3隻
             if (rand < 0.4) spawnCount = 1;
             else if (rand < 0.8) spawnCount = 2;
@@ -1350,10 +1372,10 @@ export default function JumpGame() {
             else if (rand < 0.95) spawnCount = 2;
             else spawnCount = 3;
           }
-          
+
           // 確保不超過上限
           spawnCount = Math.min(spawnCount, 3 - world.enemies.length);
-          
+
           // 生成指定數量的敵人
           for (let i = 0; i < spawnCount; i++) {
             const spawnY = world.cameraY - 50 - i * 80; // 每隻間隔80px
@@ -1369,7 +1391,7 @@ export default function JumpGame() {
       }
 
       // === 生成黑洞（1500m 後）===
-      if (heightInMeters >= 150 && world.blackholes.length < 2) {
+      if (scoreMeters >= 150 && world.blackholes.length < 2) {
         if (Math.random() < 0.001) {
           // 黑洞不在邊緣安全區生成
           const bhX =
@@ -1419,7 +1441,7 @@ export default function JumpGame() {
 
     const handleGameOver = (world) => {
       setGameState("gameover");
-      const finalScore = Math.floor(world.maxHeight / 10);
+      const finalScore = Math.floor(world.maxHeightPx / 10);
       setScore(finalScore);
       if (finalScore > highScoreRef.current) {
         setHighScore(finalScore);
@@ -1432,7 +1454,7 @@ export default function JumpGame() {
 
     const updateDOM = (player, world) => {
       // 更新分數
-      const newScore = Math.floor(world.maxHeight / 10);
+      const newScore = Math.floor(world.maxHeightPx / 10);
       if (newScore !== scoreRef.current) {
         scoreRef.current = newScore;
         setScore(newScore);
@@ -1487,44 +1509,52 @@ export default function JumpGame() {
       // 更新平台
       if (platformContainerRef.current) {
         const container = platformContainerRef.current;
-        // 過濾掉已消失的平台（gone 狀態）
-        const visiblePlatforms = world.platforms.filter(p => p.state !== "gone");
-        const needed = visiblePlatforms.length;
+        const visiblePlatforms = world.platforms.filter(
+          (p) => p.state !== "gone"
+        );
 
-        while (container.children.length < needed) {
-          const div = document.createElement("div");
-          div.className = "jumpPlatform normal";
-          div.style.cssText = `position:absolute;left:0;top:0;width:${PLATFORM_WIDTH}px;height:${PLATFORM_HEIGHT}px;`;
-          container.appendChild(div);
+        // 為每個平台建立或取得 DOM
+        for (const plat of visiblePlatforms) {
+          let el = platformDomMap.current.get(plat.id);
+
+          if (!el) {
+            // 建立新 DOM
+            el = document.createElement("div");
+            el.className = "jumpPlatform normal";
+            el.style.position = "absolute";
+            el.style.display = "none"; // 防止 (0,0) 閃現
+            el.style.width = `${PLATFORM_WIDTH}px`;
+            el.style.height = `${PLATFORM_HEIGHT}px`;
+            platformDomMap.current.set(plat.id, el);
+            container.appendChild(el);
+          }
+
+          // 更新 DOM
+          const screenY = plat.y - world.cameraY;
+          el.style.transform = `translate(${plat.x}px, ${screenY}px)`;
+          el.style.width = `${plat.width}px`;
+          el.style.display =
+            screenY > -50 && screenY < GAME_HEIGHT + 50 ? "flex" : "none";
+
+          let className = `jumpPlatform ${plat.type}`;
+          if (plat.flash) className += " flash";
+          el.className = className;
+
+          if (
+            plat.type === PLATFORM_TYPES.SPRING &&
+            !el.querySelector(".jumpSpring")
+          ) {
+            el.innerHTML = '<div class="jumpSpring">⬆️</div>';
+          } else if (plat.type !== PLATFORM_TYPES.SPRING) {
+            el.innerHTML = "";
+          }
         }
-        while (container.children.length > needed) {
-          container.removeChild(container.lastChild);
-        }
 
-        for (let i = 0; i < visiblePlatforms.length; i++) {
-          const plat = visiblePlatforms[i];
-          const el = container.children[i];
-          if (el) {
-            el.dataset.id = plat.id; // ID 對齊
-            const screenY = plat.y - world.cameraY;
-            el.style.transform = `translate(${plat.x}px, ${screenY}px)`;
-            el.style.width = `${plat.width}px`; // 動態設定寬度
-            el.style.display =
-              screenY > -50 && screenY < GAME_HEIGHT + 50 ? "flex" : "none";
-
-            let className = `jumpPlatform ${plat.type}`;
-            if (plat.state === "cracked") className += " cracked-state";
-            if (plat.flash) className += " flash";
-            el.className = className;
-
-            if (
-              plat.type === PLATFORM_TYPES.SPRING &&
-              !el.querySelector(".jumpSpring")
-            ) {
-              el.innerHTML = '<div class="jumpSpring">⬆️</div>';
-            } else if (plat.type !== PLATFORM_TYPES.SPRING) {
-              el.innerHTML = "";
-            }
+        // 清理已移除的平台 DOM
+        for (const [id, el] of platformDomMap.current.entries()) {
+          if (!visiblePlatforms.some((p) => p.id === id)) {
+            el.remove();
+            platformDomMap.current.delete(id);
           }
         }
       }
@@ -1534,35 +1564,44 @@ export default function JumpGame() {
         const container = powerupContainerRef.current;
         const visible = world.powerups.filter((p) => !p.collected);
 
-        while (container.children.length < visible.length) {
-          const div = document.createElement("div");
-          div.className = "jumpPowerup";
-          div.style.cssText =
-            "position:absolute;left:0;top:0;width:45px;height:45px;";
-          container.appendChild(div);
-        }
-        while (container.children.length > visible.length) {
-          container.removeChild(container.lastChild);
+        const icons = {
+          jetpack: "🚀",
+          springShoes: "👟",
+          shield: "🛡️",
+          safetyNet: "🪢",
+          portal: "🌀",
+        };
+
+        // 為每個道具建立或取得 DOM
+        for (const pu of visible) {
+          let el = powerupDomMap.current.get(pu.id);
+
+          if (!el) {
+            // 建立新 DOM
+            el = document.createElement("div");
+            el.className = "jumpPowerup";
+            el.style.position = "absolute";
+            el.style.display = "none"; // 防止 (0,0) 閃現
+            el.style.width = "45px";
+            el.style.height = "45px";
+            powerupDomMap.current.set(pu.id, el);
+            container.appendChild(el);
+          }
+
+          // 更新 DOM
+          const screenY = pu.y - world.cameraY;
+          el.style.transform = `translate(${pu.x}px, ${screenY}px)`;
+          el.style.display =
+            screenY > -60 && screenY < GAME_HEIGHT + 60 ? "flex" : "none";
+          el.className = `jumpPowerup ${pu.type}`;
+          el.textContent = icons[pu.type] || "⭐";
         }
 
-        for (let i = 0; i < visible.length; i++) {
-          const pu = visible[i];
-          const el = container.children[i];
-          if (el) {
-            el.dataset.id = pu.id; // ID 對齊
-            const screenY = pu.y - world.cameraY;
-            el.style.transform = `translate(${pu.x}px, ${screenY}px)`;
-            el.style.display =
-              screenY > -60 && screenY < GAME_HEIGHT + 60 ? "flex" : "none";
-            el.className = `jumpPowerup ${pu.type}`;
-            const icons = {
-              jetpack: "🚀",
-              springShoes: "👟",
-              shield: "🛡️",
-              safetyNet: "🪢",
-              portal: "🌀",
-            };
-            el.textContent = icons[pu.type] || "⭐";
+        // 清理已收集的道具 DOM
+        for (const [id, el] of powerupDomMap.current.entries()) {
+          if (!visible.some((p) => p.id === id)) {
+            el.remove();
+            powerupDomMap.current.delete(id);
           }
         }
       }
@@ -1572,42 +1611,50 @@ export default function JumpGame() {
         const container = enemyContainerRef.current;
         const enemies = world.enemies.filter((e) => e.x > -500);
 
-        while (container.children.length < enemies.length) {
-          const div = document.createElement("div");
-          div.className = "jumpEnemy";
-          div.style.cssText =
-            "position:absolute;left:0;top:0;width:40px;height:40px;";
-          div.textContent = "👾";
-          container.appendChild(div);
-        }
-        while (container.children.length > enemies.length) {
-          container.removeChild(container.lastChild);
+        // 為每個敵人建立或取得 DOM
+        for (const enemy of enemies) {
+          let el = enemyDomMap.current.get(enemy.id);
+
+          if (!el) {
+            // 建立新 DOM
+            el = document.createElement("div");
+            el.className = "jumpEnemy";
+            el.style.position = "absolute";
+            el.style.display = "none"; // 防止 (0,0) 閃現
+            el.style.width = "40px";
+            el.style.height = "40px";
+            el.textContent = "👾";
+            enemyDomMap.current.set(enemy.id, el);
+            container.appendChild(el);
+          }
+
+          // 更新 DOM
+          const screenY = enemy.y - world.cameraY;
+
+          // 根據狀態設置 class
+          if (enemy.isBounced) {
+            el.className = "jumpEnemy bounced";
+            // 被踩後：快速旋轉掉落 + 縮小
+            const scale = Math.max(0.3, 1 - enemy.rotation / 360);
+            el.style.transform = `translate(${enemy.x}px, ${screenY}px) rotate(${enemy.rotation}deg) scale(${scale})`;
+            el.style.opacity = Math.max(0.2, 1 - enemy.rotation / 720);
+          } else {
+            el.className = "jumpEnemy";
+            el.style.opacity = 1;
+            // 正常敵人：左右翻轉效果
+            const scaleX = enemy.direction > 0 ? 1 : -1;
+            el.style.transform = `translate(${enemy.x}px, ${screenY}px) scaleX(${scaleX})`;
+          }
+
+          el.style.display =
+            screenY > -50 && screenY < GAME_HEIGHT + 50 ? "flex" : "none";
         }
 
-        for (let i = 0; i < enemies.length; i++) {
-          const enemy = enemies[i];
-          const el = container.children[i];
-          if (el) {
-            el.dataset.id = enemy.id; // ID 對齊
-            const screenY = enemy.y - world.cameraY;
-            
-            // 根據狀態設置 class
-            if (enemy.isBounced) {
-              el.className = "jumpEnemy bounced";
-              // 被踩後：快速旋轉掉落 + 縮小
-              const scale = Math.max(0.3, 1 - enemy.rotation / 360); // 隨旋轉縮小
-              el.style.transform = `translate(${enemy.x}px, ${screenY}px) rotate(${enemy.rotation}deg) scale(${scale})`;
-              el.style.opacity = Math.max(0.2, 1 - enemy.rotation / 720); // 漸漸透明
-            } else {
-              el.className = "jumpEnemy";
-              el.style.opacity = 1;
-              // 正常敵人：左右翻轉效果
-              const scaleX = enemy.direction > 0 ? 1 : -1;
-              el.style.transform = `translate(${enemy.x}px, ${screenY}px) scaleX(${scaleX})`;
-            }
-            
-            el.style.display =
-              screenY > -50 && screenY < GAME_HEIGHT + 50 ? "flex" : "none";
+        // 清理已移除的敵人 DOM
+        for (const [id, el] of enemyDomMap.current.entries()) {
+          if (!enemies.some((e) => e.id === id)) {
+            el.remove();
+            enemyDomMap.current.delete(id);
           }
         }
       }
@@ -1616,29 +1663,36 @@ export default function JumpGame() {
       if (blackholeContainerRef.current) {
         const container = blackholeContainerRef.current;
 
-        while (container.children.length < world.blackholes.length) {
-          const div = document.createElement("div");
-          div.className = "jumpBlackhole";
-          div.style.cssText = "position:absolute;left:0;top:0;";
-          container.appendChild(div);
-        }
-        while (container.children.length > world.blackholes.length) {
-          container.removeChild(container.lastChild);
+        // 為每個黑洞建立或取得 DOM
+        for (const bh of world.blackholes) {
+          let el = blackholeDomMap.current.get(bh.id);
+
+          if (!el) {
+            // 建立新 DOM
+            el = document.createElement("div");
+            el.className = "jumpBlackhole";
+            el.style.position = "absolute";
+            el.style.display = "none"; // 防止 (0,0) 閃現
+            blackholeDomMap.current.set(bh.id, el);
+            container.appendChild(el);
+          }
+
+          // 更新 DOM
+          const screenY = bh.y - world.cameraY;
+          el.style.transform = `translate(${bh.x - bh.radius}px, ${
+            screenY - bh.radius
+          }px)`;
+          el.style.width = `${bh.radius * 2}px`;
+          el.style.height = `${bh.radius * 2}px`;
+          el.style.display =
+            screenY > -100 && screenY < GAME_HEIGHT + 100 ? "flex" : "none";
         }
 
-        for (let i = 0; i < world.blackholes.length; i++) {
-          const bh = world.blackholes[i];
-          const el = container.children[i];
-          if (el) {
-            el.dataset.id = bh.id; // ID 對齊
-            const screenY = bh.y - world.cameraY;
-            el.style.transform = `translate(${bh.x - bh.radius}px, ${
-              screenY - bh.radius
-            }px)`;
-            el.style.width = `${bh.radius * 2}px`;
-            el.style.height = `${bh.radius * 2}px`;
-            el.style.display =
-              screenY > -100 && screenY < GAME_HEIGHT + 100 ? "flex" : "none";
+        // 清理已移除的黑洞 DOM
+        for (const [id, el] of blackholeDomMap.current.entries()) {
+          if (!world.blackholes.some((b) => b.id === id)) {
+            el.remove();
+            blackholeDomMap.current.delete(id);
           }
         }
       }
