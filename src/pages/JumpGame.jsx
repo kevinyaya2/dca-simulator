@@ -1169,40 +1169,27 @@ export default function JumpGame() {
         const hasHorizontalOverlap =
           playerRight > enemy.x && playerLeft < enemy.x + enemy.width;
 
-        // === 非普通跳躍狀態：碰撞直接擊殺敵人（但不影響玩家）===
-        // 包含：噴射背包、彈簧、彈簧鞋、踩敵彈跳等（速度比普通跳躍 -14 快的都算）
-        const isNotNormalJump =
-          player.isBoosting || player.jumpType !== "normal";
-        if (isNotNormalJump && hasHorizontalOverlap) {
-          const verticalOverlap =
-            playerBottom > enemy.y && player.y < enemy.y + enemy.height;
-          if (verticalOverlap) {
-            enemy.isBounced = true; // 敵人進入掉落狀態
-            enemy.vy = 6; // 掉落速度
-            enemy.direction = 0; // 停止水平移動
-            continue; // 跳過後續碰撞檢查，玩家繼續往上飛
-          }
-        }
-
-        // 踩敵判定：玩家從上方接觸敵人頂部（下落時）
-        // 加入前一幀位置檢查，確保是真的踩到頂部
+        
+        // 踩敵判定（
         const prevPlayerBottom = player.prevY + player.height;
         const isStompingEnemy =
           player.vy > 0 && // 玩家正在下落
           hasHorizontalOverlap &&
           prevPlayerBottom <= enemy.y && // 前一幀在敵人上方
           playerBottom >= enemy.y && // 當前幀接觸敵人頂部
-          playerBottom <= enemy.y + enemy.height * 0.5; // 接觸範圍：敵人上50%區域
+          playerBottom <= enemy.y + enemy.height * 0.5; // 接觸敵人上半部
 
         if (isStompingEnemy) {
-          // 判斷彈簧鞋加成
+          // 彈簧鞋加成
           const springShoesMultiplier =
-            player.jumpType === "springShoes" ? SPRING_SHOES_MULTIPLIER : 1;
+            player.springJumpCount > 0 ? SPRING_SHOES_MULTIPLIER : 1;
+
           player.vy =
             SPRING_VELOCITY *
             1.5 *
             player.jumpMultiplier *
             springShoesMultiplier;
+
           player.jumpType = "enemy";
 
           // 消耗彈簧鞋次數
@@ -1215,13 +1202,31 @@ export default function JumpGame() {
             }
           }
 
-          enemy.isBounced = true; // 敵人進入掉落狀態
-          enemy.vy = 6; // 掉落速度
-          enemy.direction = 0; // 停止水平移動
-          continue; // 跳過後續碰撞檢查
+          enemy.isBounced = true;
+          enemy.vy = 6;
+          enemy.direction = 0;
+          continue;
         }
 
-        // 一般碰撞檢測（側邊或下方）
+        
+        // 非普通跳躍狀態：碰撞直接擊殺敵人（不彈跳）
+        //    包含：噴射背包、彈簧、彈簧鞋「側撞」
+        const isNotNormalJump =
+          player.isBoosting || player.jumpType !== "normal";
+
+        if (isNotNormalJump && hasHorizontalOverlap) {
+          const verticalOverlap =
+            playerBottom > enemy.y && player.y < enemy.y + enemy.height;
+
+          if (verticalOverlap) {
+            enemy.isBounced = true;
+            enemy.vy = 6;
+            enemy.direction = 0;
+            continue;
+          }
+        }
+
+        // 一般碰撞（側邊或下方）
         const tolerance = 5;
         if (
           player.x + player.width - tolerance > enemy.x + tolerance &&
@@ -1234,7 +1239,7 @@ export default function JumpGame() {
             world.powerupUsage.shield += 1;
             checkPowerupAchievements(world.powerupUsage);
             unlockAchievement("SURVIVOR");
-            enemy.x = -1000; // 移出畫面
+            enemy.x = -1000;
           } else {
             isRunning = false;
             handleGameOver(world);
