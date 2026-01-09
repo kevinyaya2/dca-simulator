@@ -121,6 +121,14 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.toast:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(255, 255, 255, 0.78);
 }
 .toast.ghost {
   opacity: 0.55;
@@ -2779,4 +2787,230 @@
   background: rgba(255, 255, 255, 0.7);
   border-radius: 8px;
   color: var(--text);
+}
+
+/* =============================
+   Auto Battle (no canvas)
+   ============================= */
+
+.ab-hpRail {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(16, 16, 22, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.ab-hpFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fill);
+  transition: width 120ms ease;
+}
+
+.ab-hpFill.enemy {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 120, 180, 0.98) 0%,
+    rgba(255, 170, 220, 0.94) 60%,
+    rgba(170, 210, 255, 0.90) 100%
+  );
+}
+
+.ab-card {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.58);
+  border-radius: 16px;
+  padding: 10px 10px;
+  color: rgba(16, 16, 22, 0.9);
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(16, 16, 30, 0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.ab-card:hover {
+  transform: translateY(-1px);
+}
+
+.ab-card:active {
+  transform: translateY(0px) scale(0.99);
+}
+
+.ab-card.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ab-skill {
+  width: 100%;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.62);
+  border-radius: 18px;
+  padding: 12px 12px;
+  color: rgba(16, 16, 22, 0.92);
+  cursor: pointer;
+  box-shadow: 0 14px 32px rgba(16, 16, 30, 0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.ab-skill:hover {
+  transform: translateY(-1px);
+}
+
+.ab-skill.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ab-bubbleZone {
+  opacity: 0;
+  background:
+    radial-gradient(220px 120px at 30% 30%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 60%),
+    radial-gradient(240px 120px at 70% 60%, rgba(170, 210, 255, 0.52) 0%, rgba(170, 210, 255, 0) 62%),
+    radial-gradient(260px 140px at 40% 70%, rgba(255, 170, 220, 0.42) 0%, rgba(255, 170, 220, 0) 66%);
+  border: 1px dashed rgba(255, 255, 255, 0.68);
+  filter: saturate(1.15) blur(0px);
+  transition: opacity 160ms ease, filter 160ms ease;
+}
+
+.ab-bubbleZone.active {
+  opacity: 0.85;
+  filter: saturate(1.22) blur(0.2px);
+  animation: abBubblePulse 900ms ease-in-out infinite;
+}
+
+.ab-unit.bubbled {
+  position: relative;
+}
+
+.ab-unit.bubbled::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 18px;
+  background:
+    radial-gradient(18px 14px at 28% 25%, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(22px 18px at 70% 32%, rgba(170, 210, 255, 0.55) 0%, rgba(170, 210, 255, 0) 72%),
+    radial-gradient(26px 20px at 52% 76%, rgba(255, 170, 220, 0.45) 0%, rgba(255, 170, 220, 0) 74%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 10px 22px rgba(16, 16, 30, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  opacity: 0.92;
+  pointer-events: none;
+  animation: abBubbleAura 900ms ease-in-out infinite;
+}
+
+.ab-unit.bubbled::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 22px;
+  background:
+    radial-gradient(10px 10px at 18% 70%, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(9px 9px at 78% 62%, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(8px 8px at 62% 18%, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0) 62%);
+  opacity: 0.75;
+  pointer-events: none;
+  animation: abBubbleSpecks 720ms ease-in-out infinite;
+}
+
+.ab-unit.hit {
+  animation: abHitUnit 140ms ease-out;
+}
+
+.ab-base.hit {
+  animation: abHitBase 160ms ease-out;
+}
+
+.ab-emoji {
+  animation: abFloat 1600ms ease-in-out infinite;
+}
+
+@keyframes abHitUnit {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes abHitBase {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  60% {
+    transform: translateX(-50%) scale(1.04);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes abFloat {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes abBubblePulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes abBubbleAura {
+  0% {
+    transform: translateY(0px) scale(1);
+    filter: saturate(1.1);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.02);
+    filter: saturate(1.2);
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    filter: saturate(1.1);
+  }
+}
+
+@keyframes abBubbleSpecks {
+  0% {
+    transform: translateY(0px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-2px);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(0px);
+    opacity: 0.6;
+  }
 }

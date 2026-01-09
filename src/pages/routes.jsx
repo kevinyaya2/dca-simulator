@@ -3,6 +3,7 @@ import DCA from "./DCA";
 import CardGame from "./CardGame";
 import FightGame from "./FightGame";
 import JumpGame from "./JumpGame";
+import AutoBattle from "./AutoBattle";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -30,6 +31,11 @@ const routes = [
     path: "/jump",
     element: <JumpGame />,
     title: "柴剛跳跳",
+  },
+  {
+    path: "/autobattle",
+    element: <AutoBattle />,
+    title: "可愛推線",
   },
 ];
 

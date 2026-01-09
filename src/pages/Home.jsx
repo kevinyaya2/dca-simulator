@@ -40,6 +40,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(255, 180, 100, 0.82), rgba(255, 130, 80, 0.82))",
       route: "/jump",
     },
+    {
+      id: "autobattle",
+      name: "柴剛推線",
+      subtitle: "Auto Battle",
+      icon: "🐾",
+      color:
+        "linear-gradient(135deg, rgba(170, 210, 255, 0.86), rgba(255, 170, 220, 0.82))",
+      route: "/autobattle",
+    },
   ];
 
   const handleAppClick = (app) => {
