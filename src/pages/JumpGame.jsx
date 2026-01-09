@@ -359,7 +359,6 @@ const isInEdgeSafeZone = (x) => {
 
 const createPlatform = (y, type = PLATFORM_TYPES.NORMAL) => {
   let x = Math.random() * (GAME_WIDTH - PLATFORM_WIDTH);
-
   return {
     id: generateId(),
     x,
@@ -370,6 +369,7 @@ const createPlatform = (y, type = PLATFORM_TYPES.NORMAL) => {
     direction: Math.random() > 0.5 ? 1 : -1,
     speed: 2,
     flash: false,
+    bornAt: performance.now(),
   };
 };
 
@@ -386,6 +386,7 @@ const createPowerup = (x, y, type, platformId = null) => {
     platformId, // 關聯的平台 ID（用於跟隨移動）
     offsetX: 0, // 相對平台的 X 偏移
     offsetY: -50, // 相對平台的 Y 偏移（預設在平台上方50px）
+    bornAt: performance.now(),
   };
 };
 
@@ -861,6 +862,10 @@ export default function JumpGame() {
             const distY = Math.abs(p.y - safetyPlatformY);
             return distY > 50; // 與新平台垂直距離超過50px才保留
           });
+          // 立即同步清理 platformId 指向不存在平台的 powerup
+          world.powerups = world.powerups.filter(
+            (pu) => !pu.platformId || world.platforms.some((plat) => plat.id === pu.platformId)
+          );
 
           const safetyPlatform = {
             id: generateId(),
@@ -873,6 +878,7 @@ export default function JumpGame() {
             speed: 0,
             flash: true, // 閃爍提示
             isSafetyPlatform: true, // 標記為安全平台
+            bornAt: performance.now(),
           };
           // 確保平台在畫面內
           safetyPlatform.x = Math.max(
@@ -901,13 +907,11 @@ export default function JumpGame() {
             plat.direction *= -1;
           }
 
-          // 同步移動平台上的道具（X 和 Y 都要更新）
-          const deltaX = plat.x - oldX;
+          // 同步移動平台上的道具（X 和 Y 直接由平台位置+offset計算，避免累積誤差）
           for (const pu of world.powerups) {
             if (pu.platformId === plat.id && !pu.collected) {
-              pu.x += deltaX;
-              // 根據平台當前位置重新計算 Y 座標（保持相對偏移）
-              pu.y = plat.y + pu.offsetY;
+              pu.x = plat.x + plat.width / 2 + (pu.offsetX || 0);
+              pu.y = plat.y + (pu.offsetY || 0);
             }
           }
         }
@@ -923,8 +927,13 @@ export default function JumpGame() {
           // 正常敵人：1000分數後才會水平移動
           if (scoreRef.current >= 1000) {
             enemy.x += enemy.speed * enemy.direction * timeScale;
-            if (enemy.x <= 0 || enemy.x + enemy.width >= GAME_WIDTH) {
-              enemy.direction *= -1;
+            // Clamp 並反轉方向，避免卡牆
+            if (enemy.x <= 0) {
+              enemy.x = 0;
+              enemy.direction = 1;
+            } else if (enemy.x + enemy.width >= GAME_WIDTH) {
+              enemy.x = GAME_WIDTH - enemy.width;
+              enemy.direction = -1;
             }
           }
 
@@ -1124,6 +1133,10 @@ export default function JumpGame() {
               world.platforms = world.platforms.filter(
                 (p) => p.y < cleanupRangeStart || p.y > cleanupRangeEnd
               );
+              // 立即同步清理 platformId 指向不存在平台的 powerup
+              world.powerups = world.powerups.filter(
+                (pu) => !pu.platformId || world.platforms.some((plat) => plat.id === pu.platformId)
+              );
 
               for (let i = 0; i < platformsToGenerate; i++) {
                 const platformY = targetY + 100 + i * 80; // 從玩家下方100px開始，每個間隔80px
@@ -1140,6 +1153,7 @@ export default function JumpGame() {
                   direction: 1,
                   speed: 0,
                   flash: false,
+                  bornAt: performance.now(),
                 };
                 world.platforms.push(safetyPlat);
               }
@@ -1319,18 +1333,16 @@ export default function JumpGame() {
             puType = POWERUP_TYPES.PORTAL; // 20% 傳送門
           }
 
-          // 計算道具位置
-          let puX = newPlat.x + PLATFORM_WIDTH / 2 - 20;
-          let puY = newY - 50;
+          // 計算道具位置（以平台中心為基準）
+          const puWidth = puType === POWERUP_TYPES.PORTAL ? 45 : 40;
+          let puX = newPlat.x + newPlat.width / 2;
+          let puY = newY - 50 + puWidth / 2;
 
           // Portal 特殊生成規則：不在邊緣安全區，不在玩家正上方100px內
           if (puType === POWERUP_TYPES.PORTAL) {
-            // 檢查是否在邊緣安全區
-            if (isInEdgeSafeZone(puX)) {
-              // 重新定位到安全區域
-              puX =
-                EDGE_SAFE_ZONE +
-                Math.random() * (GAME_WIDTH - EDGE_SAFE_ZONE * 2 - 45);
+            // 若平台本身在邊緣安全區，直接不生成 Portal
+            if (isInEdgeSafeZone(newPlat.x + newPlat.width / 2)) {
+              puType = null;
             }
             // 檢查是否在玩家正上方100px內
             const distToPlayer = Math.abs(player.y - puY);
@@ -1346,8 +1358,8 @@ export default function JumpGame() {
 
           if (puType) {
             const powerup = createPowerup(puX, puY, puType, newPlat.id);
-            powerup.offsetX = puX - newPlat.x; // 記錄相對平台的 X 偏移
-            powerup.offsetY = puY - newPlat.y; // 記錄相對平台的 Y 偏移
+            powerup.offsetX = puX - (newPlat.x + newPlat.width / 2); // 以平台中心為基準
+            powerup.offsetY = puY - newPlat.y;
             world.powerups.push(powerup);
           }
         }
@@ -1407,12 +1419,23 @@ export default function JumpGame() {
       }
 
       // === 清理畫面外元素 ===
+      const now = performance.now();
       world.platforms = world.platforms.filter(
-        (p) => p.y < world.cameraY + GAME_HEIGHT + 100 && p.state !== "gone"
+        (p) =>
+          (now - (p.bornAt || 0) < 300) ||
+          (p.y < world.cameraY + GAME_HEIGHT + 100 && p.state !== "gone")
       );
-      world.powerups = world.powerups.filter(
-        (p) => !p.collected && p.y < world.cameraY + GAME_HEIGHT + 100
-      );
+      world.powerups = world.powerups.filter((p) => {
+        const now = performance.now();
+        if (now - (p.bornAt || 0) < 300) return true; // 新生保護期
+        if (p.collected) return false;
+        if (p.y >= world.cameraY + GAME_HEIGHT + 100) return false;
+        // 若有 platformId，檢查平台是否還存在
+        if (p.platformId && !world.platforms.some((plat) => plat.id === p.platformId)) {
+          return false;
+        }
+        return true;
+      });
       // 敵人清理：移除掉出畫面的或移出畫面外的
       world.enemies = world.enemies.filter((e) => {
         const screenY = e.y - world.cameraY;
@@ -1595,7 +1618,9 @@ export default function JumpGame() {
 
           // 更新 DOM
           const screenY = pu.y - world.cameraY;
-          el.style.transform = `translate(${pu.x}px, ${screenY}px)`;
+          el.style.transform = `translate(${pu.x}px, ${screenY}px) translate(-50%, -50%)`;
+          el.style.left = "0";
+          el.style.top = "0";
           el.style.display =
             screenY > -60 && screenY < GAME_HEIGHT + 60 ? "flex" : "none";
           el.className = `jumpPowerup ${pu.type}`;
