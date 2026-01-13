@@ -46,6 +46,9 @@ function getStageParams(stage) {
   const enemyUnitHpMul = clamp(1 + t * 0.06, 1, 1.8);
   const enemyUnitAtkMul = clamp(1 + t * 0.05, 1, 1.6);
 
+  // 玩家能量上限隨關卡增加
+  const playerEnergyMax = Math.round(ENERGY_MAX + t * 10);
+
   return {
     enemyEnergyRegenPerSec,
     enemyMaxUnitsOnField,
@@ -55,6 +58,7 @@ function getStageParams(stage) {
     enemyBaseMaxHp,
     enemyUnitHpMul,
     enemyUnitAtkMul,
+    playerEnergyMax,
   };
 }
 
@@ -65,7 +69,7 @@ const UNIT_CATALOG = [
     id: "kitty",
     name: "小貓衝衝",
     emoji: "🐱",
-    cost: 15,
+    cost: 5,
     maxHp: 55,
     atk: 10,
     atkCd: 0.8,
@@ -77,7 +81,7 @@ const UNIT_CATALOG = [
     id: "bunny",
     name: "兔兔射手",
     emoji: "🐰",
-    cost: 25,
+    cost: 15,
     maxHp: 40,
     atk: 9,
     atkCd: 0.65,
@@ -89,7 +93,7 @@ const UNIT_CATALOG = [
     id: "panda",
     name: "胖胖坦",
     emoji: "🐼",
-    cost: 30,
+    cost: 20,
     maxHp: 95,
     atk: 8,
     atkCd: 1.1,
@@ -101,7 +105,7 @@ const UNIT_CATALOG = [
     id: "fox",
     name: "狐狸法師",
     emoji: "🦊",
-    cost: 35,
+    cost: 25,
     maxHp: 45,
     atk: 14,
     atkCd: 1.25,
@@ -235,11 +239,14 @@ function stepGame(prev, dtSec) {
 
   if (next.phase !== "playing") return next;
 
+  // Get player energy max from state
+  const playerEnergyMax = next.player.energyMax || ENERGY_MAX;
+
   // energy regen
   next.player.energy = clamp(
     next.player.energy + ENERGY_REGEN_PER_SEC * dtSec,
     0,
-    ENERGY_MAX
+    playerEnergyMax
   );
   next.enemy.energy = clamp(
     next.enemy.energy + stageParams.enemyEnergyRegenPerSec * dtSec,
@@ -379,8 +386,23 @@ function stepGame(prev, dtSec) {
     if (target) unitsById.set(target.uid, target);
   }
 
-  // Clean up dead units
-  const survivors = [...unitsById.values()].filter((u) => u.hp > 0);
+  // Clean up dead units and reward energy for killing enemies
+  const allUnits = [...unitsById.values()];
+  let energyGained = 0;
+
+  for (const u of allUnits) {
+    if (u.hp <= 0 && u.side === "enemy") {
+      // Player kills enemy → gain energy equal to enemy's cost
+      energyGained += u.cost;
+    }
+  }
+
+  if (energyGained > 0) {
+    const playerEnergyMax = next.player.energyMax || ENERGY_MAX;
+    next.player.energy = clamp(next.player.energy + energyGained, 0, playerEnergyMax);
+  }
+
+  const survivors = allUnits.filter((u) => u.hp > 0);
 
   // End conditions
   if (next.player.baseHp <= 0) {
@@ -422,6 +444,7 @@ function buildStageState(stage) {
       baseMaxHp: PLAYER_BASE_MAX_HP,
       baseHp: PLAYER_BASE_MAX_HP,
       energy: 60,
+      energyMax: stageParams.playerEnergyMax,
       skillCdLeft: 0,
       baseLastHitAt: 0,
     },
@@ -578,7 +601,6 @@ export default function AutoBattle() {
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="toast" onClick={() => navigate("/")}>返回</button>
-              <button className="toast" onClick={restartStage}>重開本關</button>
               <button className={isPaused ? "toast" : "toast"} onClick={togglePause}>
                 {isPaused ? "繼續" : "暫停"}
               </button>
@@ -625,6 +647,64 @@ export default function AutoBattle() {
                 </div>
               )}
 
+              {/* Game Over Overlay */}
+              {view.phase === "ended" && view.winner === "enemy" && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 50,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(16, 16, 22, 0.35)",
+                    backdropFilter: "blur(6px)",
+                    WebkitBackdropFilter: "blur(6px)",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "28px 36px",
+                      borderRadius: 28,
+                      border: "1px solid rgba(255,255,255,0.72)",
+                      background: "linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.62))",
+                      boxShadow: "0 26px 70px rgba(16,16,30,0.22)",
+                      backdropFilter: "blur(16px)",
+                      WebkitBackdropFilter: "blur(16px)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ fontSize: 42, marginBottom: 12 }}>😵</div>
+                    <div style={{ fontSize: 20, fontWeight: 950, color: "rgba(16,16,22,0.92)", marginBottom: 6 }}>
+                      第 {view.stage} 關失敗
+                    </div>
+                    <div style={{ fontSize: 13, color: "rgba(16,16,22,0.58)", marginBottom: 20 }}>
+                      我方基地被推倒了…
+                    </div>
+                    <button
+                      onClick={restartStage}
+                      style={{
+                        padding: "14px 32px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(255,255,255,0.72)",
+                        background: "linear-gradient(135deg, rgba(255,120,180,0.88), rgba(130,185,255,0.88))",
+                        boxShadow: "0 14px 40px rgba(16,16,30,0.18)",
+                        fontSize: 15,
+                        fontWeight: 900,
+                        color: "rgba(255,255,255,0.98)",
+                        cursor: "pointer",
+                        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                      }}
+                      onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                    >
+                      🔄 重開本關
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Board header */}
               <div
                 style={{
@@ -635,7 +715,7 @@ export default function AutoBattle() {
                   padding: "10px 12px 8px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: "center",
                   gap: 10,
                   zIndex: 5,
                 }}
@@ -645,25 +725,6 @@ export default function AutoBattle() {
                   <div className="ab-hpRail" style={{ width: 170 }}>
                     <div className="ab-hpFill enemy" style={{ width: `${enemyBaseHpPct}%` }} />
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: 10,
-                    fontSize: 12,
-                    opacity: 0.85,
-                  }}
-                >
-                  <div>能量</div>
-                  <div className="ab-hpRail" style={{ width: 130 }}>
-                    <div
-                      className="ab-hpFill"
-                      style={{ width: `${(view.player.energy / ENERGY_MAX) * 100}%` }}
-                    />
-                  </div>
-                  <div style={{ width: 36, textAlign: "right" }}>{fmt(view.player.energy)}</div>
                 </div>
               </div>
 
@@ -877,12 +938,26 @@ export default function AutoBattle() {
             {/* Controls (moved outside board, so it won't cover the battlefield) */}
             <div style={{ height: 12 }} />
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ fontSize: 12, opacity: 0.75 }}>我方基地</div>
-                <div className="ab-hpRail" style={{ width: 170 }}>
-                  <div className="ab-hpFill" style={{ width: `${playerBaseHpPct}%` }} />
-                </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>我方基地</div>
+              <div className="ab-hpRail" style={{ flex: 1 }}>
+                <div className="ab-hpFill" style={{ width: `${playerBaseHpPct}%` }} />
+              </div>
+              <div style={{ minWidth: 36 }} />
+            </div>
+
+            <div style={{ height: 8 }} />
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>能量</div>
+              <div className="ab-hpRail" style={{ flex: 1 }}>
+                <div
+                  className="ab-hpFill"
+                  style={{ width: `${(view.player.energy / (view.player.energyMax || ENERGY_MAX)) * 100}%` }}
+                />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, minWidth: 36, textAlign: "right" }}>
+                {fmt(view.player.energy)}
               </div>
             </div>
 
@@ -918,26 +993,6 @@ export default function AutoBattle() {
                 {view.player.skillCdLeft > 0 ? `CD ${view.player.skillCdLeft.toFixed(1)}s` : `能量 ${SKILL.cost}`}
               </span>
             </button>
-
-            <div style={{ height: 10 }} />
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 6,
-                padding: "10px 12px",
-                borderRadius: 18,
-                border: "1px solid rgba(255,255,255,0.62)",
-                background: "rgba(255,255,255,0.48)",
-                fontSize: 12,
-                color: "rgba(16,16,22,0.82)",
-              }}
-            >
-              {view.log.slice(-3).map((line, idx) => (
-                <div key={idx}>{line}</div>
-              ))}
-            </div>
           </div>
         </div>
       </div>
