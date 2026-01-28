@@ -4,6 +4,7 @@ import CardGame from "./CardGame";
 import FightGame from "./FightGame";
 import JumpGame from "./JumpGame";
 import AutoBattle from "./AutoBattle";
+import ToeicVocab from "./ToeicVocab";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -36,6 +37,11 @@ const routes = [
     path: "/autobattle",
     element: <AutoBattle />,
     title: "可愛推線",
+  },
+  {
+    path: "/toeic",
+    element: <ToeicVocab />,
+    title: "多益單字",
   },
 ];
 

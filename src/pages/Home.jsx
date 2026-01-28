@@ -49,6 +49,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(170, 210, 255, 0.86), rgba(255, 170, 220, 0.82))",
       route: "/autobattle",
     },
+    {
+      id: "toeic",
+      name: "多益單字",
+      subtitle: "TOEIC Vocab",
+      icon: "📚",
+      color:
+        "linear-gradient(135deg, rgba(120, 200, 255, 0.88), rgba(80, 160, 255, 0.88))",
+      route: "/toeic",
+    },
   ];
 
   const handleAppClick = (app) => {

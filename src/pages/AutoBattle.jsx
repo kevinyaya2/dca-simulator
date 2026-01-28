@@ -41,7 +41,7 @@ function getStageParams(stage) {
   const spawnMaxSec = clamp(3.8 - t * 0.1, spawnMinSec + 0.7, 3.8);
 
   const enemyStartEnergy = clamp(24 + t * 2.5, 20, 60);
-  const enemyBaseMaxHp = Math.round(ENEMY_BASE_MAX_HP * (1 + t * 0.12));
+  const enemyBaseMaxHp = Math.round(ENEMY_BASE_MAX_HP * (1 + t * 0.08));
 
   const enemyUnitHpMul = clamp(1 + t * 0.06, 1, 1.8);
   const enemyUnitAtkMul = clamp(1 + t * 0.05, 1, 1.6);
@@ -76,42 +76,46 @@ const UNIT_CATALOG = [
     range: 28,
     speed: 56,
     role: "近戰",
+    spawnCd: 1,
   },
   {
     id: "bunny",
     name: "兔兔射手",
     emoji: "🐰",
-    cost: 15,
-    maxHp: 40,
-    atk: 9,
-    atkCd: 0.65,
-    range: 92,
-    speed: 44,
+    cost: 10,
+    maxHp: 55,
+    atk: 12,
+    atkCd: 0.6,
+    range: 95,
+    speed: 48,
     role: "遠程",
+    spawnCd: 1.5,
   },
   {
     id: "panda",
     name: "胖胖坦",
     emoji: "🐼",
-    cost: 20,
-    maxHp: 95,
-    atk: 8,
-    atkCd: 1.1,
-    range: 26,
-    speed: 30,
+    cost: 10,
+    maxHp: 140,
+    atk: 12,
+    atkCd: 0.95,
+    range: 30,
+    speed: 32,
     role: "坦克",
+    spawnCd: 1.5,
   },
   {
     id: "fox",
     name: "狐狸法師",
     emoji: "🦊",
-    cost: 25,
-    maxHp: 45,
-    atk: 14,
-    atkCd: 1.25,
-    range: 120,
-    speed: 38,
+    cost: 15,
+    maxHp: 60,
+    atk: 18,
+    atkCd: 1.1,
+    range: 130,
+    speed: 40,
     role: "法術",
+    spawnCd: 2,
   },
 ];
 
@@ -239,6 +243,58 @@ function stepGame(prev, dtSec) {
 
   if (next.phase !== "playing") return next;
 
+  // Boss spawn logic (every 5 stages, at 80% enemy HP)
+  const isBossStage = next.stage % 5 === 0;
+  if (isBossStage && !next.bossSpawned) {
+    const enemyHpPct = next.enemy.baseHp / next.enemy.baseMaxHp;
+    if (enemyHpPct <= 0.8) {
+      const pickedRes = rngPick(next.randSeed, UNIT_CATALOG);
+      const picked = pickedRes.item;
+      next.randSeed = pickedRes.seed;
+
+      const jitterRes = rngNext(next.randSeed);
+      next.randSeed = jitterRes.seed;
+      const xJitter = 0.5;
+
+      next.idCounter += 1;
+
+      const bossHpMul = stageParams.enemyUnitHpMul * 2.5;
+      const bossAtkMul = stageParams.enemyUnitAtkMul * 0.7;
+
+      const boss = createUnit({
+        id: picked.id,
+        side: "enemy",
+        y: ENEMY_BASE_Y + 18,
+        xJitter,
+        uid: next.idCounter,
+        hpMul: bossHpMul,
+        atkMul: bossAtkMul,
+      });
+      boss.isBoss = true;
+      boss.bossScale = 1.8;
+      // Slower attack speed for boss
+      boss.atkCd = boss.atkCd * 1.5;
+
+      // Boss shockwave effect - push player units back
+      for (const u of next.units) {
+        if (u.side === "player" && u.hp > 0) {
+          const midline = BOARD_HEIGHT / 2;
+          if (u.y < midline) {
+            u.y = clampUnitY(u.y + 80, u.side);
+          }
+          u.shockwaveUntilMs = nowMs + 600;
+        }
+      }
+
+      next.units = [...next.units, boss];
+      next.bossSpawned = true;
+      next.log = [
+        ...next.log.slice(-4),
+        `💀 魔王降臨！${picked.emoji} ${picked.name} (Boss)！`,
+      ];
+    }
+  }
+
   // Get player energy max from state
   const playerEnergyMax = next.player.energyMax || ENERGY_MAX;
 
@@ -246,16 +302,30 @@ function stepGame(prev, dtSec) {
   next.player.energy = clamp(
     next.player.energy + ENERGY_REGEN_PER_SEC * dtSec,
     0,
-    playerEnergyMax
+    playerEnergyMax,
   );
   next.enemy.energy = clamp(
     next.enemy.energy + stageParams.enemyEnergyRegenPerSec * dtSec,
     0,
-    ENERGY_MAX
+    ENERGY_MAX,
   );
 
   // skill timers
   next.player.skillCdLeft = Math.max(0, next.player.skillCdLeft - dtSec);
+
+  // spawn cooldowns
+  const oldSpawnCds = next.player.spawnCds || {
+    kitty: 0,
+    bunny: 0,
+    panda: 0,
+    fox: 0,
+  };
+  next.player.spawnCds = {
+    kitty: Math.max(0, oldSpawnCds.kitty - dtSec),
+    bunny: Math.max(0, oldSpawnCds.bunny - dtSec),
+    panda: Math.max(0, oldSpawnCds.panda - dtSec),
+    fox: Math.max(0, oldSpawnCds.fox - dtSec),
+  };
   if (next.effects.bubbleUntilMs && nowMs >= next.effects.bubbleUntilMs) {
     next.effects.bubbleUntilMs = 0;
   }
@@ -265,13 +335,15 @@ function stepGame(prev, dtSec) {
   if (next.enemy.spawnCdLeft <= 0) {
     const enemyCount = next.units.reduce(
       (acc, u) => (u.side === "enemy" && u.hp > 0 ? acc + 1 : acc),
-      0
+      0,
     );
     if (enemyCount >= stageParams.enemyMaxUnitsOnField) {
       next.enemy.spawnCdLeft = 0.95;
     } else {
-      const affordable = UNIT_CATALOG.filter((u) => u.cost <= next.enemy.energy);
-      if (affordable.length > 0 && next.units.length < 24) {
+      const affordable = UNIT_CATALOG.filter(
+        (u) => u.cost <= next.enemy.energy,
+      );
+      if (affordable.length > 0 && next.units.length < 500) {
         const pickedRes = rngPick(next.randSeed, affordable);
         const picked = pickedRes.item;
         next.randSeed = pickedRes.seed;
@@ -296,10 +368,14 @@ function stepGame(prev, dtSec) {
         const cdRes = rngNext(next.randSeed);
         next.randSeed = cdRes.seed;
         next.enemy.spawnCdLeft =
-          stageParams.spawnMinSec + cdRes.value * (stageParams.spawnMaxSec - stageParams.spawnMinSec);
+          stageParams.spawnMinSec +
+          cdRes.value * (stageParams.spawnMaxSec - stageParams.spawnMinSec);
 
         next.units = [...next.units, spawn];
-        next.log = [...next.log.slice(-4), `🔴 敵方派出 ${picked.emoji} ${picked.name}`];
+        next.log = [
+          ...next.log.slice(-4),
+          `🔴 敵方派出 ${picked.emoji} ${picked.name}`,
+        ];
       } else {
         next.enemy.spawnCdLeft = 0.9;
       }
@@ -343,23 +419,52 @@ function stepGame(prev, dtSec) {
 
     const speedMultiplier = inBubbleZone ? SKILL.slowMultiplier : 1;
 
+    // Shockwave slow effect
+    const inShockwave = unit.shockwaveUntilMs && nowMs < unit.shockwaveUntilMs;
+    const shockwaveMultiplier = inShockwave ? 0.3 : 1;
+
     if (target) {
       const dist = Math.abs(unit.y - target.y);
       if (dist <= unit.range) {
         if (unit.cdLeft <= 0) {
           unit.cdLeft = unit.atkCd;
-          target.hp = Math.max(0, target.hp - unit.atk);
-          target.lastHitAt = nowMs;
 
-          // tiny pushback for cute impact
-          target.y = clampUnitY(target.y + dir * 3, target.side);
+          // AOE attack for fox only (not boss)
+          const base = UNIT_CATALOG.find((u) => u.id === unit.typeId);
+          const hasAoe = base && base.aoe;
+
+          if (hasAoe) {
+            const aoeRadius = base.aoeRadius || 45;
+            for (const e of unitsList) {
+              if (e.side !== unit.side && e.hp > 0) {
+                const aoeDist = Math.abs(e.y - target.y);
+                if (aoeDist <= aoeRadius) {
+                  e.hp = Math.max(0, e.hp - unit.atk);
+                  e.lastHitAt = nowMs;
+                  e.y = clampUnitY(e.y + dir * 3, e.side);
+                  unitsById.set(e.uid, e);
+                }
+              }
+            }
+          } else {
+            target.hp = Math.max(0, target.hp - unit.atk);
+            target.lastHitAt = nowMs;
+            target.y = clampUnitY(target.y + dir * 3, target.side);
+          }
         }
       } else {
-        unit.y = clampUnitY(unit.y + dir * unit.speed * speedMultiplier * dtSec, unit.side);
+        unit.y = clampUnitY(
+          unit.y +
+            dir * unit.speed * speedMultiplier * shockwaveMultiplier * dtSec,
+          unit.side,
+        );
       }
     } else {
       // no unit target, walk towards base
-      unit.y = clampUnitY(unit.y + dir * unit.speed * speedMultiplier * dtSec, unit.side);
+      unit.y = clampUnitY(
+        unit.y + dir * unit.speed * speedMultiplier * dtSec,
+        unit.side,
+      );
 
       if (unit.side === "player") {
         const distToEnemyBase = Math.abs(unit.y - ENEMY_BASE_Y);
@@ -399,7 +504,11 @@ function stepGame(prev, dtSec) {
 
   if (energyGained > 0) {
     const playerEnergyMax = next.player.energyMax || ENERGY_MAX;
-    next.player.energy = clamp(next.player.energy + energyGained, 0, playerEnergyMax);
+    next.player.energy = clamp(
+      next.player.energy + energyGained,
+      0,
+      playerEnergyMax,
+    );
   }
 
   const survivors = allUnits.filter((u) => u.hp > 0);
@@ -421,10 +530,10 @@ function stepGame(prev, dtSec) {
 }
 
 function buildInitialState() {
-  return buildStageState(1);
+  return buildStageState(1, false);
 }
 
-function buildStageState(stage) {
+function buildStageState(stage, keepAutoBattle = false) {
   const s = Math.max(1, stage);
   const stageParams = getStageParams(s);
 
@@ -447,6 +556,12 @@ function buildStageState(stage) {
       energyMax: stageParams.playerEnergyMax,
       skillCdLeft: 0,
       baseLastHitAt: 0,
+      spawnCds: {
+        kitty: 0,
+        bunny: 0,
+        panda: 0,
+        fox: 0,
+      },
     },
 
     enemy: {
@@ -464,7 +579,11 @@ function buildStageState(stage) {
 
     units: [],
 
+    bossSpawned: false,
+
     log: [`🗺️ 第 ${s} 關開始！用能量派兵推塔～`],
+
+    autoBattle: keepAutoBattle,
   };
 }
 
@@ -499,11 +618,15 @@ export default function AutoBattle() {
   };
 
   const restartStage = () => {
-    setView((current) => buildStageState(current.stage || 1));
+    setView((current) =>
+      buildStageState(current.stage || 1, current.autoBattle),
+    );
   };
 
   const nextStage = () => {
-    setView((current) => buildStageState((current.stage || 1) + 1));
+    setView((current) =>
+      buildStageState((current.stage || 1) + 1, current.autoBattle),
+    );
   };
 
   useEffect(() => {
@@ -523,7 +646,9 @@ export default function AutoBattle() {
       const unitDef = UNIT_CATALOG.find((u) => u.id === typeId);
       if (!unitDef) return current;
       if (current.player.energy < unitDef.cost) return current;
-      if (current.units.length >= 26) return current;
+      if (current.units.length >= 500) return current;
+      const spawnCd = current.player.spawnCds?.[typeId] ?? 0;
+      if (spawnCd > 0) return current;
 
       const jitterRes = rngNext(current.randSeed);
       const xJitter = 0.45 + (jitterRes.value * 0.18 - 0.09);
@@ -544,9 +669,30 @@ export default function AutoBattle() {
         player: {
           ...current.player,
           energy: current.player.energy - unitDef.cost,
+          spawnCds: {
+            ...current.player.spawnCds,
+            [typeId]: unitDef.spawnCd,
+          },
         },
         units: [...current.units, spawn],
-        log: [...current.log.slice(-4), `🔵 你派出 ${unitDef.emoji} ${unitDef.name}`],
+        log: [
+          ...current.log.slice(-4),
+          `🔵 你派出 ${unitDef.emoji} ${unitDef.name}`,
+        ],
+      };
+    });
+  };
+
+  const toggleAutoBattle = () => {
+    setView((current) => {
+      if (current.phase !== "playing") return current;
+      return {
+        ...current,
+        autoBattle: !current.autoBattle,
+        log: [
+          ...current.log.slice(-4),
+          current.autoBattle ? "⏸️ 關閉自動戰鬥" : "🤖 開啟自動戰鬥",
+        ],
       };
     });
   };
@@ -571,24 +717,134 @@ export default function AutoBattle() {
           bubbleUntilMs: current.timeMs + SKILL.durationSec * 1000,
           bubbleCastId: nextCastId,
         },
-        log: [...current.log.slice(-4), `🫧 你施放「${SKILL.name}」！敵方變慢了～`],
+        log: [
+          ...current.log.slice(-4),
+          `🫧 你施放「${SKILL.name}」！敵方變慢了～`,
+        ],
       };
     });
   };
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setView((prev) =>
-        prev.phase === "playing" && !prev.paused ? stepGame(prev, TICK_MS / 1000) : prev
-      );
+      setView((prev) => {
+        if (prev.phase !== "playing" || prev.paused) return prev;
+
+        let result = stepGame(prev, TICK_MS / 1000);
+
+        // Auto battle logic
+        if (result.autoBattle && result.player.energy > 0) {
+          // Try to cast bubble skill if available and energy > 70
+          if (
+            result.player.energy >= SKILL.cost &&
+            result.player.skillCdLeft <= 0 &&
+            result.player.energy > 70
+          ) {
+            const nextCastId = (result.effects.bubbleCastId || 0) + 1;
+            result = {
+              ...result,
+              player: {
+                ...result.player,
+                energy: result.player.energy - SKILL.cost,
+                skillCdLeft: SKILL.cooldownSec,
+              },
+              effects: {
+                ...result.effects,
+                bubbleUntilMs: result.timeMs + SKILL.durationSec * 1000,
+                bubbleCastId: nextCastId,
+              },
+            };
+          }
+
+          // Try to spawn units - wait for enough energy for priority units
+          if (result.units.length < 500) {
+            // Check what enemy units are currently on the field
+            const enemyUnits = result.units.filter(
+              (u) => u.side === "enemy" && u.hp > 0,
+            );
+            const enemyTypes = new Set(enemyUnits.map((u) => u.typeId));
+
+            // Build priority based on enemy composition
+            let priority = [];
+
+            // If enemy has fox or bunny, prioritize those first
+            if (enemyTypes.has("fox")) priority.push("fox");
+            if (enemyTypes.has("bunny")) priority.push("bunny");
+
+            // Then add the rest in standard priority
+            if (!priority.includes("bunny")) priority.push("bunny");
+            if (!priority.includes("panda")) priority.push("panda");
+            if (!priority.includes("fox")) priority.push("fox");
+            if (!priority.includes("kitty")) priority.push("kitty");
+
+            // Find the highest priority unit we can afford
+            let picked = null;
+            for (const id of priority) {
+              const unit = UNIT_CATALOG.find((u) => u.id === id);
+              const spawnCd = result.player.spawnCds?.[id] ?? 0;
+              if (unit && result.player.energy >= unit.cost && spawnCd <= 0) {
+                picked = unit;
+                break;
+              }
+            }
+
+            // Only spawn if we found a unit to spawn
+            // Don't spawn kitty unless we have very low energy or emergency
+            const shouldSpawn =
+              picked &&
+              (picked.id !== "kitty" ||
+                result.player.energy >= result.player.energyMax * 0.9 ||
+                enemyUnits.length >= 5);
+
+            if (shouldSpawn) {
+              const jitterRes = rngNext(result.randSeed);
+              const xJitter = 0.45 + (jitterRes.value * 0.18 - 0.09);
+              const uid = result.idCounter + 1;
+
+              const spawn = createUnit({
+                id: picked.id,
+                side: "player",
+                y: PLAYER_BASE_Y - 18,
+                xJitter,
+                uid,
+              });
+
+              result = {
+                ...result,
+                randSeed: jitterRes.seed,
+                idCounter: uid,
+                player: {
+                  ...result.player,
+                  energy: result.player.energy - picked.cost,
+                  spawnCds: {
+                    ...result.player.spawnCds,
+                    [picked.id]: picked.spawnCd,
+                  },
+                },
+                units: [...result.units, spawn],
+              };
+            }
+          }
+        }
+
+        return result;
+      });
     }, TICK_MS);
 
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const canSpawn = (u) => isPlaying && !isPaused && view.player.energy >= u.cost;
+  const canSpawn = (u) => {
+    const spawnCd = view.player.spawnCds?.[u.id] ?? 0;
+    return (
+      isPlaying && !isPaused && view.player.energy >= u.cost && spawnCd <= 0
+    );
+  };
   const canCast =
-    isPlaying && !isPaused && view.player.energy >= SKILL.cost && view.player.skillCdLeft <= 0;
+    isPlaying &&
+    !isPaused &&
+    view.player.energy >= SKILL.cost &&
+    view.player.skillCdLeft <= 0;
 
   return (
     <div className="oneui">
@@ -600,9 +856,25 @@ export default function AutoBattle() {
               <div className="subtitle">派兵 + 泡泡結界</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button className="toast" onClick={() => navigate("/")}>返回</button>
-              <button className={isPaused ? "toast" : "toast"} onClick={togglePause}>
+              <button className="toast" onClick={() => navigate("/")}>
+                返回
+              </button>
+              <button
+                className={isPaused ? "toast" : "toast"}
+                onClick={togglePause}
+              >
                 {isPaused ? "繼續" : "暫停"}
+              </button>
+              <button
+                className={view.autoBattle ? "toast" : "toast"}
+                onClick={toggleAutoBattle}
+                style={{
+                  background: view.autoBattle
+                    ? "linear-gradient(135deg, rgba(120,255,180,0.88), rgba(130,255,200,0.88))"
+                    : undefined,
+                }}
+              >
+                {view.autoBattle ? "🤖 自動中" : "🤖 自動"}
               </button>
             </div>
           </div>
@@ -667,7 +939,8 @@ export default function AutoBattle() {
                       padding: "28px 36px",
                       borderRadius: 28,
                       border: "1px solid rgba(255,255,255,0.72)",
-                      background: "linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.62))",
+                      background:
+                        "linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.62))",
                       boxShadow: "0 26px 70px rgba(16,16,30,0.22)",
                       backdropFilter: "blur(16px)",
                       WebkitBackdropFilter: "blur(16px)",
@@ -675,10 +948,23 @@ export default function AutoBattle() {
                     }}
                   >
                     <div style={{ fontSize: 42, marginBottom: 12 }}>😵</div>
-                    <div style={{ fontSize: 20, fontWeight: 950, color: "rgba(16,16,22,0.92)", marginBottom: 6 }}>
+                    <div
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 950,
+                        color: "rgba(16,16,22,0.92)",
+                        marginBottom: 6,
+                      }}
+                    >
                       第 {view.stage} 關失敗
                     </div>
-                    <div style={{ fontSize: 13, color: "rgba(16,16,22,0.58)", marginBottom: 20 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "rgba(16,16,22,0.58)",
+                        marginBottom: 20,
+                      }}
+                    >
                       我方基地被推倒了…
                     </div>
                     <button
@@ -687,17 +973,25 @@ export default function AutoBattle() {
                         padding: "14px 32px",
                         borderRadius: 999,
                         border: "1px solid rgba(255,255,255,0.72)",
-                        background: "linear-gradient(135deg, rgba(255,120,180,0.88), rgba(130,185,255,0.88))",
+                        background:
+                          "linear-gradient(135deg, rgba(255,120,180,0.88), rgba(130,185,255,0.88))",
                         boxShadow: "0 14px 40px rgba(16,16,30,0.18)",
                         fontSize: 15,
                         fontWeight: 900,
                         color: "rgba(255,255,255,0.98)",
                         cursor: "pointer",
-                        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                        transition:
+                          "transform 0.15s ease, box-shadow 0.15s ease",
                       }}
-                      onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      onMouseDown={(e) =>
+                        (e.currentTarget.style.transform = "scale(0.96)")
+                      }
+                      onMouseUp={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.transform = "scale(1)")
+                      }
                     >
                       🔄 重開本關
                     </button>
@@ -715,17 +1009,24 @@ export default function AutoBattle() {
                   padding: "10px 12px 8px",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
+                  justifyContent: "flex-start",
                   gap: 10,
                   zIndex: 5,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>敵方基地</div>
-                  <div className="ab-hpRail" style={{ width: 170 }}>
-                    <div className="ab-hpFill enemy" style={{ width: `${enemyBaseHpPct}%` }} />
-                  </div>
+                <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>
+                  敵方基地
                 </div>
+                <div
+                  className="ab-hpRail"
+                  style={{ flex: 1, marginRight: "auto" }}
+                >
+                  <div
+                    className="ab-hpFill enemy"
+                    style={{ width: `${enemyBaseHpPct}%` }}
+                  />
+                </div>
+                <div style={{ minWidth: 36 }} />
               </div>
 
               {/* Stage / status (centered above battle area) */}
@@ -759,7 +1060,9 @@ export default function AutoBattle() {
                   }}
                 >
                   {view.phase === "ended" ? (
-                    <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.92 }}>
+                    <div
+                      style={{ fontSize: 13, fontWeight: 800, opacity: 0.92 }}
+                    >
                       {view.winner === "player"
                         ? `🎉 第 ${view.stage} 關通關！準備進入下一關…`
                         : `😵 第 ${view.stage} 關失敗：重開本關再試一次`}
@@ -767,7 +1070,9 @@ export default function AutoBattle() {
                   ) : (
                     <>
                       <div>第 {view.stage} 關</div>
-                      <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.92 }}>
+                      <div
+                        style={{ fontSize: 13, fontWeight: 800, opacity: 0.92 }}
+                      >
                         {bubbleActive ? `🫧 ${bubbleLeftSec.toFixed(1)}s` : ""}
                       </div>
                     </>
@@ -794,7 +1099,8 @@ export default function AutoBattle() {
                     height: "100%",
                     borderRadius: 22,
                     overflow: "hidden",
-                    background: "linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0.28))",
+                    background:
+                      "linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0.28))",
                     border: "1px solid rgba(255,255,255,0.55)",
                     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55)",
                   }}
@@ -809,14 +1115,20 @@ export default function AutoBattle() {
                       width: 6,
                       transform: "translateX(-50%)",
                       borderRadius: 999,
-                      background: "linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.18))",
+                      background:
+                        "linear-gradient(180deg, rgba(255,255,255,0.42), rgba(255,255,255,0.18))",
                       opacity: 0.85,
                     }}
                   />
 
                   {/* enemy base */}
                   <div
-                    className={view.enemy.baseLastHitAt && view.timeMs - view.enemy.baseLastHitAt < 180 ? "ab-base hit" : "ab-base"}
+                    className={
+                      view.enemy.baseLastHitAt &&
+                      view.timeMs - view.enemy.baseLastHitAt < 180
+                        ? "ab-base hit"
+                        : "ab-base"
+                    }
                     style={{
                       position: "absolute",
                       left: "50%",
@@ -825,7 +1137,8 @@ export default function AutoBattle() {
                       width: BASE_RADIUS * 2,
                       height: BASE_RADIUS * 2,
                       borderRadius: 999,
-                      background: "linear-gradient(135deg, rgba(255,170,220,0.75), rgba(170,210,255,0.62))",
+                      background:
+                        "linear-gradient(135deg, rgba(255,170,220,0.75), rgba(170,210,255,0.62))",
                       border: "1px solid rgba(255,255,255,0.75)",
                       display: "grid",
                       placeItems: "center",
@@ -838,7 +1151,12 @@ export default function AutoBattle() {
 
                   {/* player base */}
                   <div
-                    className={view.player.baseLastHitAt && view.timeMs - view.player.baseLastHitAt < 180 ? "ab-base hit" : "ab-base"}
+                    className={
+                      view.player.baseLastHitAt &&
+                      view.timeMs - view.player.baseLastHitAt < 180
+                        ? "ab-base hit"
+                        : "ab-base"
+                    }
                     style={{
                       position: "absolute",
                       left: "50%",
@@ -847,7 +1165,8 @@ export default function AutoBattle() {
                       width: BASE_RADIUS * 2,
                       height: BASE_RADIUS * 2,
                       borderRadius: 999,
-                      background: "linear-gradient(135deg, rgba(255,200,140,0.72), rgba(255,170,220,0.55))",
+                      background:
+                        "linear-gradient(135deg, rgba(255,200,140,0.72), rgba(255,170,220,0.55))",
                       border: "1px solid rgba(255,255,255,0.75)",
                       display: "grid",
                       placeItems: "center",
@@ -861,17 +1180,26 @@ export default function AutoBattle() {
                   {/* units */}
                   {view.units.map((u) => {
                     const xPercent = clamp(u.xJitter, 0.34, 0.66) * 100;
-                    const recentlyHit = u.lastHitAt && view.timeMs - u.lastHitAt < 140;
-                    const bubbled = u.bubbledUntilMs && u.bubbledUntilMs > view.timeMs;
+                    const recentlyHit =
+                      u.lastHitAt && view.timeMs - u.lastHitAt < 140;
+                    const bubbled =
+                      u.bubbledUntilMs && u.bubbledUntilMs > view.timeMs;
+                    const inShockwave =
+                      u.shockwaveUntilMs && u.shockwaveUntilMs > view.timeMs;
                     const hpPct = clamp((u.hp / u.maxHp) * 100, 0, 100);
 
                     const unitClassName = [
                       "ab-unit",
                       recentlyHit ? "hit" : "",
                       bubbled ? "bubbled" : "",
+                      inShockwave ? "shockwave" : "",
+                      u.isBoss ? "boss" : "",
                     ]
                       .filter(Boolean)
                       .join(" ");
+
+                    const unitSize = u.isBoss ? 42 * 3 : 42;
+                    const emojiSize = u.isBoss ? 22 * 3 : 22;
 
                     return (
                       <div
@@ -882,8 +1210,8 @@ export default function AutoBattle() {
                           left: `${xPercent}%`,
                           top: u.y,
                           transform: "translate(-50%, -50%)",
-                          width: 42,
-                          height: 42,
+                          width: unitSize,
+                          height: unitSize,
                           borderRadius: 16,
                           border:
                             u.side === "player"
@@ -898,9 +1226,15 @@ export default function AutoBattle() {
                           placeItems: "center",
                           zIndex: 4,
                         }}
-                        title={`${u.emoji} ${u.name}（${u.role}）`}
+                        title={`${u.emoji} ${u.name}（${u.role}）${u.isBoss ? " - BOSS" : ""}`}
                       >
-                        <div className="ab-emoji" style={{ fontSize: 22, lineHeight: "22px" }}>
+                        <div
+                          className="ab-emoji"
+                          style={{
+                            fontSize: emojiSize,
+                            lineHeight: `${emojiSize}px`,
+                          }}
+                        >
                           {u.emoji}
                         </div>
                         <div
@@ -939,9 +1273,14 @@ export default function AutoBattle() {
             <div style={{ height: 12 }} />
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>我方基地</div>
+              <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>
+                我方基地
+              </div>
               <div className="ab-hpRail" style={{ flex: 1 }}>
-                <div className="ab-hpFill" style={{ width: `${playerBaseHpPct}%` }} />
+                <div
+                  className="ab-hpFill"
+                  style={{ width: `${playerBaseHpPct}%` }}
+                />
               </div>
               <div style={{ minWidth: 36 }} />
             </div>
@@ -949,34 +1288,58 @@ export default function AutoBattle() {
             <div style={{ height: 8 }} />
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>能量</div>
+              <div style={{ fontSize: 12, opacity: 0.75, minWidth: 50 }}>
+                能量
+              </div>
               <div className="ab-hpRail" style={{ flex: 1 }}>
                 <div
                   className="ab-hpFill"
-                  style={{ width: `${(view.player.energy / (view.player.energyMax || ENERGY_MAX)) * 100}%` }}
+                  style={{
+                    width: `${(view.player.energy / (view.player.energyMax || ENERGY_MAX)) * 100}%`,
+                  }}
                 />
               </div>
-              <div style={{ fontSize: 13, fontWeight: 800, minWidth: 36, textAlign: "right" }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  minWidth: 36,
+                  textAlign: "right",
+                }}
+              >
                 {fmt(view.player.energy)}
               </div>
             </div>
 
             <div style={{ height: 10 }} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              {UNIT_CATALOG.map((u) => (
-                <button
-                  key={u.id}
-                  className={canSpawn(u) ? "ab-card" : "ab-card disabled"}
-                  onClick={() => spawnPlayer(u.id)}
-                  disabled={!canSpawn(u)}
-                  title={`${u.name}｜${u.role}｜花費 ${u.cost}`}
-                >
-                  <div style={{ fontSize: 18 }}>{u.emoji}</div>
-                  <div style={{ fontSize: 12, fontWeight: 800 }}>{u.cost}</div>
-                  <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{u.name}</div>
-                </button>
-              ))}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 10,
+              }}
+            >
+              {UNIT_CATALOG.map((u) => {
+                const spawnCd = view.player.spawnCds?.[u.id] ?? 0;
+                return (
+                  <button
+                    key={u.id}
+                    className={canSpawn(u) ? "ab-card" : "ab-card disabled"}
+                    onClick={() => spawnPlayer(u.id)}
+                    disabled={!canSpawn(u)}
+                    title={`${u.name}｜${u.role}｜花費 ${u.cost}`}
+                  >
+                    <div style={{ fontSize: 18 }}>{u.emoji}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800 }}>
+                      {spawnCd > 0 ? `${spawnCd.toFixed(1)}s` : u.cost}
+                    </div>
+                    <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                      {u.name}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <div style={{ height: 10 }} />
@@ -987,10 +1350,14 @@ export default function AutoBattle() {
               disabled={!canCast}
               title={`${SKILL.name}｜花費 ${SKILL.cost}｜CD ${SKILL.cooldownSec}s`}
             >
-              <span style={{ fontSize: 18, marginRight: 8 }}>{SKILL.emoji}</span>
+              <span style={{ fontSize: 18, marginRight: 8 }}>
+                {SKILL.emoji}
+              </span>
               <span style={{ fontWeight: 900 }}>{SKILL.name}</span>
               <span style={{ marginLeft: 10, opacity: 0.75 }}>
-                {view.player.skillCdLeft > 0 ? `CD ${view.player.skillCdLeft.toFixed(1)}s` : `能量 ${SKILL.cost}`}
+                {view.player.skillCdLeft > 0
+                  ? `CD ${view.player.skillCdLeft.toFixed(1)}s`
+                  : `能量 ${SKILL.cost}`}
               </span>
             </button>
           </div>
