@@ -19,8 +19,7 @@ const PLATFORM_GAP_MAX = 120;
 const INITIAL_PLATFORM_COUNT = 10;
 
 // 道具持續時間 (ms)
-const JETPACK_DURATION = 2500;
-const SPRING_SHOES_DURATION = 5000;
+const JETPACK_DURATION = 3000;
 
 // 平台類型
 const PLATFORM_TYPES = {
@@ -35,7 +34,7 @@ const POWERUP_TYPES = {
   SPRING_SHOES: "springShoes",
   SHIELD: "shield",
   SAFETY_NET: "safetyNet", // 安全網：翻牆時生成安全平台
-  PORTAL: "portal", // 傳送門：瞬移至當前高度的0.5倍
+  PORTAL: "portal", // 傳送門：瞬移至當前高度的1.5倍
 };
 
 // 成就定義
@@ -408,14 +407,6 @@ const createEnemy = (y) => ({
   rotateSpeed: 8, // 掉落時旋轉速度
 });
 
-const createBlackhole = (x, y) => ({
-  id: generateId(),
-  x,
-  y,
-  radius: 40,
-  pullStrength: 0.3,
-});
-
 export default function JumpGame() {
   const navigate = useNavigate();
 
@@ -448,7 +439,6 @@ export default function JumpGame() {
   const platformContainerRef = useRef(null);
   const powerupContainerRef = useRef(null);
   const enemyContainerRef = useRef(null);
-  const blackholeContainerRef = useRef(null);
   const scoreRef = useRef(0);
   const scoreDomRef = useRef(null);
 
@@ -456,7 +446,6 @@ export default function JumpGame() {
   const platformDomMap = useRef(new Map());
   const powerupDomMap = useRef(new Map());
   const enemyDomMap = useRef(new Map());
-  const blackholeDomMap = useRef(new Map());
 
   // 玩家狀態
   const playerRef = useRef({
@@ -495,7 +484,6 @@ export default function JumpGame() {
     platforms: [],
     powerups: [],
     enemies: [],
-    blackholes: [],
     // 里程碑
     milestone1000: false,
     milestone2000: false,
@@ -567,13 +555,13 @@ export default function JumpGame() {
       setAchievements(newAchievements);
       localStorage.setItem(
         "jumpGameAchievements",
-        JSON.stringify(newAchievements)
+        JSON.stringify(newAchievements),
       );
 
       setShowAchievement(achievement);
       safeTimeout(() => setShowAchievement(null), 3000);
     },
-    [safeTimeout]
+    [safeTimeout],
   );
 
   // 檢查道具使用次數成就
@@ -610,7 +598,7 @@ export default function JumpGame() {
       if (usage.portal >= 40) unlockAchievement("POWERUP_PORTAL_40");
       if (usage.portal >= 50) unlockAchievement("POWERUP_PORTAL_50");
     },
-    [unlockAchievement]
+    [unlockAchievement],
   );
 
   // ============ 初始化平台 ============
@@ -652,14 +640,11 @@ export default function JumpGame() {
       platformContainerRef.current.innerHTML = "";
     if (powerupContainerRef.current) powerupContainerRef.current.innerHTML = "";
     if (enemyContainerRef.current) enemyContainerRef.current.innerHTML = "";
-    if (blackholeContainerRef.current)
-      blackholeContainerRef.current.innerHTML = "";
 
     // 清空 DOM Map（避免重置遊戲後殘留舊引用）
     platformDomMap.current.clear();
     powerupDomMap.current.clear();
     enemyDomMap.current.clear();
-    blackholeDomMap.current.clear();
   }, []);
 
   // ============ 重置遊戲 ============
@@ -699,7 +684,6 @@ export default function JumpGame() {
       platforms: initialPlatforms,
       powerups: [],
       enemies: [],
-      blackholes: [],
       milestone1000: false,
       milestone2000: false,
       springCount: 0,
@@ -791,19 +775,6 @@ export default function JumpGame() {
         player.vy += GRAVITY * timeScale;
       }
 
-      // 黑洞吸引
-      for (const bh of world.blackholes) {
-        const dx = bh.x - (player.x + player.width / 2);
-        const dy = bh.y - (player.y + player.height / 2);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 150) {
-          const safeDist = Math.max(dist, 20); // 防止距離過近速度爆炸
-          const force = bh.pullStrength * (1 - dist / 150) * timeScale;
-          player.vy += force * 2;
-          player.vx += (dx / safeDist) * force;
-        }
-      }
-
       // 翻牆後微吸附畫面中心
       if (currentTime < player.wrapCenterPullUntil) {
         const centerX = GAME_WIDTH / 2 - player.width / 2;
@@ -864,7 +835,9 @@ export default function JumpGame() {
           });
           // 立即同步清理 platformId 指向不存在平台的 powerup
           world.powerups = world.powerups.filter(
-            (pu) => !pu.platformId || world.platforms.some((plat) => plat.id === pu.platformId)
+            (pu) =>
+              !pu.platformId ||
+              world.platforms.some((plat) => plat.id === pu.platformId),
           );
 
           const safetyPlatform = {
@@ -883,7 +856,7 @@ export default function JumpGame() {
           // 確保平台在畫面內
           safetyPlatform.x = Math.max(
             0,
-            Math.min(GAME_WIDTH - safetyPlatform.width, safetyPlatform.x)
+            Math.min(GAME_WIDTH - safetyPlatform.width, safetyPlatform.x),
           );
           world.platforms.push(safetyPlatform);
           // 移除閃爍效果
@@ -896,7 +869,6 @@ export default function JumpGame() {
       // === 更新移動平台 ===
       for (const plat of world.platforms) {
         if (plat.type === PLATFORM_TYPES.MOVING) {
-          const oldX = plat.x;
           plat.x += plat.speed * plat.direction * timeScale;
           // 碰到邊界時反轉方向並修正位置
           if (plat.x <= 0) {
@@ -924,8 +896,8 @@ export default function JumpGame() {
           enemy.y += enemy.vy * timeScale;
           enemy.rotation += enemy.rotateSpeed * timeScale;
         } else {
-          // 正常敵人：1000分數後才會水平移動
-          if (scoreRef.current >= 1000) {
+          // 正常敵人：10000分數後才會水平移動
+          if (scoreRef.current >= 10000) {
             enemy.x += enemy.speed * enemy.direction * timeScale;
             // Clamp 並反轉方向，避免卡牆
             if (enemy.x <= 0) {
@@ -1054,11 +1026,11 @@ export default function JumpGame() {
             checkPowerupAchievements(world.powerupUsage);
           } else if (pu.type === POWERUP_TYPES.SPRING_SHOES) {
             player.jumpMultiplier = SPRING_SHOES_MULTIPLIER;
-            player.springJumpCount += 5; // 獲得5次加強跳躍
+            player.springJumpCount += 10; // 獲得10次加強跳躍
           } else if (pu.type === POWERUP_TYPES.SHIELD) {
             player.shieldCount += 1; // 獲得1次護盾
           } else if (pu.type === POWERUP_TYPES.SAFETY_NET) {
-            player.safetyNetCount += 3; // 獲得3次使用機會
+            player.safetyNetCount += 5; // 獲得5次使用機會
           } else if (pu.type === POWERUP_TYPES.PORTAL) {
             // === Portal 傳送邏輯 ===
             // 1. 計算順移距離 = 當前高度 × 0.5
@@ -1068,18 +1040,6 @@ export default function JumpGame() {
 
             // 2. 安全性檢查
             let isSafe = true;
-
-            // 不可落在黑洞半徑內（80px）
-            for (const bh of world.blackholes) {
-              const dist = Math.sqrt(
-                Math.pow(player.x + player.width / 2 - bh.x, 2) +
-                  Math.pow(targetY + player.height / 2 - bh.y, 2)
-              );
-              if (dist < bh.radius + 40) {
-                isSafe = false;
-                break;
-              }
-            }
 
             // 不可落在敵人 ±80px 內
             if (isSafe) {
@@ -1131,11 +1091,13 @@ export default function JumpGame() {
               const cleanupRangeStart = targetY - 50;
               const cleanupRangeEnd = targetY + 500;
               world.platforms = world.platforms.filter(
-                (p) => p.y < cleanupRangeStart || p.y > cleanupRangeEnd
+                (p) => p.y < cleanupRangeStart || p.y > cleanupRangeEnd,
               );
               // 立即同步清理 platformId 指向不存在平台的 powerup
               world.powerups = world.powerups.filter(
-                (pu) => !pu.platformId || world.platforms.some((plat) => plat.id === pu.platformId)
+                (pu) =>
+                  !pu.platformId ||
+                  world.platforms.some((plat) => plat.id === pu.platformId),
               );
 
               for (let i = 0; i < platformsToGenerate; i++) {
@@ -1183,7 +1145,6 @@ export default function JumpGame() {
         const hasHorizontalOverlap =
           playerRight > enemy.x && playerLeft < enemy.x + enemy.width;
 
-        
         // 踩敵判定（
         const prevPlayerBottom = player.prevY + player.height;
         const isStompingEnemy =
@@ -1222,7 +1183,6 @@ export default function JumpGame() {
           continue;
         }
 
-        
         // 非普通跳躍狀態：碰撞直接擊殺敵人（不彈跳）
         //    包含：噴射背包、彈簧、彈簧鞋「側撞」
         const isNotNormalJump =
@@ -1373,18 +1333,18 @@ export default function JumpGame() {
           let spawnCount = 1;
           const rand = Math.random();
 
-          if (scoreMeters >= 200) {
-            // 2000m+: 20% 1隻, 40% 2隻, 40% 3隻
+          if (scoreMeters >= 10000) {
+            // 10000m+: 20% 1隻, 40% 2隻, 40% 3隻
             if (rand < 0.2) spawnCount = 1;
             else if (rand < 0.6) spawnCount = 2;
             else spawnCount = 3;
-          } else if (scoreMeters >= 100) {
-            // 1000-2000m: 40% 1隻, 40% 2隻, 20% 3隻
+          } else if (scoreMeters >= 5000) {
+            // 5000-10000m: 40% 1隻, 40% 2隻, 20% 3隻
             if (rand < 0.4) spawnCount = 1;
             else if (rand < 0.8) spawnCount = 2;
             else spawnCount = 3;
           } else {
-            // 500-1000m: 70% 1隻, 25% 2隻, 5% 3隻
+            // 500-5000m: 70% 1隻, 25% 2隻, 5% 3隻
             if (rand < 0.7) spawnCount = 1;
             else if (rand < 0.95) spawnCount = 2;
             else spawnCount = 3;
@@ -1407,23 +1367,12 @@ export default function JumpGame() {
         }
       }
 
-      // === 生成黑洞（1500m 後）===
-      if (scoreMeters >= 150 && world.blackholes.length < 2) {
-        if (Math.random() < 0.001) {
-          // 黑洞不在邊緣安全區生成
-          const bhX =
-            EDGE_SAFE_ZONE +
-            Math.random() * (GAME_WIDTH - EDGE_SAFE_ZONE * 2 - 80);
-          world.blackholes.push(createBlackhole(bhX, world.cameraY - 100));
-        }
-      }
-
       // === 清理畫面外元素 ===
       const now = performance.now();
       world.platforms = world.platforms.filter(
         (p) =>
-          (now - (p.bornAt || 0) < 300) ||
-          (p.y < world.cameraY + GAME_HEIGHT + 100 && p.state !== "gone")
+          now - (p.bornAt || 0) < 300 ||
+          (p.y < world.cameraY + GAME_HEIGHT + 100 && p.state !== "gone"),
       );
       world.powerups = world.powerups.filter((p) => {
         const now = performance.now();
@@ -1431,7 +1380,10 @@ export default function JumpGame() {
         if (p.collected) return false;
         if (p.y >= world.cameraY + GAME_HEIGHT + 100) return false;
         // 若有 platformId，檢查平台是否還存在
-        if (p.platformId && !world.platforms.some((plat) => plat.id === p.platformId)) {
+        if (
+          p.platformId &&
+          !world.platforms.some((plat) => plat.id === p.platformId)
+        ) {
           return false;
         }
         return true;
@@ -1441,9 +1393,6 @@ export default function JumpGame() {
         const screenY = e.y - world.cameraY;
         return e.x > -500 && screenY > -200 && screenY < GAME_HEIGHT + 200;
       });
-      world.blackholes = world.blackholes.filter(
-        (b) => b.y < world.cameraY + GAME_HEIGHT + 200
-      );
 
       // === 遊戲結束檢查 ===
       if (player.y > world.cameraY + GAME_HEIGHT + 100) {
@@ -1517,20 +1466,20 @@ export default function JumpGame() {
         playerDomRef.current.classList.toggle("boosting", player.isBoosting);
         playerDomRef.current.classList.toggle(
           "hasShield",
-          player.shieldCount > 0
+          player.shieldCount > 0,
         );
         playerDomRef.current.classList.toggle(
           "hasSpringShoes",
-          player.springJumpCount > 0
+          player.springJumpCount > 0,
         );
         playerDomRef.current.classList.toggle(
           "hasSafetyNet",
-          player.safetyNetCount > 0
+          player.safetyNetCount > 0,
         );
         playerDomRef.current.classList.toggle("wrapping", player.isWrapping);
         playerDomRef.current.classList.toggle(
           "teleporting",
-          player.isTeleporting
+          player.isTeleporting,
         );
       }
 
@@ -1538,7 +1487,7 @@ export default function JumpGame() {
       if (platformContainerRef.current) {
         const container = platformContainerRef.current;
         const visiblePlatforms = world.platforms.filter(
-          (p) => p.state !== "gone"
+          (p) => p.state !== "gone",
         );
 
         // 為每個平台建立或取得 DOM
@@ -1688,44 +1637,6 @@ export default function JumpGame() {
           }
         }
       }
-
-      // 更新黑洞
-      if (blackholeContainerRef.current) {
-        const container = blackholeContainerRef.current;
-
-        // 為每個黑洞建立或取得 DOM
-        for (const bh of world.blackholes) {
-          let el = blackholeDomMap.current.get(bh.id);
-
-          if (!el) {
-            // 建立新 DOM
-            el = document.createElement("div");
-            el.className = "jumpBlackhole";
-            el.style.position = "absolute";
-            el.style.display = "none"; // 防止 (0,0) 閃現
-            blackholeDomMap.current.set(bh.id, el);
-            container.appendChild(el);
-          }
-
-          // 更新 DOM
-          const screenY = bh.y - world.cameraY;
-          el.style.transform = `translate(${bh.x - bh.radius}px, ${
-            screenY - bh.radius
-          }px)`;
-          el.style.width = `${bh.radius * 2}px`;
-          el.style.height = `${bh.radius * 2}px`;
-          el.style.display =
-            screenY > -100 && screenY < GAME_HEIGHT + 100 ? "flex" : "none";
-        }
-
-        // 清理已移除的黑洞 DOM
-        for (const [id, el] of blackholeDomMap.current.entries()) {
-          if (!world.blackholes.some((b) => b.id === id)) {
-            el.remove();
-            blackholeDomMap.current.delete(id);
-          }
-        }
-      }
     };
 
     rafId = requestAnimationFrame(gameLoop);
@@ -1809,7 +1720,7 @@ export default function JumpGame() {
         inputRef.current.left = false;
       }
     },
-    [gameState]
+    [gameState],
   );
 
   const handleTouchEnd = useCallback(() => {
@@ -1840,7 +1751,7 @@ export default function JumpGame() {
           <button className="backBtn" onClick={() => navigate("/")}>
             ← 返回
           </button>
-          <h1 className="jumpTitle">🦘 柴剛上岸跳跳</h1>
+          <h1 className="jumpTitle">🦘 柴剛跳跳</h1>
         </header>
 
         {/* 分數顯示 */}
@@ -1906,7 +1817,6 @@ export default function JumpGame() {
           onTouchEnd={handleTouchEnd}
           style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
         >
-          <div ref={blackholeContainerRef} className="jumpBlackholeContainer" />
           <div ref={platformContainerRef} className="jumpPlatformContainer" />
           <div ref={powerupContainerRef} className="jumpPowerupContainer" />
           <div ref={enemyContainerRef} className="jumpEnemyContainer" />
@@ -1933,14 +1843,14 @@ export default function JumpGame() {
             <div className="jumpOverlay">
               <div className="jumpOverlayContent">
                 <div className="jumpOverlayEmoji">🦘</div>
-                <h2>柴剛上岸跳跳</h2>
+                <h2>柴剛跳跳</h2>
                 <p>⌨️ 方向鍵 / 📱 觸控控制</p>
-                <p className="jumpHint">踩平台往上跳！小心怪物和黑洞！</p>
+                <p className="jumpHint">踩平台往上跳！小心怪物！</p>
                 <div className="jumpPowerupGuide">
-                  <span>🚀 噴射背包 (2.5秒)</span>
-                  <span>👟 彈簧鞋 (5次)</span>
+                  <span>🚀 噴射背包 (3秒)</span>
+                  <span>👟 彈簧鞋 (10次)</span>
                   <span>🛡️ 護盾 (免死1次)</span>
-                  <span>🪢 安全網 (3次穿牆生成平台)</span>
+                  <span>🪢 安全網 (5次穿牆生成平台)</span>
                   <span>🌀 傳送門 (瞬移到目前1.5倍高度)</span>
                 </div>
                 <button className="jumpStartBtn" onClick={resetGame}>

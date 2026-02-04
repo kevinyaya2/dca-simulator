@@ -29,18 +29,20 @@ const shuffleArray = (array) => {
   return arr;
 };
 
-const getRandomMeanings = (words, n, excludeIndex) => {
-  const pool = words
-    .map((w, idx) => ({ meaning: w.meaning, idx }))
-    .filter(({ idx }) => idx !== excludeIndex);
+const getRandomMeanings = (words, n, excludeMeaning) => {
+  // 建立不重複的中文意思池
+  const meaningSet = new Set();
+  words.forEach((w) => {
+    if (w.meaning !== excludeMeaning) {
+      meaningSet.add(w.meaning);
+    }
+  });
 
-  const result = [];
-  for (let i = 0; i < Math.min(n, pool.length); i++) {
-    const r = Math.floor(Math.random() * (pool.length - i));
-    result.push(pool[r].meaning);
-    [pool[r], pool[pool.length - 1 - i]] = [pool[pool.length - 1 - i], pool[r]];
-  }
-  return result;
+  const pool = Array.from(meaningSet);
+
+  // 使用 Fisher-Yates 洗牌演算法隨機選擇
+  const shuffled = shuffleArray(pool);
+  return shuffled.slice(0, Math.min(n, shuffled.length));
 };
 
 /* =====================
@@ -132,21 +134,12 @@ export default function ToeicVocab() {
     const quizWord = words[quizWordIndex];
     if (!quizWord) return;
 
-    const wrongPool = words.filter((w) =>
-      wrongKeys.includes(`${w.word}_${w.partOfSpeech}`),
-    );
+    // 從全部單字中隨機選擇 3 個錯誤選項（排除正確答案）
+    const wrongOptions = getRandomMeanings(words, 3, quizWord.meaning);
 
-    let wrongOptions = getRandomMeanings(wrongPool, 3, quizWordIndex);
-    if (wrongOptions.length < 3) {
-      wrongOptions = [
-        ...wrongOptions,
-        ...getRandomMeanings(words, 3 - wrongOptions.length, quizWordIndex),
-      ];
-    }
-
-    const options = [quizWord.meaning, ...wrongOptions].sort(
-      () => Math.random() - 0.5,
-    );
+    // 使用 Fisher-Yates 洗牌演算法完全隨機打亂選項
+    const allOptions = [quizWord.meaning, ...wrongOptions];
+    const options = shuffleArray(allOptions);
 
     setOptions(options);
     setSelected(null);

@@ -287,7 +287,7 @@ export default function FightGame() {
               <button className="backBtn" onClick={() => navigate("/")}>
                 ← 返回
               </button>
-              <div className="title">柴剛上岸格鬥</div>
+              <div className="title">柴剛格鬥</div>
               <div className="subtitle">回合制對戰｜柴剛 vs 生活壓力怪</div>
             </div>
           </div>

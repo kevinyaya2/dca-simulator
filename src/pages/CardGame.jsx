@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 const INITIAL_CASH = 100000;
-const MAX_ROUNDS = 10;
+const MAX_ROUNDS = 12;
 
 // 市場事件定義
 const MARKET_EVENTS = [
@@ -10,56 +10,51 @@ const MARKET_EVENTS = [
   { id: "up", name: "小漲 📊", desc: "穩定上揚", multiplier: 1.08 },
   { id: "flat", name: "盤整 ➡️", desc: "橫向整理", multiplier: 1.0 },
   { id: "down", name: "小跌 📉", desc: "市場修正", multiplier: 0.95 },
-  { id: "crash", name: "大跌 💥", desc: "恐慌性下跌", multiplier: 0.80 },
+  { id: "crash", name: "大跌 💥", desc: "恐慌性下跌", multiplier: 0.8 },
 ];
 
 // 卡牌定義
 const CARD_DECK = [
   {
-    id: "dca",
-    name: "定期定額",
-    description: "穩健投資，不懼波動",
-    riskLevel: "低",
-    color: "linear-gradient(135deg, rgba(100, 180, 255, 0.85), rgba(70, 150, 255, 0.85))",
-    effect: (market, player) => {
-      // 穩定小幅成長，不受市場影響太大
-      const baseReturn = 0.06;
-      const invested = Math.min(player.cash * 0.4, player.cash);
-      const gain = invested * baseReturn;
+    id: "cash_king",
+    name: "現金為王",
+    description: "完全觀望",
+    riskLevel: "極低",
+    color:
+      "linear-gradient(135deg, rgba(200, 200, 200, 0.85), rgba(160, 160, 160, 0.85))",
+    effect: () => {
       return {
-        cashChange: -invested,
-        assetChange: invested + gain,
-        message: `投入 ${fmtMoney(invested)}，獲得 ${fmtMoney(gain)} 收益`,
+        cashChange: 0,
+        assetChange: 0,
+        message: "本回合保持觀望，現金不動",
       };
     },
   },
   {
-    id: "buy_dip",
-    name: "逢低加碼",
-    description: "下跌時效果加倍",
-    riskLevel: "中",
-    color: "linear-gradient(135deg, rgba(130, 255, 180, 0.85), rgba(90, 220, 140, 0.85))",
+    id: "dca",
+    name: "定期定額",
+    description: "穩定長期投入",
+    riskLevel: "低",
+    color:
+      "linear-gradient(135deg, rgba(100, 180, 255, 0.85), rgba(70, 150, 255, 0.85))",
     effect: (market, player) => {
-      const isDown = market.multiplier < 1.0;
-      const multiplier = isDown ? 2.0 : 1.0;
-      const invested = Math.min(player.cash * 0.5, player.cash);
-      const baseReturn = 0.08 * multiplier;
-      const gain = invested * baseReturn;
+      const invested = Math.min(player.cash * 0.35, player.cash);
+      const assetChange = invested * market.multiplier;
+      const gain = assetChange - invested;
       return {
         cashChange: -invested,
-        assetChange: invested + gain,
-        message: isDown 
-          ? `逢低買進！投入 ${fmtMoney(invested)}，效果加倍！` 
-          : `投入 ${fmtMoney(invested)}，獲得 ${fmtMoney(gain)} 收益`,
+        assetChange: assetChange,
+        message: `穩定投入 ${fmtMoney(invested)}，獲得 ${fmtMoney(gain)} 收益`,
       };
     },
   },
   {
     id: "stop_loss",
     name: "停損",
-    description: "下跌時減少損失",
+    description: "防守型操作",
     riskLevel: "低",
-    color: "linear-gradient(135deg, rgba(255, 220, 120, 0.85), rgba(255, 190, 80, 0.85))",
+    color:
+      "linear-gradient(135deg, rgba(255, 220, 120, 0.85), rgba(255, 190, 80, 0.85))",
     effect: (market, player) => {
       const isDown = market.multiplier < 1.0;
       if (isDown) {
@@ -72,61 +67,52 @@ const CARD_DECK = [
         };
       } else {
         // 上漲時小幅獲利
-        const invested = Math.min(player.cash * 0.3, player.cash);
-        const gain = invested * 0.04;
+        const invested = Math.min(player.cash * 0.2, player.cash);
+        const assetChange = invested * market.multiplier;
+        const gain = assetChange - invested;
         return {
           cashChange: -invested,
-          assetChange: invested + gain,
-          message: `市場穩定，小幅投資 ${fmtMoney(invested)}`,
+          assetChange: assetChange,
+          message: `市場穩定，小幅投資 ${fmtMoney(invested)}，獲得 ${fmtMoney(gain)} 收益`,
         };
       }
     },
   },
   {
-    id: "all_in",
-    name: "ALL IN",
-    description: "高風險高報酬",
-    riskLevel: "高",
-    color: "linear-gradient(135deg, rgba(255, 100, 150, 0.85), rgba(230, 70, 120, 0.85))",
+    id: "buy_dip",
+    name: "逢低加碼",
+    description: "趁跌布局",
+    riskLevel: "中",
+    color:
+      "linear-gradient(135deg, rgba(130, 255, 180, 0.85), rgba(90, 220, 140, 0.85))",
     effect: (market, player) => {
-      const invested = player.cash * 0.8; // 投入 80% 現金
-      const marketEffect = market.multiplier - 1.0; // -0.2 到 0.25
-      const gain = invested * marketEffect * 1.5; // 放大市場效果
+      const isDown = market.multiplier < 1.0;
+      const invested = Math.min(player.cash * 0.5, player.cash);
+      const multiplier = isDown ? 1.5 : 1.0;
+      const assetChange = invested * market.multiplier * multiplier;
+      const gain = assetChange - invested;
       return {
         cashChange: -invested,
-        assetChange: invested + gain,
-        message: market.multiplier >= 1.0
-          ? `All In！投入 ${fmtMoney(invested)}，大賺 ${fmtMoney(gain)}！`
-          : `All In！投入 ${fmtMoney(invested)}，虧損 ${fmtMoney(Math.abs(gain))}...`,
-      };
-    },
-  },
-  {
-    id: "cash_king",
-    name: "現金為王",
-    description: "保留現金，不投資",
-    riskLevel: "極低",
-    color: "linear-gradient(135deg, rgba(200, 200, 200, 0.85), rgba(160, 160, 160, 0.85))",
-    effect: () => {
-      return {
-        cashChange: 0,
-        assetChange: 0,
-        message: "本回合保持觀望，現金不動",
+        assetChange: assetChange,
+        message: isDown
+          ? `逢低買進！投入 ${fmtMoney(invested)}，效果加倍！獲得 ${fmtMoney(gain)} 收益`
+          : `投入 ${fmtMoney(invested)}，獲得 ${fmtMoney(gain)} 收益`,
       };
     },
   },
   {
     id: "rebalance",
     name: "資產再平衡",
-    description: "調整配置，降低風險",
+    description: "調整配置",
     riskLevel: "中",
-    color: "linear-gradient(135deg, rgba(180, 150, 255, 0.85), rgba(150, 120, 230, 0.85))",
+    color:
+      "linear-gradient(135deg, rgba(180, 150, 255, 0.85), rgba(150, 120, 230, 0.85))",
     effect: (market, player) => {
       const targetCashRatio = 0.3;
       const totalValue = player.cash + player.asset;
       const targetCash = totalValue * targetCashRatio;
       const cashDiff = targetCash - player.cash;
-      
+
       if (cashDiff > 0) {
         // 需要賣出資產換現金
         const sellAmount = Math.min(cashDiff, player.asset * 0.3);
@@ -138,12 +124,70 @@ const CARD_DECK = [
       } else {
         // 需要買入資產
         const buyAmount = Math.min(Math.abs(cashDiff), player.cash * 0.3);
+        const assetChange = buyAmount * market.multiplier;
         return {
           cashChange: -buyAmount,
-          assetChange: buyAmount * 1.02,
+          assetChange: assetChange,
           message: `買入 ${fmtMoney(buyAmount)} 資產，調整配置`,
         };
       }
+    },
+  },
+  {
+    id: "heavy_position",
+    name: "重倉進場",
+    description: "逆勢重壓，放大判斷",
+    riskLevel: "高",
+    color:
+      "linear-gradient(135deg, rgba(255, 150, 100, 0.85), rgba(230, 120, 70, 0.85))",
+    effect: (market, player) => {
+      const invested = Math.min(player.cash * 0.75, player.cash);
+
+      const isDown = market.multiplier < 1.0;
+
+      // 方案 B：逆勢思維
+      // 下跌時給更高 bonus，代表撿便宜
+      const bonus = isDown ? 1.4 : 1.2;
+
+      const assetChange = invested * market.multiplier * bonus;
+      const gain = assetChange - invested;
+
+      return {
+        cashChange: -invested,
+        assetChange,
+        message: isDown
+          ? `逆勢重倉！市場恐慌中投入 ${fmtMoney(invested)}，撿到便宜，獲得 ${fmtMoney(gain)} 收益`
+          : market.multiplier >= 1.0
+            ? `重倉進場！投入 ${fmtMoney(invested)}，大賺 ${fmtMoney(gain)}！`
+            : `重倉進場！投入 ${fmtMoney(invested)}，虧損 ${fmtMoney(Math.abs(gain))}...`,
+      };
+    },
+  },
+  {
+    id: "all_in",
+    name: "ALL IN",
+    description: "孤注一擲，賭方向",
+    riskLevel: "極高",
+    color:
+      "linear-gradient(135deg, rgba(255, 100, 150, 0.85), rgba(230, 70, 120, 0.85))",
+    effect: (market, player) => {
+      const invested = player.cash;
+
+      const isUp = market.multiplier >= 1.0;
+
+      // 不對稱放大：跌比漲更痛
+      const leverage = isUp ? 2.2 : 2.8;
+
+      const assetChange = invested * market.multiplier * leverage;
+      const gain = assetChange - invested;
+
+      return {
+        cashChange: -invested,
+        assetChange,
+        message: isUp
+          ? `ALL IN！孤注一擲 ${fmtMoney(invested)}，方向正確，狂賺 ${fmtMoney(gain)}！！`
+          : `ALL IN！孤注一擲 ${fmtMoney(invested)}，方向錯誤，慘賠 ${fmtMoney(Math.abs(gain))}…`,
+      };
     },
   },
 ];
@@ -155,9 +199,14 @@ const fmtMoney = (n) =>
     maximumFractionDigits: 0,
   }).format(Math.round(n));
 
-// 隨機抽卡（不重複）
+// 隨機抽卡（不重複，使用 Fisher-Yates 洗牌）
 function drawCards(deck, count) {
-  const shuffled = [...deck].sort(() => Math.random() - 0.5);
+  const shuffled = [...deck];
+  // Fisher-Yates 洗牌算法
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   return shuffled.slice(0, count);
 }
 
@@ -168,40 +217,46 @@ function getRandomMarket() {
 
 export default function CardGame() {
   const navigate = useNavigate();
-  
+
   // 遊戲狀態
   const [gameState, setGameState] = useState("intro"); // intro, playing, result
   const [round, setRound] = useState(1);
   const [cash, setCash] = useState(INITIAL_CASH);
   const [asset, setAsset] = useState(0);
-  
+  const [totalInvested, setTotalInvested] = useState(INITIAL_CASH);
+
   // 卡牌與市場
   const [currentMarket, setCurrentMarket] = useState(null);
   const [handCards, setHandCards] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [hasPlayedCard, setHasPlayedCard] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  
+
   // 歷史記錄
   const [history, setHistory] = useState([]);
   const [usedCards, setUsedCards] = useState([]);
-  
+
   // Toast 訊息
   const [toast, setToast] = useState("");
 
   // 計算總資產
   const totalAsset = useMemo(() => cash + asset, [cash, asset]);
-  
+
   // 計算報酬率
-  const roi = useMemo(() => ((totalAsset - INITIAL_CASH) / INITIAL_CASH) * 100, [totalAsset]);
-  
+  const roi = useMemo(
+    () => ((totalAsset - totalInvested) / totalInvested) * 100,
+    [totalAsset, totalInvested],
+  );
+
   // 投資風格評語
   const investmentStyle = useMemo(() => {
     if (usedCards.length === 0) return "新手投資者";
-    
-    const riskCount = usedCards.filter(c => c.riskLevel === "高").length;
-    const safeCount = usedCards.filter(c => c.riskLevel === "低" || c.riskLevel === "極低").length;
-    
+
+    const riskCount = usedCards.filter((c) => c.riskLevel === "高").length;
+    const safeCount = usedCards.filter(
+      (c) => c.riskLevel === "低" || c.riskLevel === "極低",
+    ).length;
+
     if (riskCount > safeCount * 2) return "激進型投資者 🔥";
     if (safeCount > riskCount * 2) return "保守型投資者 🛡️";
     return "平衡型投資者 ⚖️";
@@ -217,7 +272,7 @@ export default function CardGame() {
   // 選擇卡牌
   function selectCard(card) {
     if (hasPlayedCard) {
-      showToast("已出牌，請按下一年");
+      showToast("已出牌，請按下一月");
       return;
     }
     if (selectedCard?.id === card.id) {
@@ -237,14 +292,10 @@ export default function CardGame() {
     const playerState = { cash, asset };
     const result = selectedCard.effect(currentMarket, playerState);
 
-    // 應用市場效果到資產
-    const marketEffect = (asset + result.assetChange) * (currentMarket.multiplier - 1.0);
-    const finalAssetChange = result.assetChange + marketEffect;
-
     // 更新資產
     const newCash = Math.max(0, cash + result.cashChange);
-    const newAsset = Math.max(0, asset + finalAssetChange);
-    
+    const newAsset = Math.max(0, asset + result.assetChange);
+
     setCash(newCash);
     setAsset(newAsset);
     setActionMessage(result.message);
@@ -277,6 +328,8 @@ export default function CardGame() {
     }
 
     setRound(round + 1);
+    setCash(cash + 30000); // 每月新增現金
+    setTotalInvested(totalInvested + 30000); // 更新總投入成本
     setCurrentMarket(getRandomMarket());
     setHandCards(drawCards(CARD_DECK, 3));
     setSelectedCard(null);
@@ -290,6 +343,7 @@ export default function CardGame() {
     setRound(1);
     setCash(INITIAL_CASH);
     setAsset(0);
+    setTotalInvested(INITIAL_CASH);
     setCurrentMarket(null);
     setHandCards([]);
     setSelectedCard(null);
@@ -328,15 +382,20 @@ export default function CardGame() {
               <div className="cardGameTitle">🃏 投資卡牌遊戲</div>
               <div className="cardGameDesc">
                 <p>初始資金：{fmtMoney(INITIAL_CASH)}</p>
-                <p>遊戲回合：{MAX_ROUNDS} 年</p>
+                <p>遊戲回合：{MAX_ROUNDS} 月</p>
                 <p>每回合抽 3 張卡，選 1 張出牌</p>
+                <p>每新的回合都會增加 3 萬現金</p>
               </div>
-              
+
               <div className="cardPreview">
                 <div className="previewTitle">卡牌類型</div>
                 <div className="cardList">
                   {CARD_DECK.slice(0, 4).map((card) => (
-                    <div key={card.id} className="miniCard" style={{ background: card.color }}>
+                    <div
+                      key={card.id}
+                      className="miniCard"
+                      style={{ background: card.color }}
+                    >
                       <div className="miniCardName">{card.name}</div>
                       <div className="miniCardRisk">{card.riskLevel}風險</div>
                     </div>
@@ -355,7 +414,9 @@ export default function CardGame() {
             <>
               {/* 資產總覽 */}
               <section className="card hero">
-                <div className="roundIndicator">第 {round} / {MAX_ROUNDS} 年</div>
+                <div className="roundIndicator">
+                  第 {round} / {MAX_ROUNDS} 月
+                </div>
                 <div className="heroRow">
                   <div>
                     <div className="label">總資產</div>
@@ -390,7 +451,11 @@ export default function CardGame() {
                     <div className="marketDesc">{currentMarket.desc}</div>
                     <div className="marketMultiplier">
                       資產波動：
-                      <span className={currentMarket.multiplier >= 1.0 ? "pos" : "neg"}>
+                      <span
+                        className={
+                          currentMarket.multiplier >= 1.0 ? "pos" : "neg"
+                        }
+                      >
                         {currentMarket.multiplier >= 1.0 ? "+" : ""}
                         {((currentMarket.multiplier - 1.0) * 100).toFixed(0)}%
                       </span>
@@ -414,7 +479,9 @@ export default function CardGame() {
                         <div className="gameCardName">{card.name}</div>
                         <div className="gameCardDesc">{card.description}</div>
                         <div className="gameCardRisk">
-                          <span className="riskBadge">{card.riskLevel}風險</span>
+                          <span className="riskBadge">
+                            {card.riskLevel}風險
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -452,8 +519,8 @@ export default function CardGame() {
 
                 <div className="grid2">
                   <div className="mini">
-                    <div className="label">初始資金</div>
-                    <div className="value">{fmtMoney(INITIAL_CASH)}</div>
+                    <div className="label">總投入成本</div>
+                    <div className="value">{fmtMoney(totalInvested)}</div>
                   </div>
                   <div className="mini">
                     <div className="label">投資風格</div>
@@ -470,12 +537,14 @@ export default function CardGame() {
                 <div className="historyList">
                   {history.map((record, idx) => (
                     <div key={idx} className="historyItem">
-                      <div className="historyYear">第 {record.round} 年</div>
+                      <div className="historyYear">第 {record.round} 月</div>
                       <div className="historyDetail">
                         <div className="historyMarket">{record.market}</div>
                         <div className="historyCard">{record.card}</div>
                       </div>
-                      <div className="historyTotal">{fmtMoney(record.totalAsset)}</div>
+                      <div className="historyTotal">
+                        {fmtMoney(record.totalAsset)}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -490,19 +559,19 @@ export default function CardGame() {
         <footer className="bottomBar">
           {gameState === "playing" && (
             <>
-              <button 
-                className="btn ghost" 
+              <button
+                className="btn ghost"
                 onClick={playCard}
                 disabled={!selectedCard || actionMessage}
               >
                 出牌
               </button>
-              <button 
-                className="btn solid" 
+              <button
+                className="btn solid"
                 onClick={nextRound}
                 disabled={!actionMessage}
               >
-                {round >= MAX_ROUNDS ? "查看結果" : "下一年"}
+                {round >= MAX_ROUNDS ? "查看結果" : "下一月"}
               </button>
             </>
           )}
