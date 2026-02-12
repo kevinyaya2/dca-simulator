@@ -8,9 +8,11 @@ const GAME_HEIGHT = 600;
 const BIRD_SIZE = 40;
 const PIPE_WIDTH = 60;
 const PIPE_GAP = 180;
-const GRAVITY = 0.4;
+// 基於時間的物理常數（以每秒為單位，適應不同刷新率）
+const TARGET_FPS = 60;
+const GRAVITY = 0.4 * TARGET_FPS; // 每秒增加的速度
 const JUMP_FORCE = -7;
-const PIPE_SPEED = 2.5;
+const PIPE_SPEED = 2.5 * TARGET_FPS; // 每秒移動的像素
 
 // 帳單柱類型
 const BILL_TYPES = [
@@ -94,6 +96,7 @@ const FlappySalaryGame = () => {
   const scoreRef = useRef(score);
   const gameLoopRef = useRef(null);
   const lastPipeRef = useRef(0);
+  const lastTimeRef = useRef(0); // 追蹤上一幀時間
 
   // 同步 ref 和 state
   useEffect(() => {
@@ -155,19 +158,28 @@ const FlappySalaryGame = () => {
       return;
     }
 
-    const gameLoop = () => {
+    lastTimeRef.current = performance.now();
+
+    const gameLoop = (currentTime) => {
       if (gameStateRef.current !== "playing") return;
 
-      // 更新小鳥速度和位置
-      velocityRef.current += GRAVITY;
-      birdYRef.current += velocityRef.current;
+      // 計算 delta time（秒）
+      const deltaTime = Math.min(
+        (currentTime - lastTimeRef.current) / 1000,
+        0.1,
+      ); // 限制最大 delta 避免跳幀
+      lastTimeRef.current = currentTime;
+
+      // 更新小鳥速度和位置（基於時間）
+      velocityRef.current += GRAVITY * deltaTime;
+      birdYRef.current += velocityRef.current * deltaTime * TARGET_FPS;
 
       setBirdVelocity(velocityRef.current);
       setBirdY(birdYRef.current);
 
-      // 更新柱子
+      // 更新柱子（基於時間）
       let newPipes = pipesRef.current
-        .map((pipe) => ({ ...pipe, x: pipe.x - PIPE_SPEED }))
+        .map((pipe) => ({ ...pipe, x: pipe.x - PIPE_SPEED * deltaTime }))
         .filter((pipe) => pipe.x > -PIPE_WIDTH);
 
       // 計分
@@ -272,6 +284,10 @@ const FlappySalaryGame = () => {
         <div
           className="game-area"
           onClick={jump}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            jump();
+          }}
           style={{ width: GAME_WIDTH, height: GAME_HEIGHT }}
         >
           {/* 薪水小鳥 */}
@@ -359,6 +375,21 @@ const FlappySalaryGame = () => {
             </div>
           )}
         </div>
+
+        {/* 跳躍按鈕 */}
+        <button
+          className="jump-btn"
+          onTouchStart={(e) => {
+            e.preventDefault();
+            jump();
+          }}
+          onClick={jump}
+        >
+          <span className="jump-icon">👤</span>
+          <span className="jump-text">
+            {gameState === "ready" ? "開始遊戲" : gameState === "gameover" ? "再試一次" : "跳躍"}
+          </span>
+        </button>
 
         <div className="instructions">
           <div className="instruction-item">
