@@ -58,6 +58,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(120, 200, 255, 0.88), rgba(80, 160, 255, 0.88))",
       route: "/toeic",
     },
+    {
+      id: "flappy",
+      name: "薪水小鳥",
+      subtitle: "Flappy Salary",
+      icon: "🐤",
+      color:
+        "linear-gradient(135deg, rgba(102, 126, 234, 0.88), rgba(118, 75, 162, 0.88))",
+      route: "/flappy",
+    },
   ];
 
   const handleAppClick = (app) => {

@@ -856,17 +856,14 @@ export default function AutoBattle() {
               <div className="subtitle">派兵 + 泡泡結界</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button className="toast" onClick={() => navigate("/")}>
-                返回
+              <button className="backBtn" onClick={() => navigate("/")}>
+                ← 返回
+              </button>
+              <button className="backBtn" onClick={togglePause}>
+                {isPaused ? "▶ 繼續" : "⏸ 暫停"}
               </button>
               <button
-                className={isPaused ? "toast" : "toast"}
-                onClick={togglePause}
-              >
-                {isPaused ? "繼續" : "暫停"}
-              </button>
-              <button
-                className={view.autoBattle ? "toast" : "toast"}
+                className="backBtn"
                 onClick={toggleAutoBattle}
                 style={{
                   background: view.autoBattle

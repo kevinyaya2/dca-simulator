@@ -18,6 +18,9 @@ const PLATFORM_GAP_MIN = 60;
 const PLATFORM_GAP_MAX = 120;
 const INITIAL_PLATFORM_COUNT = 10;
 
+// 超過此分數時顯示為無限
+const INFINITY_SCORE_THRESHOLD = 1000000000000000; // 1000兆（10^15）
+
 // 道具持續時間 (ms)
 const JETPACK_DURATION = 3000;
 
@@ -292,6 +295,19 @@ const DYNAMIC_TITLE_LEVELS = [
 
 // 動態計算稱號函數
 const getScoreTitle = (score) => {
+  // 0. 超高分：無限存在（超過安全整數範圍或數值異常）
+  if (
+    !Number.isFinite(score) ||
+    !Number.isSafeInteger(Math.floor(score)) ||
+    score >= INFINITY_SCORE_THRESHOLD
+  ) {
+    return {
+      milestoneScore: INFINITY_SCORE_THRESHOLD,
+      title: "∞ 無限存在",
+      icon: "🌌",
+    };
+  }
+
   // 1. 先檢查基礎稱號
   for (let i = BASE_SCORE_TITLES.length - 1; i >= 0; i--) {
     if (score >= BASE_SCORE_TITLES[i].score) {
@@ -347,6 +363,28 @@ const getScoreTitle = (score) => {
 
 // ============ 工具函數 ============
 const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// 格式化分數顯示（超過安全整數範圍顯示為 ∞）
+const formatScore = (score) => {
+  // 檢查是否超過安全整數範圍或數值異常
+  if (
+    !Number.isFinite(score) ||
+    !Number.isSafeInteger(Math.floor(score)) ||
+    score >= INFINITY_SCORE_THRESHOLD
+  ) {
+    return "∞";
+  }
+  return score.toLocaleString();
+};
+
+// 檢查分數是否達到無限境界
+const isInfinityScore = (score) => {
+  return (
+    !Number.isFinite(score) ||
+    !Number.isSafeInteger(Math.floor(score)) ||
+    score >= INFINITY_SCORE_THRESHOLD
+  );
+};
 
 // 邊緣安全區寬度（畫面左右各 15%）
 const EDGE_SAFE_ZONE = GAME_WIDTH * 0.15;
@@ -1759,12 +1797,14 @@ export default function JumpGame() {
           <div className="jumpScoreItem">
             <span className="jumpScoreLabel">分數</span>
             <span className="jumpScoreValue" ref={scoreDomRef}>
-              {score}
+              {formatScore(score)}
             </span>
           </div>
           <div className="jumpScoreItem">
             <span className="jumpScoreLabel">最高</span>
-            <span className="jumpScoreValue best">{highScore}</span>
+            <span className="jumpScoreValue best">
+              {formatScore(highScore)}
+            </span>
           </div>
           <div className="jumpEffects">
             {activeEffects.jetpack && <span className="jumpEffect">🚀</span>}
@@ -1875,21 +1915,79 @@ export default function JumpGame() {
             </div>
           )}
 
-          {gameState === "gameover" && (
-            <div className="jumpOverlay gameOver">
-              <div className="jumpOverlayContent">
-                <div className="jumpOverlayEmoji">💀</div>
-                <h2>Game Over</h2>
-                <p className="jumpFinalScore">分數：{score}m</p>
-                {score >= highScore && score > 0 && (
-                  <p className="jumpNewRecord">🎉 新紀錄！</p>
-                )}
-                <button className="jumpStartBtn" onClick={resetGame}>
-                  重新開始
-                </button>
-              </div>
-            </div>
-          )}
+          {gameState === "gameover" &&
+            (() => {
+              const titleInfo = getScoreTitle(score);
+              const isInfinity = isInfinityScore(score);
+              const wasInfinity = isInfinityScore(highScore);
+              // 新紀錄判定：非無限時比較數值；首次達到無限也算新紀錄
+              const isNewRecord =
+                score > 0 &&
+                ((isInfinity && !wasInfinity) || // 首次達到無限
+                  (!isInfinity && !wasInfinity && score > highScore)); // 普通新紀錄
+              const getResultEmoji = () => {
+                if (isInfinity) return "🌌";
+                if (score >= 10000) return "🏆";
+                if (score >= 5000) return "👑";
+                if (score >= 2000) return "🌟";
+                if (score >= 1000) return "⭐";
+                if (score >= 500) return "🎯";
+                if (score >= 100) return "🚀";
+                return "💪";
+              };
+              const getResultMessage = () => {
+                if (isInfinity && wasInfinity) return "再次抵達無限境界！";
+                if (isInfinity && !wasInfinity) return "🎊 首次突破無限！";
+                if (score >= 10000) return "神級表現！";
+                if (score >= 5000) return "太強了！";
+                if (score >= 2000) return "表現優異！";
+                if (score >= 1000) return "做得好！";
+                if (score >= 500) return "不錯的嘗試！";
+                if (score >= 100) return "繼續加油！";
+                return "下次會更好！";
+              };
+              const getTitle = () => {
+                if (isInfinity && wasInfinity) return "∞ 無限境界";
+                if (isNewRecord) return "🎉 新紀錄！";
+                return "Game Over";
+              };
+              return (
+                <div className="jumpOverlay gameOver">
+                  <div className="jumpOverlayContent">
+                    <div className="jumpOverlayEmoji bounce">
+                      {getResultEmoji()}
+                    </div>
+                    <h2>{getTitle()}</h2>
+                    <div className="jumpResultStats">
+                      <div className="jumpResultScore">
+                        <span className="jumpResultLabel">本次分數</span>
+                        <span className="jumpResultValue">
+                          {formatScore(score)}m
+                        </span>
+                      </div>
+                      <div className="jumpResultTitle">
+                        <span className="jumpResultTitleIcon">
+                          {titleInfo.icon}
+                        </span>
+                        <span className="jumpResultTitleText">
+                          {titleInfo.title}
+                        </span>
+                      </div>
+                      <div className="jumpResultBest">
+                        <span className="jumpResultLabel">最高紀錄</span>
+                        <span className="jumpResultValue">
+                          {formatScore(Math.max(score, highScore))}m
+                        </span>
+                      </div>
+                    </div>
+                    <p className="jumpResultMessage">{getResultMessage()}</p>
+                    <button className="jumpStartBtn" onClick={resetGame}>
+                      🔄 再來一次
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
         </div>
 
         {/* 控制按鈕 */}

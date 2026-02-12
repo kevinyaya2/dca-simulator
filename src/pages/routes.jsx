@@ -5,6 +5,7 @@ import FightGame from "./FightGame";
 import JumpGame from "./JumpGame";
 import AutoBattle from "./AutoBattle";
 import ToeicVocab from "./ToeicVocab";
+import FlappySalaryGame from "./FlappySalaryGame";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -42,6 +43,11 @@ const routes = [
     path: "/toeic",
     element: <ToeicVocab />,
     title: "多益單字",
+  },
+  {
+    path: "/flappy",
+    element: <FlappySalaryGame />,
+    title: "薪水小鳥",
   },
 ];
 
