@@ -7,12 +7,12 @@ const GAME_WIDTH = 400;
 const GAME_HEIGHT = 600;
 const BIRD_SIZE = 40;
 const PIPE_WIDTH = 60;
-const PIPE_GAP = 180;
+const PIPE_GAP = 220;
 // 基於時間的物理常數（以每秒為單位，適應不同刷新率）
 const TARGET_FPS = 60;
-const GRAVITY = 0.4 * TARGET_FPS; // 每秒增加的速度
-const JUMP_FORCE = -7;
-const PIPE_SPEED = 2.5 * TARGET_FPS; // 每秒移動的像素
+const GRAVITY = 0.3 * TARGET_FPS; // 每秒增加的速度
+const JUMP_FORCE = -4.5;
+const PIPE_SPEED = 2 * TARGET_FPS; // 每秒移動的像素
 
 // 帳單柱類型
 const BILL_TYPES = [
@@ -368,9 +368,6 @@ const FlappySalaryGame = () => {
                   <strong>{score}</strong>
                   <span className="final-bird">達成：{currentBird.name}</span>
                 </div>
-                <button className="restart-btn" onClick={jump}>
-                  🔄 再試一次
-                </button>
               </div>
             </div>
           )}
@@ -387,7 +384,11 @@ const FlappySalaryGame = () => {
         >
           <span className="jump-icon">👤</span>
           <span className="jump-text">
-            {gameState === "ready" ? "開始遊戲" : gameState === "gameover" ? "再試一次" : "跳躍"}
+            {gameState === "ready"
+              ? "開始遊戲"
+              : gameState === "gameover"
+                ? "再試一次"
+                : "跳躍"}
           </span>
         </button>
 
