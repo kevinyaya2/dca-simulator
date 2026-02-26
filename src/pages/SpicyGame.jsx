@@ -268,15 +268,17 @@ const LEVELS = [
 
 // ========== 遊戲常數 ==========
 const GAME_WIDTH = 360;
-const GAME_HEIGHT = 640;
+const GAME_HEIGHT = 520;
 const PLAYER_SIZE = 50;
 const PROJECTILE_SIZE = 20;
 const FIREBALL_SIZE = 24;
 const BOSS_WIDTH = 80;
 const BOSS_HEIGHT = 70;
 const MINION_SIZE = 36;
-const PLAYER_Y = GAME_HEIGHT - 80;
-const BOSS_Y = 60;
+const PLAYER_Y = GAME_HEIGHT - 70;
+const BOSS_Y = 50;
+const POWERUP_SIZE = 32;
+const AUTO_FIRE_INTERVAL = 150; // 自動發射間隔 (ms)
 const PROJECTILE_SPEED = 10;
 const PLAYER_SPEED = 6;
 
@@ -363,6 +365,10 @@ export default function SpicyGame() {
   // 新增：滑動提示
   const [showSwipeHint, setShowSwipeHint] = useState(true);
 
+  // 新增：道具狀態
+  const [hasAutoFire, setHasAutoFire] = useState(false);
+  const [cloneCount, setCloneCount] = useState(0);
+
   // UI 快照狀態：用於 React render 同步位置資訊
   const [ui, setUi] = useState({
     playerX: GAME_WIDTH / 2 - PLAYER_SIZE / 2,
@@ -370,6 +376,7 @@ export default function SpicyGame() {
     projectiles: [],
     fireballs: [],
     minions: [],
+    powerups: [],
     bgOffset1: 0,
     bgOffset2: 0,
     bgOffset3: 0,
@@ -378,11 +385,13 @@ export default function SpicyGame() {
   // 遊戲邏輯狀態（用 useRef 避免每幀 re-render）
   const gameRef = useRef({
     playerX: GAME_WIDTH / 2 - PLAYER_SIZE / 2,
+    targetPlayerX: GAME_WIDTH / 2 - PLAYER_SIZE / 2,
     bossX: GAME_WIDTH / 2 - BOSS_WIDTH / 2,
     bossDirection: 1,
     projectiles: [],
     fireballs: [],
     minions: [],
+    powerups: [],
     bossHp: 100,
     scoville: 0,
     score: 0,
@@ -392,6 +401,7 @@ export default function SpicyGame() {
     bossKills: 0,
     lastFireballTime: 0,
     lastMinionTime: 0,
+    lastAutoFireTime: 0,
     isRunning: false,
     animationId: null,
     lastTime: 0,
@@ -400,6 +410,10 @@ export default function SpicyGame() {
     projectileIdCounter: 0,
     fireballIdCounter: 0,
     minionIdCounter: 0,
+    powerupIdCounter: 0,
+    // 道具狀態
+    hasAutoFire: false,
+    cloneCount: 0,
     // 背景偏移
     bgOffset1: 0,
     bgOffset2: 0,
@@ -408,6 +422,7 @@ export default function SpicyGame() {
 
   const gameAreaRef = useRef(null);
   const soundRef = useRef(new SoundManager());
+  const shootIntervalRef = useRef(null);
 
   // 當前關卡資料
   const level = LEVELS[currentLevel];
@@ -420,11 +435,13 @@ export default function SpicyGame() {
     const initBossX = GAME_WIDTH / 2 - BOSS_WIDTH / 2;
 
     game.playerX = initPlayerX;
+    game.targetPlayerX = initPlayerX;
     game.bossX = initBossX;
     game.bossDirection = 1;
     game.projectiles = [];
     game.fireballs = [];
     game.minions = [];
+    game.powerups = [];
     game.bossHp = lvl.bossHp;
     game.scoville = keepStats ? game.scoville : 0;
     game.stageMinionKills = 0;
@@ -434,6 +451,14 @@ export default function SpicyGame() {
     game.projectileIdCounter = 0;
     game.fireballIdCounter = 0;
     game.minionIdCounter = 0;
+    game.powerupIdCounter = 0;
+    // 道具狀態保留（永久）
+    if (!keepStats) {
+      game.hasAutoFire = false;
+      game.cloneCount = 0;
+      setHasAutoFire(false);
+      setCloneCount(0);
+    }
 
     setUi({
       playerX: initPlayerX,
@@ -441,6 +466,7 @@ export default function SpicyGame() {
       projectiles: [],
       fireballs: [],
       minions: [],
+      powerups: [],
       bgOffset1: game.bgOffset1,
       bgOffset2: game.bgOffset2,
       bgOffset3: game.bgOffset3,
@@ -464,10 +490,15 @@ export default function SpicyGame() {
     game.bgOffset1 = 0;
     game.bgOffset2 = 0;
     game.bgOffset3 = 0;
+    game.hasAutoFire = false;
+    game.cloneCount = 0;
+    game.lastAutoFireTime = 0;
     setScore(0);
     setMinionKills(0);
     setBossKills(0);
     setShowSwipeHint(true);
+    setHasAutoFire(false);
+    setCloneCount(0);
     initLevel(0);
     setGameState("playing");
     game.isRunning = true;
@@ -487,9 +518,21 @@ export default function SpicyGame() {
 
   // ========== 重試 ==========
   const retry = useCallback(() => {
+    // 保留道具狀態
+    const game = gameRef.current;
+    const savedAutoFire = game.hasAutoFire;
+    const savedCloneCount = game.cloneCount;
+    
     initLevel(currentLevel);
+    
+    // 恢復道具狀態
+    game.hasAutoFire = savedAutoFire;
+    game.cloneCount = savedCloneCount;
+    setHasAutoFire(savedAutoFire);
+    setCloneCount(savedCloneCount);
+    
     setGameState("playing");
-    gameRef.current.isRunning = true;
+    game.isRunning = true;
   }, [currentLevel, initLevel]);
 
   // ========== 從頭開始 ==========
@@ -502,10 +545,15 @@ export default function SpicyGame() {
     game.bgOffset1 = 0;
     game.bgOffset2 = 0;
     game.bgOffset3 = 0;
+    game.hasAutoFire = false;
+    game.cloneCount = 0;
+    game.lastAutoFireTime = 0;
     setScore(0);
     setMinionKills(0);
     setBossKills(0);
     setShowSwipeHint(true);
+    setHasAutoFire(false);
+    setCloneCount(0);
     initLevel(0);
     setGameState("playing");
     game.isRunning = true;
@@ -515,6 +563,11 @@ export default function SpicyGame() {
   const togglePause = useCallback(() => {
     if (gameState === "playing") {
       gameRef.current.isRunning = false;
+      // 清除長按發射
+      if (shootIntervalRef.current) {
+        clearInterval(shootIntervalRef.current);
+        shootIntervalRef.current = null;
+      }
       setGameState("paused");
     } else if (gameState === "paused") {
       gameRef.current.isRunning = true;
@@ -523,16 +576,36 @@ export default function SpicyGame() {
     }
   }, [gameState]);
 
+  // ========== 清除長按發射（組件卸載時）==========
+  useEffect(() => {
+    return () => {
+      if (shootIntervalRef.current) {
+        clearInterval(shootIntervalRef.current);
+        shootIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   // ========== 發射冰淇淋球 ==========
   const shoot = useCallback(() => {
     if (gameState !== "playing") return;
     const game = gameRef.current;
+    // 主角發射
     game.projectiles.push({
       x: game.playerX + PLAYER_SIZE / 2 - PROJECTILE_SIZE / 2,
       y: PLAYER_Y - PROJECTILE_SIZE,
       id: game.projectileIdCounter++,
     });
-    soundRef.current.shoot();
+    // 分身發射
+    for (let i = 0; i < game.cloneCount; i++) {
+      const offset = Math.ceil((i + 1) / 2) * 35 * (i % 2 === 0 ? 1 : -1);
+      const cloneX = Math.max(0, Math.min(GAME_WIDTH - PROJECTILE_SIZE, game.playerX + PLAYER_SIZE / 2 - PROJECTILE_SIZE / 2 + offset));
+      game.projectiles.push({
+        x: cloneX,
+        y: PLAYER_Y - PROJECTILE_SIZE,
+        id: game.projectileIdCounter++,
+      });
+    }
   }, [gameState]);
 
   // ========== 主遊戲迴圈 ==========
@@ -558,12 +631,20 @@ export default function SpicyGame() {
       game.bgOffset2 = (game.bgOffset2 + lvl.scrollSpeed * 0.6 * deltaTime * scrollMultiplier) % 150;
       game.bgOffset3 = (game.bgOffset3 + lvl.scrollSpeed * 1.0 * deltaTime * scrollMultiplier) % 100;
 
-      // ========== 玩家移動 ==========
+      // ========== 玩家移動（平滑補間）==========
+      const LERP_FACTOR = 0.25;
       if (game.keys.left) {
-        game.playerX = Math.max(0, game.playerX - PLAYER_SPEED * deltaTime);
+        game.targetPlayerX = Math.max(0, game.targetPlayerX - PLAYER_SPEED * deltaTime);
       }
       if (game.keys.right) {
-        game.playerX = Math.min(GAME_WIDTH - PLAYER_SIZE, game.playerX + PLAYER_SPEED * deltaTime);
+        game.targetPlayerX = Math.min(GAME_WIDTH - PLAYER_SIZE, game.targetPlayerX + PLAYER_SPEED * deltaTime);
+      }
+      // 平滑移動到目標位置
+      const diff = game.targetPlayerX - game.playerX;
+      if (Math.abs(diff) > 0.5) {
+        game.playerX += diff * LERP_FACTOR;
+      } else {
+        game.playerX = game.targetPlayerX;
       }
 
       // ========== 小辣椒敵人生成（從上方往下）==========
@@ -622,6 +703,58 @@ export default function SpicyGame() {
         return f.y < GAME_HEIGHT + FIREBALL_SIZE;
       });
 
+      // ========== 更新道具位置 ==========
+      game.powerups = game.powerups.filter((p) => {
+        p.y += 2 * deltaTime;
+        return p.y < GAME_HEIGHT + POWERUP_SIZE;
+      });
+
+      // ========== 道具與玩家碰撞 ==========
+      const playerRect = { x: game.playerX, y: PLAYER_Y, width: PLAYER_SIZE, height: PLAYER_SIZE };
+      game.powerups = game.powerups.filter((p) => {
+        const powerupRect = { x: p.x, y: p.y, width: POWERUP_SIZE, height: POWERUP_SIZE };
+        if (checkCollision(powerupRect, playerRect)) {
+          if (p.type === "autofire") {
+            game.hasAutoFire = true;
+            setHasAutoFire(true);
+          } else if (p.type === "clone") {
+            if (game.cloneCount < 4) {
+              game.cloneCount++;
+              setCloneCount(game.cloneCount);
+              // 達到最大分身數量時，清除所有剩餘的分身道具
+              if (game.cloneCount >= 4) {
+                game.powerups = game.powerups.filter((pw) => pw.type !== "clone");
+              }
+            }
+          }
+          game.score += 100;
+          soundRef.current.victory();
+          return false;
+        }
+        return true;
+      });
+
+      // ========== 自動發射 ==========
+      if (game.hasAutoFire && currentTime - game.lastAutoFireTime > AUTO_FIRE_INTERVAL) {
+        // 主角發射
+        game.projectiles.push({
+          x: game.playerX + PLAYER_SIZE / 2 - PROJECTILE_SIZE / 2,
+          y: PLAYER_Y - PROJECTILE_SIZE,
+          id: game.projectileIdCounter++,
+        });
+        // 分身發射
+        for (let i = 0; i < game.cloneCount; i++) {
+          const offset = Math.ceil((i + 1) / 2) * 35 * (i % 2 === 0 ? 1 : -1);
+          const cloneX = Math.max(0, Math.min(GAME_WIDTH - PROJECTILE_SIZE, game.playerX + PLAYER_SIZE / 2 - PROJECTILE_SIZE / 2 + offset));
+          game.projectiles.push({
+            x: cloneX,
+            y: PLAYER_Y - PROJECTILE_SIZE,
+            id: game.projectileIdCounter++,
+          });
+        }
+        game.lastAutoFireTime = currentTime;
+      }
+
       // ========== 投射物與小辣椒碰撞 ==========
       game.projectiles = game.projectiles.filter((p) => {
         const projRect = { x: p.x, y: p.y, width: PROJECTILE_SIZE, height: PROJECTILE_SIZE };
@@ -636,6 +769,26 @@ export default function SpicyGame() {
               game.stageMinionKills++;
               game.score += 50;
               soundRef.current.minionHit();
+              // 機率掉落道具 (15%)
+              // 已滿則不掉落：自動攻擊已有 + 分身已滿4隻
+              const canDropAutofire = !game.hasAutoFire;
+              const canDropClone = game.cloneCount < 4;
+              if (Math.random() < 0.15 && (canDropAutofire || canDropClone)) {
+                let powerupType;
+                if (canDropAutofire && canDropClone) {
+                  powerupType = Math.random() < 0.5 ? "autofire" : "clone";
+                } else if (canDropAutofire) {
+                  powerupType = "autofire";
+                } else {
+                  powerupType = "clone";
+                }
+                game.powerups.push({
+                  x: m.x + MINION_SIZE / 2 - POWERUP_SIZE / 2,
+                  y: m.y,
+                  type: powerupType,
+                  id: game.powerupIdCounter++,
+                });
+              }
               // 檢查是否觸發 Boss
               if (!game.bossPhase && game.stageMinionKills >= lvl.minionKillsRequired) {
                 game.bossPhase = true;
@@ -669,7 +822,6 @@ export default function SpicyGame() {
       }
 
       // ========== 火球與玩家碰撞 ==========
-      const playerRect = { x: game.playerX, y: PLAYER_Y, width: PLAYER_SIZE, height: PLAYER_SIZE };
       game.fireballs = game.fireballs.filter((f) => {
         const fireRect = { x: f.x, y: f.y, width: FIREBALL_SIZE, height: FIREBALL_SIZE };
         if (checkCollision(fireRect, playerRect)) {
@@ -697,18 +849,39 @@ export default function SpicyGame() {
 
       // ========== 檢查勝利/失敗 ==========
       if (game.bossPhase && game.bossHp <= 0) {
-        game.isRunning = false;
         game.bossKills++;
         game.score += 500 + (currentLevel + 1) * 200;
+        
+        // 打敗 Boss 減辣度：第 N 關減 N*10%，最多減 100%
+        const scovilleReduction = Math.min((currentLevel + 1) * 10, 100);
+        game.scoville = Math.max(0, game.scoville - scovilleReduction);
+        setScovilleLevel(game.scoville);
+        
         soundRef.current.victory();
-        if (currentLevel < LEVELS.length - 1) {
-          setGameState("levelclear");
-        } else {
-          setGameState("victory");
-        }
         setMinionKills(game.minionKills);
         setBossKills(game.bossKills);
         setScore(game.score);
+        
+        if (currentLevel < LEVELS.length - 1) {
+          // 自動進入下一關（短暫暫停後繼續）
+          game.bossPhase = false;
+          game.stageMinionKills = 0;
+          game.bossHp = LEVELS[currentLevel + 1].bossHp;
+          game.projectiles = [];
+          game.fireballs = [];
+          game.minions = [];
+          game.powerups = [];
+          game.lastFireballTime = 0;
+          game.lastMinionTime = 0;
+          setBossPhase(false);
+          setStageMinionKills(0);
+          setBossHp(LEVELS[currentLevel + 1].bossHp);
+          setCurrentLevel(currentLevel + 1);
+          // 不停止遊戲，繼續運行
+        } else {
+          game.isRunning = false;
+          setGameState("victory");
+        }
       }
 
       if (game.scoville >= 100) {
@@ -736,6 +909,7 @@ export default function SpicyGame() {
           projectiles: game.projectiles.map((p) => ({ ...p })),
           fireballs: game.fireballs.map((f) => ({ ...f })),
           minions: game.minions.map((m) => ({ ...m })),
+          powerups: game.powerups.map((p) => ({ ...p })),
           bgOffset1: game.bgOffset1,
           bgOffset2: game.bgOffset2,
           bgOffset3: game.bgOffset3,
@@ -800,8 +974,19 @@ export default function SpicyGame() {
       const x = e.clientX - rect.left;
       game.touchStartX = x;
 
-      const y = e.clientY - rect.top;
-      if (y < GAME_HEIGHT / 2) shoot();
+      // 點擊左側 1/3 區域 → 向左移動
+      if (x < GAME_WIDTH / 3) {
+        game.targetPlayerX = Math.max(0, game.targetPlayerX - 40);
+        setShowSwipeHint(false);
+      }
+      // 點擊右側 1/3 區域 → 向右移動
+      else if (x > (GAME_WIDTH * 2) / 3) {
+        game.targetPlayerX = Math.min(GAME_WIDTH - PLAYER_SIZE, game.targetPlayerX + 40);
+        setShowSwipeHint(false);
+      }
+
+      // 點擊任意位置都發射
+      shoot();
     };
 
     const handlePointerMove = (e) => {
@@ -812,7 +997,7 @@ export default function SpicyGame() {
       if (Math.abs(deltaX) > 2) {
         setShowSwipeHint(false);
       }
-      game.playerX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, game.playerX + deltaX));
+      game.targetPlayerX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, game.targetPlayerX + deltaX));
       game.touchStartX = x;
     };
 
@@ -871,6 +1056,14 @@ export default function SpicyGame() {
               <span className="sv-hud-value">🌶️{minionKills}</span>
             </div>
             <div className="sv-hud-item">
+              <span className="sv-hud-label">道具</span>
+              <span className="sv-hud-value">
+                {hasAutoFire && "⚡"}
+                {cloneCount > 0 && `👥${cloneCount}`}
+                {!hasAutoFire && cloneCount === 0 && "-"}
+              </span>
+            </div>
+            <div className="sv-hud-item">
               <span className="sv-hud-label">分數</span>
               <span className="sv-hud-value">{score}</span>
             </div>
@@ -904,7 +1097,7 @@ export default function SpicyGame() {
           {/* 滑動提示 */}
           {gameState === "playing" && showSwipeHint && (
             <div className="sv-swipe-hint">
-              <span className="sv-swipe-hint-text">← 左右滑動操控 →</span>
+              <span className="sv-swipe-hint-text">← 點擊或滑動移動 →</span>
             </div>
           )}
 
@@ -918,7 +1111,7 @@ export default function SpicyGame() {
                 <p className="sv-instructions">
                   🎮 左右鍵移動 ｜ 空白鍵發射
                   <br />
-                  📱 拖曳移動 ｜ 點擊上方發射
+                  📱 點擊左右側移動 ｜ 拖曳操控
                   <br />
                   <br />
                   🌶️ 擊敗小辣椒 → 闖關 → 打倒Boss!
@@ -1076,17 +1269,6 @@ export default function SpicyGame() {
             </div>
           )}
 
-          {/* 辣度條 */}
-          {gameState !== "start" && (
-            <div className="sv-scoville-bar">
-              <div className="sv-bar-label">🌡️ 辣度</div>
-              <div className="sv-bar-track">
-                <div className="sv-bar-fill sv-scoville-fill" style={{ width: `${scovilleLevel}%` }} />
-              </div>
-              <span className="sv-bar-value">{Math.round(scovilleLevel)}%</span>
-            </div>
-          )}
-
           {/* Boss（僅 bossPhase 顯示）*/}
           {gameState !== "start" && bossPhase && (
             <div
@@ -1135,21 +1317,69 @@ export default function SpicyGame() {
             ))}
           </div>
 
+          {/* 道具 - JSX map 渲染 */}
+          <div className="sv-powerups">
+            {ui.powerups.map((p) => (
+              <div
+                key={p.id}
+                className={`sv-powerup sv-powerup-${p.type}`}
+                style={{ left: p.x, top: p.y }}
+              >
+                {p.type === "autofire" ? "⚡" : "👥"}
+              </div>
+            ))}
+          </div>
+
           {/* 玩家 */}
           {gameState !== "start" && (
-            <div
-              className={`sv-player ${playerHit ? "sv-player-hit" : ""}`}
-              style={{
-                left: ui.playerX,
-                top: PLAYER_Y,
-                width: PLAYER_SIZE,
-                height: PLAYER_SIZE,
-              }}
-            >
-              🍦
-            </div>
+            <>
+              {/* 分身 */}
+              {Array.from({ length: cloneCount }).map((_, i) => {
+                const offset = Math.ceil((i + 1) / 2) * 35 * (i % 2 === 0 ? 1 : -1);
+                const cloneX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, ui.playerX + offset));
+                return (
+                  <div
+                    key={`clone-${i}`}
+                    className="sv-player sv-player-clone"
+                    style={{
+                      left: cloneX,
+                      top: PLAYER_Y,
+                      width: PLAYER_SIZE,
+                      height: PLAYER_SIZE,
+                    }}
+                  >
+                    🍦
+                  </div>
+                );
+              })}
+              {/* 主角 */}
+              <div
+                className={`sv-player ${playerHit ? "sv-player-hit" : ""}`}
+                style={{
+                  left: ui.playerX,
+                  top: PLAYER_Y,
+                  width: PLAYER_SIZE,
+                  height: PLAYER_SIZE,
+                }}
+              >
+                🍦
+              </div>
+            </>
           )}
         </div>
+
+        {/* 辣度條（遊戲畫面外）*/}
+        {gameState !== "start" && (
+          <div className="sv-scoville-bar">
+            <div className={`sv-scoville-track ${scovilleLevel === 0 ? 'sv-frozen' : ''}`}>
+              <div className={`sv-scoville-fill ${scovilleLevel === 0 ? 'sv-frozen' : ''}`} style={{ width: `${Math.max(scovilleLevel, 15)}%` }}>
+                {scovilleLevel === 0 && <span className="sv-scoville-icon sv-ice-icon">🧊</span>}
+                {scovilleLevel >= 10 && <span className="sv-scoville-icon">🌶️</span>}
+                <span className="sv-scoville-value">{Math.round(scovilleLevel)}%</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 射擊按鈕（行動裝置）*/}
         {gameState === "playing" && (
@@ -1158,8 +1388,30 @@ export default function SpicyGame() {
             onTouchStart={(e) => {
               e.preventDefault();
               shoot();
+              shootIntervalRef.current = setInterval(() => shoot(), 120);
             }}
-            onClick={shoot}
+            onTouchEnd={() => {
+              if (shootIntervalRef.current) {
+                clearInterval(shootIntervalRef.current);
+                shootIntervalRef.current = null;
+              }
+            }}
+            onMouseDown={() => {
+              shoot();
+              shootIntervalRef.current = setInterval(() => shoot(), 120);
+            }}
+            onMouseUp={() => {
+              if (shootIntervalRef.current) {
+                clearInterval(shootIntervalRef.current);
+                shootIntervalRef.current = null;
+              }
+            }}
+            onMouseLeave={() => {
+              if (shootIntervalRef.current) {
+                clearInterval(shootIntervalRef.current);
+                shootIntervalRef.current = null;
+              }
+            }}
           >
             <span className="sv-shoot-icon">❄️</span>
             <span className="sv-shoot-text">發射冰淇淋</span>
