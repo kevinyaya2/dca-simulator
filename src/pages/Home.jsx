@@ -67,6 +67,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(102, 126, 234, 0.88), rgba(118, 75, 162, 0.88))",
       route: "/flappy",
     },
+    {
+      id: "spicy",
+      name: "辣度挑戰",
+      subtitle: "Spicy Game",
+      icon: "🌶️",
+      color:
+        "linear-gradient(135deg, rgba(255, 87, 87, 0.88), rgba(255, 150, 50, 0.88))",
+      route: "/spicy",
+    },
   ];
 
   const handleAppClick = (app) => {

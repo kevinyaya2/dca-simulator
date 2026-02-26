@@ -1,0 +1,940 @@
+/* File: src/pages/SpicyGame.css */
+/* 辣度挑戰遊戲 - 關卡推進版 - One UI 玻璃擬態風格 */
+
+/* ========== 頁面容器 ========== */
+.sv-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sv-container {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== 頂部導覽 ========== */
+.sv-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+}
+
+.sv-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: rgba(16, 16, 22, 0.9);
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.sv-header-spacer {
+  width: 70px; /* 與返回按鈕相同寬度 */
+}
+
+.sv-back-btn,
+.sv-pause-btn {
+  padding: 10px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(16, 16, 22, 0.85);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sv-back-btn:hover,
+.sv-pause-btn:hover {
+  background: rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
+}
+
+.sv-back-btn:active,
+.sv-pause-btn:active {
+  transform: translateY(0);
+}
+
+/* ========== HUD 資訊列 ========== */
+.sv-hud {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.55) 100%
+  );
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.sv-hud-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 3px 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.sv-hud-item:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+}
+
+.sv-hud-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 1px;
+}
+
+.sv-hud-value {
+  font-size: 14px;
+  font-weight: 900;
+  color: rgba(16, 16, 22, 0.92);
+  line-height: 1.1;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+.sv-hud-sub {
+  font-size: 8px;
+  font-weight: 500;
+  color: rgba(16, 16, 22, 0.55);
+  margin-top: 1px;
+}
+
+.sv-hud-shu .sv-hud-value {
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+  font-size: 15px;
+  letter-spacing: -0.5px;
+  width: 100%;
+  text-align: center;
+}
+
+/* ========== 遊戲區域 ========== */
+.sv-game-area {
+  position: relative;
+  border-radius: 28px;
+  background: linear-gradient(
+    180deg,
+    rgba(135, 206, 250, 0.6) 0%,
+    rgba(255, 182, 193, 0.5) 50%,
+    rgba(255, 218, 185, 0.6) 100%
+  );
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -20px 40px rgba(255, 200, 150, 0.2);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+/* ========== 背景卷軸層 ========== */
+.sv-bg-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+
+/* 遠景層 - 雲朵 */
+.sv-bg-layer-1 {
+  z-index: 1;
+  opacity: 0.35;
+  background-image: 
+    radial-gradient(ellipse 80px 40px at 60px 50px, rgba(255,255,255,0.9), transparent 70%),
+    radial-gradient(ellipse 60px 30px at 180px 120px, rgba(255,255,255,0.85), transparent 70%),
+    radial-gradient(ellipse 100px 50px at 300px 80px, rgba(255,255,255,0.8), transparent 70%),
+    radial-gradient(ellipse 70px 35px at 100px 250px, rgba(255,255,255,0.85), transparent 70%),
+    radial-gradient(ellipse 90px 45px at 250px 320px, rgba(255,255,255,0.9), transparent 70%);
+  background-size: 360px 200px;
+}
+
+/* 中景層 - 閃光粒子 */
+.sv-bg-layer-2 {
+  z-index: 2;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(circle 3px at 40px 30px, rgba(255,255,200,0.9), transparent 70%),
+    radial-gradient(circle 2px at 120px 80px, rgba(255,200,255,0.8), transparent 70%),
+    radial-gradient(circle 4px at 200px 50px, rgba(200,255,255,0.9), transparent 70%),
+    radial-gradient(circle 2px at 280px 100px, rgba(255,255,200,0.85), transparent 70%),
+    radial-gradient(circle 3px at 80px 120px, rgba(255,200,200,0.8), transparent 70%),
+    radial-gradient(circle 2px at 320px 60px, rgba(200,200,255,0.9), transparent 70%);
+  background-size: 360px 150px;
+  animation: sv-sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sv-sparkle {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.75; }
+}
+
+/* 近景層 - 地面線條 */
+.sv-bg-layer-3 {
+  z-index: 3;
+  opacity: 0.2;
+  background-image:
+    linear-gradient(90deg, transparent 0%, transparent 45%, rgba(139,69,19,0.3) 50%, transparent 55%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, transparent 15%, rgba(139,69,19,0.2) 20%, transparent 25%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, transparent 75%, rgba(139,69,19,0.25) 80%, transparent 85%, transparent 100%);
+  background-size: 360px 100px;
+}
+
+/* ========== 進度條 ========== */
+.sv-progress-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 60px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+.sv-progress-fill {
+  background: linear-gradient(90deg, #64B5F6, #42A5F5, #2196F3);
+  box-shadow: 0 0 12px rgba(33, 150, 243, 0.5);
+}
+
+/* ========== HP 血條 ========== */
+.sv-boss-hp-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 10;
+}
+
+.sv-bar-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.7);
+  margin-bottom: 4px;
+}
+
+.sv-bar-track {
+  height: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sv-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.1s ease-out;
+}
+
+.sv-hp-fill {
+  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+/* ========== 辣度條 ========== */
+.sv-scoville-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 60px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+.sv-scoville-fill {
+  background: linear-gradient(90deg, #FFD54F, #FF9800, #F44336);
+  box-shadow: 0 0 12px rgba(244, 67, 54, 0.5);
+}
+
+.sv-bar-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.8);
+  min-width: 36px;
+}
+
+/* ========== Boss 角色 ========== */
+.sv-boss {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.05s ease-out;
+  z-index: 5;
+  padding: 6px 10px 8px;
+  border-radius: 22px;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.75), rgba(255,255,255,0.18) 55%, rgba(255,255,255,0.08) 80%);
+  border: 1px solid rgba(255,255,255,0.55);
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255,255,255,0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: sv-boss-wiggle 1.6s ease-in-out infinite;
+}
+
+.sv-boss-emoji {
+  font-size: 48px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.sv-boss-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.7);
+  margin-top: 2px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+@keyframes sv-boss-wiggle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-2px) rotate(-2deg); }
+  60% { transform: translateY(1px) rotate(2deg); }
+}
+
+/* Boss 被擊中抖動 */
+.sv-boss.sv-shake {
+  animation: sv-shake 0.15s ease-in-out, sv-boss-pop 0.18s ease-out;
+}
+
+@keyframes sv-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px) rotate(-3deg); }
+  40% { transform: translateX(8px) rotate(3deg); }
+  60% { transform: translateX(-5px) rotate(-2deg); }
+  80% { transform: translateX(5px) rotate(2deg); }
+}
+
+@keyframes sv-boss-pop {
+  0% { transform: scale(1); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* ========== Boss 來臨警告 ========== */
+.sv-boss-warning {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  font-weight: 900;
+  color: #F44336;
+  text-shadow: 
+    0 0 10px rgba(244, 67, 54, 0.8),
+    0 0 20px rgba(244, 67, 54, 0.6),
+    0 2px 4px rgba(0,0,0,0.3);
+  z-index: 50;
+  animation: sv-warning-pulse 0.5s ease-in-out infinite alternate;
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: 2px;
+}
+
+@keyframes sv-warning-pulse {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
+}
+
+/* ========== 小辣椒敵人 (Minion) ========== */
+.sv-minions {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.sv-minion {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.85), rgba(255,200,200,0.4) 60%, rgba(255,150,150,0.2) 80%);
+  border: 2px solid rgba(255,255,255,0.6);
+  box-shadow:
+    0 6px 16px rgba(244, 67, 54, 0.3),
+    inset 0 1px 0 rgba(255,255,255,0.9);
+  animation: sv-minion-wobble 0.6s ease-in-out infinite;
+  transition: transform 0.05s ease-out;
+}
+
+/* 小辣椒不同外觀類型 */
+.sv-minion-type-0 {
+  animation-delay: 0s;
+}
+
+.sv-minion-type-1 {
+  animation-delay: 0.2s;
+  filter: hue-rotate(15deg);
+}
+
+.sv-minion-type-2 {
+  animation-delay: 0.4s;
+  filter: hue-rotate(-15deg) saturate(1.2);
+}
+
+@keyframes sv-minion-wobble {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50% { transform: translateY(-3px) rotate(5deg); }
+}
+
+/* ========== 玩家角色 ========== */
+.sv-player {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+  transition: transform 0.05s ease-out;
+  z-index: 5;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 45%, rgba(255,255,255,0.12) 70%);
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 18px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255,255,255,0.9);
+  animation: sv-player-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes sv-player-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.03); }
+}
+
+.sv-player-hit {
+  animation: sv-player-hit 0.2s ease-out, sv-player-pop 0.22s ease-out;
+}
+
+@keyframes sv-player-hit {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25)); }
+  50% { transform: scale(0.85); filter: drop-shadow(0 4px 8px rgba(255, 0, 0, 0.5)) brightness(1.2); }
+}
+
+@keyframes sv-player-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.86); }
+  100% { transform: scale(1); }
+}
+
+/* ========== 投射物（冰淇淋球）========== */
+.sv-projectiles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.sv-projectile {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #FFFFFF, #B3E5FC, #81D4FA);
+  box-shadow:
+    0 2px 8px rgba(129, 212, 250, 0.6),
+    0 0 12px rgba(255, 255, 255, 0.8);
+  animation: sv-projectile-glow 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes sv-projectile-glow {
+  0% { box-shadow: 0 2px 8px rgba(129, 212, 250, 0.6), 0 0 12px rgba(255, 255, 255, 0.8); }
+  100% { box-shadow: 0 2px 12px rgba(129, 212, 250, 0.9), 0 0 20px rgba(255, 255, 255, 1); }
+}
+
+/* ========== 火球（辣椒素）========== */
+.sv-fireballs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.sv-fireball {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 40% 30%, #FFEB3B, #FF9800, #F44336, #B71C1C);
+  box-shadow:
+    0 4px 12px rgba(244, 67, 54, 0.7),
+    0 0 20px rgba(255, 152, 0, 0.5);
+  animation: sv-fireball-pulse 0.2s ease-in-out infinite alternate;
+}
+
+@keyframes sv-fireball-pulse {
+  0% { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1.1) rotate(10deg); }
+}
+
+/* ========== 射擊按鈕 ========== */
+.sv-shoot-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  margin: 16px auto 0;
+  padding: 18px 32px;
+  border-radius: 24px;
+  border: 1.5px solid rgba(129, 212, 250, 0.8);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(230, 245, 255, 0.75) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 8px 32px rgba(79, 195, 247, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  outline: none;
+}
+
+.sv-shoot-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    800px 150px at 50% 0%,
+    rgba(129, 212, 250, 0.5) 0%,
+    rgba(129, 212, 250, 0.15) 35%,
+    rgba(129, 212, 250, 0) 60%
+  );
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.sv-shoot-btn:active {
+  transform: scale(0.96);
+  box-shadow:
+    0 4px 16px rgba(79, 195, 247, 0.2),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.sv-shoot-icon {
+  font-size: 1.8rem;
+  position: relative;
+  z-index: 1;
+}
+
+.sv-shoot-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: rgba(16, 16, 22, 0.85);
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== 覆蓋層 ========== */
+.sv-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
+  border-radius: 28px;
+}
+
+.sv-gameover-overlay {
+  background: rgba(255, 200, 200, 0.7);
+}
+
+/* ========== 模態框 ========== */
+.sv-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 24px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  max-width: 300px;
+}
+
+.sv-modal h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: 800;
+  color: rgba(16, 16, 22, 0.9);
+}
+
+.sv-modal p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: rgba(16, 16, 22, 0.7);
+  line-height: 1.5;
+}
+
+.sv-victory-icon,
+.sv-gameover-icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+}
+
+.sv-score-display {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: rgba(16, 16, 22, 0.9) !important;
+  margin-top: 8px !important;
+}
+
+/* ========== 結算統計格子 ========== */
+.sv-stats-grid {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sv-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(240,240,255,0.6));
+  border: 1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  min-width: 70px;
+}
+
+.sv-stat-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.sv-stat-value {
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(16, 16, 22, 0.9);
+  line-height: 1;
+}
+
+.sv-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(16, 16, 22, 0.5);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ========== 按鈕 ========== */
+.sv-btn {
+  padding: 14px 28px;
+  border-radius: 16px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 12px;
+}
+
+.sv-btn-primary {
+  background: linear-gradient(135deg, #FF6B9D, #C084FC, #60A5FA);
+  color: white;
+  box-shadow: 0 6px 20px rgba(192, 132, 252, 0.4);
+}
+
+.sv-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(192, 132, 252, 0.5);
+}
+
+.sv-btn-primary:active {
+  transform: translateY(0);
+}
+
+.sv-btn-secondary {
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(16, 16, 22, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.sv-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* ========== 滑動提示 ========== */
+.sv-swipe-hint {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+  animation: sv-swipe-hint-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.sv-swipe-hint-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.8);
+  white-space: nowrap;
+}
+
+@keyframes sv-swipe-hint-pulse {
+  0%, 100% { opacity: 0.9; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.03); }
+}
+
+/* ========== 起始畫面 ========== */
+.sv-start-screen {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 180, 200, 0.85) 0%,
+    rgba(255, 220, 180, 0.85) 50%,
+    rgba(180, 220, 255, 0.85) 100%
+  );
+}
+
+.sv-start-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.sv-start-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: sv-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes sv-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.sv-start-content h2 {
+  font-size: 26px;
+  font-weight: 900;
+  color: rgba(16, 16, 22, 0.9);
+  margin: 0 0 4px;
+}
+
+.sv-start-content > p {
+  font-size: 14px;
+  color: rgba(16, 16, 22, 0.6);
+  margin: 0;
+}
+
+.sv-instructions {
+  margin-top: 20px !important;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 13px !important;
+  line-height: 1.8 !important;
+  color: rgba(16, 16, 22, 0.75) !important;
+}
+
+/* ========== 響應式調整 ========== */
+@media (max-width: 400px) {
+  .sv-page {
+    padding: 8px;
+  }
+
+  .sv-game-area {
+    border-radius: 20px;
+  }
+
+  .sv-hud {
+    padding: 10px 8px;
+    border-radius: 16px;
+    gap: 6px;
+  }
+
+  .sv-hud-value {
+    font-size: 14px;
+  }
+
+  .sv-hud-shu .sv-hud-value {
+    font-size: 16px;
+  }
+
+  .sv-modal {
+    padding: 24px 20px;
+    max-width: 280px;
+  }
+
+  .sv-stats-grid {
+    gap: 8px;
+  }
+
+  .sv-stat {
+    padding: 10px 12px;
+    min-width: 60px;
+  }
+}
+
+/* ========== 高刷新率優化 ========== */
+@media (prefers-reduced-motion: no-preference) {
+  .sv-player,
+  .sv-boss,
+  .sv-projectile,
+  .sv-fireball,
+  .sv-minion,
+  .sv-bg-layer {
+    will-change: transform, left, top, background-position;
+  }
+}
+/* ==============================
+   可愛化：角色本體 + 微動畫（免改 JSX）
+================================ */
+
+/* 讓角色有「本體貼紙」感 */
+.sv-boss,
+.sv-player {
+  transform-origin: 50% 70%;
+}
+
+/* 玩家：冰淇淋小角色（貼紙底 + 高光 + 腮紅） */
+.sv-player {
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 45%, rgba(255,255,255,0.12) 70%);
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 18px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255,255,255,0.9);
+  animation: sv-player-breathe 1.8s ease-in-out infinite;
+}
+
+/* 玩家臉部（用 pseudo element 生成，不改 JSX） */
+.sv-player::before,
+.sv-player::after {
+  content: "";
+  position: absolute;
+  top: 55%;
+  width: 6px;
+  height: 6px;
+  background: rgba(16, 16, 22, 0.75);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,0.6));
+}
+.sv-player::before { left: 14px; }
+.sv-player::after  { right: 14px; }
+
+/* 小嘴巴 */
+.sv-player span,
+.sv-player {
+  position: relative;
+}
+.sv-player span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  width: 12px;
+  height: 8px;
+  border: 2px solid rgba(16, 16, 22, 0.55);
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0 0 12px 12px;
+  transform: translateX(-50%);
+  opacity: 0.9;
+}
+
+/* 命中時更 Q 彈 */
+.sv-boss.sv-shake {
+  animation: sv-shake 0.15s ease-in-out, sv-boss-pop 0.18s ease-out;
+}
+@keyframes sv-boss-pop {
+  0% { transform: scale(1); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.sv-player-hit {
+  animation: sv-player-hit 0.2s ease-out, sv-player-pop 0.22s ease-out;
+}
+@keyframes sv-player-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.86); }
+  100% { transform: scale(1); }
+}
