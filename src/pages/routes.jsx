@@ -1,5 +1,6 @@
 import Home from "./Home";
 import DCA from "./DCA";
+import MDCalculator from "./MDCalculator";
 import CardGame from "./CardGame";
 import FightGame from "./FightGame";
 import JumpGame from "./JumpGame";
@@ -54,6 +55,11 @@ const routes = [
     path: "/spicy",
     element: <SpicyGame />,
     title: "辣度挑戰",
+  },
+  {
+    path: "/md-calc",
+    element: <MDCalculator />,
+    title: "MD 段位計算器",
   },
 ];
 

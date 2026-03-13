@@ -76,6 +76,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(255, 87, 87, 0.88), rgba(255, 150, 50, 0.88))",
       route: "/spicy",
     },
+    {
+      id: "md-calc",
+      name: "MD 段位",
+      subtitle: "Rank Calculator",
+      icon: "🎴",
+      color:
+        "linear-gradient(135deg, rgba(20, 196, 142, 0.88), rgba(3, 129, 255, 0.88))",
+      route: "/md-calc",
+    },
   ];
 
   const handleAppClick = (app) => {

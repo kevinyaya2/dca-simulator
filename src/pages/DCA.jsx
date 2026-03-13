@@ -37,7 +37,7 @@ export default function DCA() {
   const [toast, setToast] = useState("");
 
   const result = useMemo(() => {
-    const safeMonthly = clamp(Number(monthly) || 0, 0, 300000);
+    const safeMonthly = clamp(Number(monthly) || 0, 0, 50000);
     const safeRate = clamp(Number(rate) || 0, 0, 30);
     const safeYears = clamp(Number(years) || 0, 0, 50);
     const safePrincipal = clamp(Number(principal) || 0, 0, 999999999);
@@ -68,7 +68,7 @@ export default function DCA() {
 
   const pMonthly = useMemo(() => {
     const min = 0,
-      max = 30000;
+      max = 50000;
     const v = clamp(result.safeMonthly, min, max);
     return `${((v - min) / (max - min)) * 100}%`;
   }, [result.safeMonthly]);
@@ -187,7 +187,7 @@ export default function DCA() {
                 className="range"
                 type="range"
                 min="0"
-                max="30000"
+                max="50000"
                 step="500"
                 value={result.safeMonthly}
                 onChange={(e) => setMonthly(Number(e.target.value))}
