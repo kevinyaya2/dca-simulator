@@ -1,6 +1,9 @@
 import Home from "./Home";
 import DCA from "./DCA";
 import MDCalculator from "./MDCalculator";
+import MonteCarloPi from "./MonteCarloPi";
+import RandomWalk from "./RandomWalk";
+import MandelbrotExplorer from "./MandelbrotExplorer";
 import CardGame from "./CardGame";
 import FightGame from "./FightGame";
 import JumpGame from "./JumpGame";
@@ -8,6 +11,7 @@ import AutoBattle from "./AutoBattle";
 import ToeicVocab from "./ToeicVocab";
 import FlappySalaryGame from "./FlappySalaryGame";
 import SpicyGame from "./SpicyGame";
+import GameOfLife from "./GameOfLife";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -60,6 +64,26 @@ const routes = [
     path: "/md-calc",
     element: <MDCalculator />,
     title: "MD 段位計算器",
+  },
+  {
+    path: "/monte-carlo",
+    element: <MonteCarloPi />,
+    title: "蒙特卡洛 π",
+  },
+  {
+    path: "/random-walk",
+    element: <RandomWalk />,
+    title: "隨機漫步",
+  },
+  {
+    path: "/mandelbrot",
+    element: <MandelbrotExplorer />,
+    title: "曼德博集合",
+  },
+  {
+    path: "/game-of-cells",
+    element: <GameOfLife />,
+    title: "細胞遊戲",
   },
 ];
 

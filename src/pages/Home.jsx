@@ -85,6 +85,42 @@ export default function Home() {
         "linear-gradient(135deg, rgba(20, 196, 142, 0.88), rgba(3, 129, 255, 0.88))",
       route: "/md-calc",
     },
+    {
+      id: "monte-carlo",
+      name: "蒙特卡洛",
+      subtitle: "π Estimator",
+      icon: "🎯",
+      color:
+        "linear-gradient(135deg, rgba(100, 80, 255, 0.88), rgba(200, 80, 255, 0.82))",
+      route: "/monte-carlo",
+    },
+    {
+      id: "random-walk",
+      name: "隨機漫步",
+      subtitle: "Multi Walker",
+      icon: "👣",
+      color:
+        "linear-gradient(135deg, rgba(30, 200, 180, 0.88), rgba(50, 130, 255, 0.85))",
+      route: "/random-walk",
+    },
+    {
+      id: "mandelbrot",
+      name: "曼德博集合",
+      subtitle: "Fractal Explorer",
+      icon: "🔍",
+      color:
+        "linear-gradient(135deg, rgba(0, 7, 100, 0.92), rgba(32, 107, 203, 0.9))",
+      route: "/mandelbrot",
+    },
+    {
+      id: "game-of-cells",
+      name: "細胞遊戲",
+      subtitle: "Conway's GoL",
+      icon: "🧬",
+      color:
+        "linear-gradient(135deg, rgba(255, 100, 180, 0.88), rgba(255, 180, 100, 0.85))",
+      route: "/game-of-cells",
+    },
   ];
 
   const handleAppClick = (app) => {
