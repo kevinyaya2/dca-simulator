@@ -104,9 +104,25 @@ export default function RandomWalk() {
 
       for (let s = 0; s < n; s++) {
         const d = DIRS[Math.floor(Math.random() * 4)];
-        walker.x += d[0];
-        walker.y += d[1];
-        ctx.lineTo(walker.x, walker.y);
+        const newX = walker.x + d[0];
+        const newY = walker.y + d[1];
+
+        // 繞回邊界（wrap around），避免 walker 跑到畫布外
+        const wrappedX = ((newX % SIZE) + SIZE) % SIZE;
+        const wrappedY = ((newY % SIZE) + SIZE) % SIZE;
+        const wrapped = wrappedX !== newX || wrappedY !== newY;
+
+        walker.x = wrappedX;
+        walker.y = wrappedY;
+
+        if (wrapped) {
+          // 跨越邊界時先 stroke 再重新 moveTo，避免畫出橫跨整個畫布的長線
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(walker.x, walker.y);
+        } else {
+          ctx.lineTo(walker.x, walker.y);
+        }
       }
       ctx.stroke();
     }

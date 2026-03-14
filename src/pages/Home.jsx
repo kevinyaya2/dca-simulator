@@ -112,15 +112,6 @@ export default function Home() {
         "linear-gradient(135deg, rgba(0, 7, 100, 0.92), rgba(32, 107, 203, 0.9))",
       route: "/mandelbrot",
     },
-    {
-      id: "game-of-cells",
-      name: "細胞遊戲",
-      subtitle: "Conway's GoL",
-      icon: "🧬",
-      color:
-        "linear-gradient(135deg, rgba(255, 100, 180, 0.88), rgba(255, 180, 100, 0.85))",
-      route: "/game-of-cells",
-    },
   ];
 
   const handleAppClick = (app) => {
