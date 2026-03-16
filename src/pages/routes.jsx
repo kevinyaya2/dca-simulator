@@ -11,6 +11,7 @@ import AutoBattle from "./AutoBattle";
 import ToeicVocab from "./ToeicVocab";
 import FlappySalaryGame from "./FlappySalaryGame";
 import SpicyGame from "./SpicyGame";
+import BombGame from "./BombGame";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -78,6 +79,11 @@ const routes = [
     path: "/mandelbrot",
     element: <MandelbrotExplorer />,
     title: "曼德博集合",
+  },
+  {
+    path: "/bomb",
+    element: <BombGame />,
+    title: "炸彈超人",
   },
 ];
 

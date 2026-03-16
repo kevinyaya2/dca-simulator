@@ -112,6 +112,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(0, 7, 100, 0.92), rgba(32, 107, 203, 0.9))",
       route: "/mandelbrot",
     },
+    {
+      id: "bomb",
+      name: "炸彈超人",
+      subtitle: "Bomberman",
+      icon: "💣",
+      color:
+        "linear-gradient(135deg, rgba(220, 80, 30, 0.92), rgba(255, 160, 0, 0.88))",
+      route: "/bomb",
+    },
   ];
 
   const handleAppClick = (app) => {

@@ -82,7 +82,7 @@ export default function DCA() {
 
   const pYears = useMemo(() => {
     const min = 1,
-      max = 30;
+      max = 50;
     const v = clamp(result.safeYears || 1, min, max);
     return `${((v - min) / (max - min)) * 100}%`;
   }, [result.safeYears]);
@@ -106,7 +106,7 @@ export default function DCA() {
       `\n總投入：${fmtMoney(result.totalInvest)}\n` +
       `期末資產：${fmtMoney(result.fv)}\n` +
       `預估獲利：${fmtMoney(result.profit)}（${(result.roi * 100).toFixed(
-        1
+        1,
       )}%）`;
 
     try {
@@ -235,7 +235,7 @@ export default function DCA() {
                 className="range"
                 type="range"
                 min="1"
-                max="30"
+                max="50"
                 step="1"
                 value={result.safeYears}
                 onChange={(e) => setYears(Number(e.target.value))}
