@@ -132,9 +132,18 @@ function initState() {
   const map = buildMap();
   return {
     map, // ROWS × COLS 格子陣列
-    player: { r: 1, c: 1, alive: true },
-    bombs: [], // { r, c, placedAt }
+    player: {
+      r: 1,
+      c: 1,
+      alive: true,
+      hasShield: false,
+      invincibleUntil: 0,
+      blastRange: 2,
+    },
+    bombs: [], // { r, c, placedAt, ownerCanPass, range }
     blasts: [], // { r, c, startAt, cells: [{r,c}] }
+    shields: [], // 地圖上掉落的護盾道具 {r, c}
+    fires: [], // 地圖上掉落的火焰範圍道具 {r, c}
     enemies: spawnEnemies(map), // 動物敵人
     bombCount: 0, // 總放炸彈數
     blocksLeft: countBlocks(map),
@@ -152,7 +161,7 @@ function initState() {
  * 依四個方向延伸，碰到 WALL 停止，碰到 BLOCK 停止（含 BLOCK 本身）。
  * 回傳所有爆炸格子的 {r, c} 陣列。
  */
-function calcBlastCells(map, br, bc) {
+function calcBlastCells(map, br, bc, range = BLAST_RANGE) {
   const cells = [{ r: br, c: bc }]; // 中心
   const dirs = [
     [-1, 0],
@@ -161,7 +170,7 @@ function calcBlastCells(map, br, bc) {
     [0, 1],
   ];
   for (const [dr, dc] of dirs) {
-    for (let i = 1; i <= BLAST_RANGE; i++) {
+    for (let i = 1; i <= range; i++) {
       const nr = br + dr * i;
       const nc = bc + dc * i;
       if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) break;
@@ -305,22 +314,124 @@ function render(ctx, state, now) {
     ctx.stroke();
   }
 
+  // ── 火焰範圍道具（地圖上之掉落物）──────────────────────────────────────
+  for (const f of state.fires ?? []) {
+    const fx = f.c * TILE + TILE / 2;
+    const fy = f.r * TILE + TILE / 2;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 280);
+    ctx.save();
+
+    // 底板：橙紅放射漸層
+    const fgrad = ctx.createRadialGradient(fx, fy - 1, 1, fx, fy, 12);
+    fgrad.addColorStop(0, `rgba(255, 220, 60, ${0.95 + 0.05 * pulse})`);
+    fgrad.addColorStop(0.5, `rgba(255, 90, 0, ${0.88 + 0.08 * pulse})`);
+    fgrad.addColorStop(1, "rgba(200, 0, 0, 0)");
+    ctx.fillStyle = fgrad;
+    ctx.beginPath();
+    ctx.arc(fx, fy, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 外發光環（橙色）
+    ctx.shadowColor = "#ff6600";
+    ctx.shadowBlur = 14 + 8 * pulse;
+    ctx.strokeStyle = `rgba(255, 140, 0, ${0.75 + 0.25 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(fx, fy, 11 + pulse * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 🔥 emoji
+    ctx.globalAlpha = 1;
+    ctx.font = `bold ${TILE - 7}px serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🔥", fx, fy + 1);
+
+    ctx.restore();
+  }
+  for (const sh of state.shields ?? []) {
+    const sx = sh.c * TILE + TILE / 2;
+    const sy = sh.r * TILE + TILE / 2;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 320);
+    ctx.save();
+
+    // 亮眼底板：黃色圓形漸層，強烈對比深色背景
+    const grad = ctx.createRadialGradient(sx, sy - 1, 1, sx, sy, 12);
+    grad.addColorStop(0, `rgba(255, 240, 60, ${0.92 + 0.08 * pulse})`);
+    grad.addColorStop(0.55, `rgba(255, 180, 0, ${0.82 + 0.1 * pulse})`);
+    grad.addColorStop(1, `rgba(200, 80, 0, 0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 外發光環（青色）
+    ctx.shadowColor = "#00f5ff";
+    ctx.shadowBlur = 14 + 8 * pulse;
+    ctx.strokeStyle = `rgba(0, 245, 255, ${0.7 + 0.3 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 11 + pulse * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 🛡 emoji 置中
+    ctx.globalAlpha = 1;
+    ctx.font = `bold ${TILE - 7}px serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🛡", sx, sy + 1);
+
+    ctx.restore();
+  }
+
   // ── 玩家（街機小精靈角色）────────────────────────────────────────────
   ctx.save();
   const cx = player.c * TILE + TILE / 2; // tile 水平中心
   const bot = player.r * TILE + TILE - 2; // 角色底部 y
+
+  // 護盾光環（繪於角色底層）
+  if (player.hasShield && player.alive) {
+    const shPulse = 0.5 + 0.5 * Math.sin(now / 230);
+    ctx.strokeStyle = "#22d3ee";
+    ctx.lineWidth = 3;
+    ctx.shadowColor = "#22d3ee";
+    ctx.shadowBlur = 12 + 8 * shPulse;
+    ctx.globalAlpha = 0.55 + 0.3 * shPulse;
+    ctx.beginPath();
+    ctx.arc(cx, bot - 11, 15, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.08 + 0.06 * shPulse;
+    ctx.fillStyle = "#22d3ee";
+    ctx.beginPath();
+    ctx.arc(cx, bot - 11, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+  // 無敵閃爍
+  if (player.invincibleUntil > now) {
+    ctx.globalAlpha = Math.sin(now / 55) > 0 ? 1 : 0.22;
+  }
 
   if (player.alive) {
     // 走路動畫：腳依 now 左右搖擺 ±2px
     const swing = Math.sin(now / 130) * 2;
 
     // 地面陰影
-    ctx.globalAlpha = 0.22;
+    ctx.globalAlpha =
+      player.invincibleUntil > now
+        ? Math.sin(now / 55) > 0
+          ? 0.22
+          : 0.05
+        : 0.22;
     ctx.fillStyle = "#000";
     ctx.beginPath();
     ctx.ellipse(cx, bot + 1, 7, 2.2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha =
+      player.invincibleUntil > now ? (Math.sin(now / 55) > 0 ? 1 : 0.22) : 1;
 
     // 雙腳（深藍褲管）
     const legH = 5,
@@ -484,6 +595,8 @@ export default function BombGame() {
       blocksDestroyed: 0,
       enemiesLeft: init.enemies.length,
       elapsedSec: 0,
+      hasShield: false,
+      blastRange: 2,
     };
   });
 
@@ -498,6 +611,8 @@ export default function BombGame() {
       blocksDestroyed: s.blocksDestroyed,
       enemiesLeft: s.enemies.filter((e) => !e.dead).length,
       elapsedSec: s.elapsedSec,
+      hasShield: s.player.hasShield,
+      blastRange: s.player.blastRange,
     });
   }, []);
 
@@ -515,7 +630,13 @@ export default function BombGame() {
     const { r, c } = s.player;
     // 同格已有炸彈則不重複放
     if (s.bombs.some((b) => b.r === r && b.c === c)) return;
-    s.bombs.push({ r, c, placedAt: performance.now() });
+    s.bombs.push({
+      r,
+      c,
+      placedAt: performance.now(),
+      ownerCanPass: true,
+      range: s.player.blastRange,
+    });
     s.bombCount++;
     syncUi();
   }, [syncUi]);
@@ -592,11 +713,49 @@ export default function BombGame() {
           // 邊界 & 牆壁碰撞
           const inBounds = nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS;
           const targetTile = inBounds ? s.map[nr][nc] : WALL;
-          if (inBounds && targetTile !== WALL && targetTile !== BLOCK) {
+          // 炸彈碰撞：自己剛放下且還沒離開過 → 可穿越
+          const bombAtTarget = inBounds
+            ? s.bombs.find((b) => b.r === nr && b.c === nc)
+            : null;
+          const canPassBomb = !bombAtTarget || bombAtTarget.ownerCanPass;
+          if (
+            inBounds &&
+            targetTile !== WALL &&
+            targetTile !== BLOCK &&
+            canPassBomb
+          ) {
             s.player.r = nr;
             s.player.c = nc;
+            // 離開舊格 → 封鎖腳下炸彈（不再允許回踩）
+            for (const bomb of s.bombs) {
+              if (bomb.ownerCanPass && bomb.r === r && bomb.c === c) {
+                bomb.ownerCanPass = false;
+              }
+            }
           }
           lastMoveRef.current = now;
+        }
+        // 撿護盾道具
+        {
+          const shIdx = s.shields.findIndex(
+            (sh) => sh.r === s.player.r && sh.c === s.player.c,
+          );
+          if (shIdx !== -1) {
+            s.shields.splice(shIdx, 1);
+            s.player.hasShield = true;
+            needUiSync = true;
+          }
+        }
+        // 撿火焰範圍道具
+        {
+          const fIdx = s.fires.findIndex(
+            (f) => f.r === s.player.r && f.c === s.player.c,
+          );
+          if (fIdx !== -1) {
+            s.fires.splice(fIdx, 1);
+            s.player.blastRange = Math.min(s.player.blastRange + 1, 8);
+            needUiSync = true;
+          }
         }
       }
 
@@ -610,7 +769,7 @@ export default function BombGame() {
           changed = false;
           for (const bomb of s.bombs) {
             if (explodedSet.has(`${bomb.r},${bomb.c}`)) continue;
-            const cells = calcBlastCells(s.map, bomb.r, bomb.c);
+            const cells = calcBlastCells(s.map, bomb.r, bomb.c, bomb.range);
             for (const cell of cells) {
               if (explodedSet.has(`${cell.r},${cell.c}`)) {
                 // 此炸彈被連鎖引爆
@@ -624,7 +783,13 @@ export default function BombGame() {
 
         for (const key of explodedSet) {
           const [br, bc] = key.split(",").map(Number);
-          const cells = calcBlastCells(s.map, br, bc);
+          const bomb = s.bombs.find((b) => b.r === br && b.c === bc);
+          const cells = calcBlastCells(
+            s.map,
+            br,
+            bc,
+            bomb?.range ?? s.player.blastRange,
+          );
           s.blasts.push({ r: br, c: bc, startAt: now, cells });
 
           // 炸掉可破壞牆
@@ -633,6 +798,13 @@ export default function BombGame() {
               s.map[cell.r][cell.c] = EMPTY;
               s.blocksLeft = Math.max(0, s.blocksLeft - 1);
               s.blocksDestroyed++;
+              // 掉落道具：20% 護盾、25% 火焰範圍（互斥）
+              const roll = Math.random();
+              if (roll < 0.2) {
+                s.shields.push({ r: cell.r, c: cell.c });
+              } else if (roll < 0.45) {
+                s.fires.push({ r: cell.r, c: cell.c });
+              }
             }
           }
           // 炸死爆炸範圍內的敵人
@@ -671,6 +843,7 @@ export default function BombGame() {
               nc >= 0 &&
               nc < COLS &&
               s.map[nr][nc] === EMPTY &&
+              !s.bombs.some((b) => b.r === nr && b.c === nc) &&
               !s.enemies.some(
                 (e) => !e.dead && e !== enemy && e.r === nr && e.c === nc,
               )
@@ -694,10 +867,17 @@ export default function BombGame() {
         const touchedEnemy = s.enemies.some(
           (e) => !e.dead && e.r === r && e.c === c,
         );
-        if (inBlast || touchedEnemy) {
-          s.player.alive = false;
-          s.gameOver = true;
-          needUiSync = true;
+        if ((inBlast || touchedEnemy) && now >= s.player.invincibleUntil) {
+          if (s.player.hasShield) {
+            // 護盾吐氣 → 免死一次 + 1.5s 無敋時間
+            s.player.hasShield = false;
+            s.player.invincibleUntil = now + 1500;
+            needUiSync = true;
+          } else {
+            s.player.alive = false;
+            s.gameOver = true;
+            needUiSync = true;
+          }
         }
       }
 
@@ -766,9 +946,7 @@ export default function BombGame() {
                 ← 返回
               </button>
               <div className="title">炸彈超人</div>
-              <div className="subtitle">
-                Bomberman · 放炸彈 · 不要被炸到
-              </div>
+              <div className="subtitle">Bomberman · 放炸彈 · 不要被炸到</div>
             </div>
             <div
               className="chip"
@@ -953,10 +1131,31 @@ export default function BombGame() {
                 val: ui.alive ? "存活" : "陣亡",
                 col: ui.alive ? "rgba(0,145,60,0.9)" : "rgba(200,30,60,0.9)",
               },
+              {
+                icon: "🛡",
+                label: "護盾",
+                val: ui.hasShield ? "持有" : "無",
+                col: ui.hasShield ? "rgba(34,211,238,0.95)" : undefined,
+                glow: ui.hasShield,
+              },
+              {
+                icon: "🔥",
+                label: "範圍",
+                val: `${ui.blastRange} 格`,
+                col:
+                  ui.blastRange >= 5
+                    ? "rgba(255,80,0,0.95)"
+                    : ui.blastRange >= 4
+                      ? "rgba(255,140,0,0.95)"
+                      : ui.blastRange >= 3
+                        ? "rgba(255,200,0,0.9)"
+                        : undefined,
+                glow: ui.blastRange >= 4,
+              },
               { icon: "💣", label: "炸彈", val: `${ui.bombCount} 顆` },
               { icon: "🧱", label: "磚牆", val: `${ui.blocksLeft}` },
               { icon: "🐾", label: "敵人", val: `${ui.enemiesLeft} 隻` },
-            ].map(({ icon, label, val, col }) => (
+            ].map(({ icon, label, val, col, glow }) => (
               <div
                 key={icon}
                 className="chip"
@@ -965,6 +1164,18 @@ export default function BombGame() {
                   textAlign: "center",
                   fontWeight: 800,
                   color: col,
+                  boxShadow:
+                    icon === "🔥" && glow
+                      ? "0 0 10px rgba(255,120,0,0.55)"
+                      : glow
+                        ? "0 0 10px rgba(34,211,238,0.45)"
+                        : undefined,
+                  border:
+                    icon === "🔥" && glow
+                      ? "1px solid rgba(255,120,0,0.6)"
+                      : glow
+                        ? "1px solid rgba(34,211,238,0.5)"
+                        : undefined,
                 }}
               >
                 <div style={{ fontSize: 10, marginBottom: 1, opacity: 0.62 }}>
