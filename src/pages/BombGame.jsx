@@ -17,7 +17,8 @@ const BLOCK = 2; // 可破壞牆（磚塊）
 
 // 炸彈 / 爆炸時間
 const BOMB_DELAY = 3000; // ms，炸彈爆炸延遲
-const BLAST_LIFE = 500; // ms，爆炸持續時間
+const BLAST_LIFE = 500; // ms，爆炸視覺持續時間
+const BLAST_KILL_LIFE = 300; // ms，爆炸傷害判定時間（短於視覺，避免末段誤殺）
 const BLAST_RANGE = 3; // 爆炸延伸格數
 const ENEMY_COUNT = 8; // 初始敵人數量
 
@@ -96,6 +97,10 @@ function countBlocks(map) {
 
 /** 隨機生成敵人，避開玩家出生點周圍 */
 function spawnEnemies(map) {
+  // 從 10 種動物隨機不重複挑選 ENEMY_COUNT 種
+  const shuffled = [...ANIMALS]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, ENEMY_COUNT);
   const enemies = [];
   const used = new Set(["1,1", "2,1", "1,2", "3,1", "1,3"]);
   for (let i = 0; i < ENEMY_COUNT; i++) {
@@ -113,7 +118,7 @@ function spawnEnemies(map) {
       enemies.push({
         r,
         c,
-        emoji: ANIMALS[i % ANIMALS.length],
+        emoji: shuffled[i],
         lastMove: 0,
         moveInterval:
           ENEMY_MOVE_MIN + Math.random() * (ENEMY_MOVE_MAX - ENEMY_MOVE_MIN),
@@ -136,7 +141,7 @@ function initState() {
       r: 1,
       c: 1,
       alive: true,
-      hasShield: false,
+      shieldCount: 0,
       invincibleUntil: 0,
       blastRange: 2,
     },
@@ -272,6 +277,35 @@ function render(ctx, state, now) {
     }
   }
 
+  // ── 炸彈爆炸預警範圍 ──────────────────────────────────────────────────
+  for (const bomb of bombs) {
+    const age = now - bomb.placedAt;
+    const t = age / BOMB_DELAY; // 0~1
+    const warnProgress = t; // 0→1（放置起即顯示，越接近爆炸越明顯）
+    const pulse = 0.5 + 0.5 * Math.sin(age / 100);
+    const blastCells = calcBlastCells(
+      state.map,
+      bomb.r,
+      bomb.c,
+      bomb.range ?? BLAST_RANGE,
+    );
+    for (const cell of blastCells) {
+      const wx = cell.c * TILE;
+      const wy = cell.r * TILE;
+      const isCenter = cell.r === bomb.r && cell.c === bomb.c;
+      // 底色：半透明紅橙覆蓋
+      ctx.globalAlpha = warnProgress * (0.28 + 0.22 * pulse);
+      ctx.fillStyle = isCenter ? "#ff1100" : "#ff6600";
+      ctx.fillRect(wx + 1, wy + 1, TILE - 2, TILE - 2);
+      // 邊框：明亮警示線
+      ctx.globalAlpha = warnProgress * (0.55 + 0.3 * pulse);
+      ctx.strokeStyle = isCenter ? "#ff4400" : "#ffaa00";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(wx + 1.5, wy + 1.5, TILE - 3, TILE - 3);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // ── 炸彈 ──────────────────────────────────────────────────────────────
   for (const bomb of bombs) {
     const x = bomb.c * TILE;
@@ -392,7 +426,7 @@ function render(ctx, state, now) {
   const bot = player.r * TILE + TILE - 2; // 角色底部 y
 
   // 護盾光環（繪於角色底層）
-  if (player.hasShield && player.alive) {
+  if (player.shieldCount > 0 && player.alive) {
     const shPulse = 0.5 + 0.5 * Math.sin(now / 230);
     ctx.strokeStyle = "#22d3ee";
     ctx.lineWidth = 3;
@@ -595,7 +629,7 @@ export default function BombGame() {
       blocksDestroyed: 0,
       enemiesLeft: init.enemies.length,
       elapsedSec: 0,
-      hasShield: false,
+      shieldCount: 0,
       blastRange: 2,
     };
   });
@@ -611,7 +645,7 @@ export default function BombGame() {
       blocksDestroyed: s.blocksDestroyed,
       enemiesLeft: s.enemies.filter((e) => !e.dead).length,
       elapsedSec: s.elapsedSec,
-      hasShield: s.player.hasShield,
+      shieldCount: s.player.shieldCount,
       blastRange: s.player.blastRange,
     });
   }, []);
@@ -742,7 +776,7 @@ export default function BombGame() {
           );
           if (shIdx !== -1) {
             s.shields.splice(shIdx, 1);
-            s.player.hasShield = true;
+            s.player.shieldCount++;
             needUiSync = true;
           }
         }
@@ -861,16 +895,18 @@ export default function BombGame() {
       // ── 5. 玩家碰到爆炸或敵人則死亡 ─────────────────────────────────
       if (s.player.alive && !s.gameOver) {
         const { r, c } = s.player;
-        const inBlast = s.blasts.some((bl) =>
-          bl.cells.some((cell) => cell.r === r && cell.c === c),
+        const inBlast = s.blasts.some(
+          (bl) =>
+            now - bl.startAt < BLAST_KILL_LIFE &&
+            bl.cells.some((cell) => cell.r === r && cell.c === c),
         );
         const touchedEnemy = s.enemies.some(
           (e) => !e.dead && e.r === r && e.c === c,
         );
         if ((inBlast || touchedEnemy) && now >= s.player.invincibleUntil) {
-          if (s.player.hasShield) {
-            // 護盾吐氣 → 免死一次 + 1.5s 無敋時間
-            s.player.hasShield = false;
+          if (s.player.shieldCount > 0) {
+            // 護盾抵擋 → 消耗一層 + 1.5s 無敵時間
+            s.player.shieldCount--;
             s.player.invincibleUntil = now + 1500;
             needUiSync = true;
           } else {
@@ -1134,9 +1170,9 @@ export default function BombGame() {
               {
                 icon: "🛡",
                 label: "護盾",
-                val: ui.hasShield ? "持有" : "無",
-                col: ui.hasShield ? "rgba(34,211,238,0.95)" : undefined,
-                glow: ui.hasShield,
+                val: ui.shieldCount > 0 ? `×${ui.shieldCount}` : "無",
+                col: ui.shieldCount > 0 ? "rgba(34,211,238,0.95)" : undefined,
+                glow: ui.shieldCount > 0,
               },
               {
                 icon: "🔥",
