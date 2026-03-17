@@ -56,6 +56,110 @@ const COLOR = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════
+// 音效系統（Web Audio API，程序式合成）
+// ══════════════════════════════════════════════════════════════════════════
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    try {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch {
+      _audioCtx = null;
+    }
+  }
+  if (_audioCtx?.state === "suspended") _audioCtx.resume();
+  return _audioCtx;
+}
+
+/** 放炸彈：短促金屬叩擊聲 */
+function playTick() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = "square";
+  o.frequency.setValueAtTime(220, t);
+  o.frequency.exponentialRampToValueAtTime(80, t + 0.06);
+  g.gain.setValueAtTime(0.35, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+  o.start(t); o.stop(t + 0.07);
+}
+
+/** 爆炸：低頻噪音爆炸聲 */
+function playBoom() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const bufSize = Math.floor(ctx.sampleRate * 0.5);
+  const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.setValueAtTime(500, t);
+  filt.frequency.exponentialRampToValueAtTime(30, t + 0.5);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(1.0, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  src.connect(filt); filt.connect(g); g.connect(ctx.destination);
+  src.start(t); src.stop(t + 0.5);
+}
+
+/** 撿道具：兩段上升叮聲 */
+function playBling() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  [880, 1320].forEach((freq, i) => {
+    const t = ctx.currentTime + i * 0.09;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = "sine";
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    o.start(t); o.stop(t + 0.18);
+  });
+}
+
+/** 死亡：鋸齒波下降哀嚎 */
+function playUgh() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(280, t);
+  o.frequency.exponentialRampToValueAtTime(55, t + 0.6);
+  g.gain.setValueAtTime(0.45, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+  o.start(t); o.stop(t + 0.65);
+}
+
+/** 過關：四音上升勝利旋律 */
+function playClear() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  [523, 659, 784, 1047].forEach((freq, i) => {
+    const t = ctx.currentTime + i * 0.14;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = "sine";
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.38, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o.start(t); o.stop(t + 0.22);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // 地圖生成
 // ══════════════════════════════════════════════════════════════════════════
 /**
@@ -672,6 +776,7 @@ export default function BombGame() {
       range: s.player.blastRange,
     });
     s.bombCount++;
+    playTick();
     syncUi();
   }, [syncUi]);
 
@@ -766,6 +871,33 @@ export default function BombGame() {
                 bomb.ownerCanPass = false;
               }
             }
+          } else if (
+            inBounds &&
+            targetTile !== WALL &&
+            targetTile !== BLOCK &&
+            !canPassBomb
+          ) {
+            // 玩家推移炸彈（炸彈向同方向滑一格，敵人無此能力）
+            const pushR = nr + (nr - r);
+            const pushC = nc + (nc - c);
+            const pushInBounds =
+              pushR >= 0 && pushR < ROWS && pushC >= 0 && pushC < COLS;
+            const pushTile = pushInBounds ? s.map[pushR][pushC] : WALL;
+            const bombAtPush = pushInBounds
+              ? s.bombs.find((b) => b.r === pushR && b.c === pushC)
+              : null;
+            if (
+              pushInBounds &&
+              pushTile !== WALL &&
+              pushTile !== BLOCK &&
+              !bombAtPush
+            ) {
+              bombAtTarget.r = pushR;
+              bombAtTarget.c = pushC;
+              bombAtTarget.ownerCanPass = false;
+              s.player.r = nr;
+              s.player.c = nc;
+            }
           }
           lastMoveRef.current = now;
         }
@@ -777,6 +909,7 @@ export default function BombGame() {
           if (shIdx !== -1) {
             s.shields.splice(shIdx, 1);
             s.player.shieldCount++;
+            playBling();
             needUiSync = true;
           }
         }
@@ -788,6 +921,7 @@ export default function BombGame() {
           if (fIdx !== -1) {
             s.fires.splice(fIdx, 1);
             s.player.blastRange = Math.min(s.player.blastRange + 1, 8);
+            playBling();
             needUiSync = true;
           }
         }
@@ -796,6 +930,7 @@ export default function BombGame() {
       // ── 2. 炸彈爆炸處理 ───────────────────────────────────────────────
       const toExplode = s.bombs.filter((b) => now - b.placedAt >= BOMB_DELAY);
       if (toExplode.length > 0) {
+        playBoom();
         // 連鎖：先算所有待爆炸炸彈的爆炸格，再看格子裡有無其他炸彈
         const explodedSet = new Set(toExplode.map((b) => `${b.r},${b.c}`));
         let changed = true;
@@ -912,6 +1047,7 @@ export default function BombGame() {
           } else {
             s.player.alive = false;
             s.gameOver = true;
+            playUgh();
             needUiSync = true;
           }
         }
@@ -925,6 +1061,7 @@ export default function BombGame() {
       ) {
         s.won = true;
         s.gameOver = true;
+        playClear();
         s.elapsedSec = Math.round((now - startTimeRef.current) / 1000);
         needUiSync = true;
       }
