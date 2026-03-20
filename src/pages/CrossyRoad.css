@@ -1,0 +1,382 @@
+/* CrossyRoad - 柴犬過馬路 */
+
+.crossy-container {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 18px 14px 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.crossy-header {
+  padding: 6px 4px 12px;
+}
+
+.crossy-header h1 {
+  font-size: 26px;
+  font-weight: 950;
+  letter-spacing: 0.2px;
+  color: var(--text);
+  margin: 0;
+}
+
+.crossy-header .subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 分數面板 */
+.crossy-score-board {
+  position: relative;
+  border-radius: 28px;
+  padding: 14px 20px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 12px;
+
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadowL);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  overflow: hidden;
+}
+
+.crossy-score-board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    1200px 220px at 20% 0%,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.25) 30%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.crossy-score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+}
+
+.crossy-score-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.crossy-score-value {
+  font-size: 30px;
+  font-weight: 950;
+  margin-top: 2px;
+  letter-spacing: 0.2px;
+  color: rgba(16, 16, 22, 0.95);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.crossy-score-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 6px 4px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--border) 40%,
+    var(--border) 60%,
+    transparent 100%
+  );
+}
+
+/* ── Combo ── */
+.crossy-combo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 20px;
+  margin-bottom: 10px;
+  border-radius: 20px;
+  overflow: hidden;
+  animation: combo-pop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes combo-pop {
+  0% {
+    transform: scale(0.55) translateY(-10px);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.14) translateY(2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Warm: 2-4 */
+.combo-warm {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 200, 40, 0.18) 0%,
+    rgba(255, 140, 0, 0.13) 100%
+  );
+  border: 1px solid rgba(255, 190, 40, 0.5);
+  box-shadow:
+    0 4px 20px rgba(255, 160, 0, 0.22),
+    inset 0 1px 0 rgba(255, 250, 160, 0.12);
+}
+
+/* Hot: 5-9 */
+.combo-hot {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 100, 20, 0.22) 0%,
+    rgba(210, 40, 0, 0.18) 100%
+  );
+  border: 1px solid rgba(255, 90, 20, 0.6);
+  box-shadow:
+    0 4px 24px rgba(255, 80, 0, 0.32),
+    inset 0 1px 0 rgba(255, 180, 100, 0.12);
+  animation:
+    combo-pop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both,
+    combo-hot-glow 0.9s ease-in-out infinite 0.38s;
+}
+
+@keyframes combo-hot-glow {
+  0%,
+  100% {
+    box-shadow: 0 4px 24px rgba(255, 80, 0, 0.32);
+  }
+  50% {
+    box-shadow: 0 4px 36px rgba(255, 80, 0, 0.6);
+  }
+}
+
+/* Inferno: 10+ */
+.combo-inferno {
+  background: linear-gradient(
+    135deg,
+    rgba(220, 0, 0, 0.28) 0%,
+    rgba(140, 0, 50, 0.22) 100%
+  );
+  border: 1px solid rgba(255, 50, 50, 0.65);
+  box-shadow:
+    0 4px 28px rgba(200, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 140, 140, 0.13);
+  animation:
+    combo-pop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both,
+    combo-inferno-shake 0.12s linear infinite 0.38s;
+}
+
+@keyframes combo-inferno-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  33% {
+    transform: translateX(-2px) rotate(-0.4deg);
+  }
+  67% {
+    transform: translateX(2px) rotate(0.4deg);
+  }
+}
+
+.combo-fire {
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 160, 0, 0.9));
+  animation: fire-flicker 0.45s ease-in-out infinite alternate;
+}
+
+@keyframes fire-flicker {
+  from {
+    transform: scale(1) rotate(-4deg);
+  }
+  to {
+    transform: scale(1.18) rotate(4deg);
+  }
+}
+
+.combo-text {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.combo-count {
+  font-size: 30px;
+  font-weight: 950;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.combo-warm .combo-count {
+  color: #ffcc44;
+  text-shadow: 0 0 14px rgba(255, 200, 0, 0.75);
+}
+
+.combo-hot .combo-count {
+  color: #ff7733;
+  text-shadow: 0 0 18px rgba(255, 100, 0, 0.85);
+}
+
+.combo-inferno .combo-count {
+  background: linear-gradient(155deg, #ff6b6b 20%, #ff0000 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.9));
+}
+
+.combo-bonus {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  letter-spacing: 0.3px;
+}
+
+/* 遊戲畫面 */
+.crossy-game-area {
+  position: relative;
+  border-radius: 28px;
+  overflow: hidden;
+  margin: 0 auto;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+
+  border: 1px solid var(--border);
+  box-shadow: var(--shadowL);
+}
+
+.crossy-game-area canvas {
+  display: block;
+  border-radius: 26px;
+  width: 100%;
+  height: auto;
+}
+
+/* 控制按鈕 */
+.crossy-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.crossy-ctrl-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.crossy-ctrl-btn {
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  box-shadow: var(--shadowM);
+  backdrop-filter: blur(12px);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.crossy-ctrl-btn:active {
+  transform: scale(0.92);
+  box-shadow: var(--shadowS);
+}
+
+.crossy-touch-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+/* 說明 */
+.crossy-instructions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.crossy-instructions .key {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(180, 180, 200, 0.18);
+  border: 1px solid rgba(180, 180, 200, 0.3);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 收集物圖例 */
+.crossy-legend {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--cardA), var(--cardB));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadowM);
+}
+
+.crossy-legend h3 {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+
+.crossy-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.crossy-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(180, 180, 200, 0.1);
+  border: 1px solid rgba(180, 180, 200, 0.2);
+}

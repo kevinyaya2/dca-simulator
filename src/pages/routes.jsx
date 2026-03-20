@@ -12,6 +12,7 @@ import ToeicVocab from "./ToeicVocab";
 import FlappySalaryGame from "./FlappySalaryGame";
 import SpicyGame from "./SpicyGame";
 import BombGame from "./BombGame";
+import CrossyRoad from "./CrossyRoad";
 
 // 路由配置：集中管理所有頁面路由
 const routes = [
@@ -43,7 +44,7 @@ const routes = [
   {
     path: "/autobattle",
     element: <AutoBattle />,
-    title: "可愛推線",
+    title: "柴剛推線",
   },
   {
     path: "/toeic",
@@ -84,6 +85,11 @@ const routes = [
     path: "/bomb",
     element: <BombGame />,
     title: "炸彈超人",
+  },
+  {
+    path: "/crossy",
+    element: <CrossyRoad />,
+    title: "天天過馬路",
   },
 ];
 

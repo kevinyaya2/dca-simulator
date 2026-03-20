@@ -121,6 +121,15 @@ export default function Home() {
         "linear-gradient(135deg, rgba(220, 80, 30, 0.92), rgba(255, 160, 0, 0.88))",
       route: "/bomb",
     },
+    {
+      id: "crossy",
+      name: "天天過馬路",
+      subtitle: "Crossy Shiba",
+      icon: "🐕",
+      color:
+        "linear-gradient(135deg, rgba(126, 200, 80, 0.90), rgba(60, 160, 230, 0.88))",
+      route: "/crossy",
+    },
   ];
 
   const handleAppClick = (app) => {
