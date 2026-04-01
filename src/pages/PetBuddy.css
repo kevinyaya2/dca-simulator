@@ -237,6 +237,22 @@
   animation: petShake 420ms ease-in-out;
 }
 
+.petSpriteWrap.isPlayBurst .petAscii {
+  animation: playPulse 620ms ease-out;
+}
+
+.petSpriteWrap.isSleepDrift .petAscii {
+  animation: sleepGlow 1200ms ease-in-out;
+}
+
+.petSpriteWrap.isFeedBurst .petAscii {
+  animation: feedGlow 680ms ease-out;
+}
+
+.petSpriteWrap.isBathSplash .petAscii {
+  animation: bathGlow 820ms ease-out;
+}
+
 .isShinyWrap {
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.28));
 }
@@ -262,7 +278,9 @@
 }
 
 .feedParticles,
-.bathBubbles {
+.bathBubbles,
+.playSparks,
+.sleepDream {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -278,23 +296,70 @@
 
 .feedParticles span {
   color: #ffe066;
-  animation: feedBurst 700ms ease-out forwards;
+  font-size: 18px;
+  animation: feedBurst 900ms ease-out forwards;
 }
 
 .feedParticles span:nth-child(1) { left: 42%; top: 58%; animation-delay: 0ms; }
 .feedParticles span:nth-child(2) { left: 48%; top: 56%; animation-delay: 80ms; }
 .feedParticles span:nth-child(3) { left: 52%; top: 54%; animation-delay: 140ms; }
 .feedParticles span:nth-child(4) { left: 58%; top: 58%; animation-delay: 200ms; }
+.feedParticles span:nth-child(5) { left: 34%; top: 50%; animation-delay: 70ms; }
+.feedParticles span:nth-child(6) { left: 64%; top: 50%; animation-delay: 170ms; }
+.feedParticles span:nth-child(7) { left: 50%; top: 42%; animation-delay: 250ms; }
 
 .bathBubbles span {
-  color: rgba(255, 255, 255, 0.95);
-  animation: bubbleRise 900ms ease-out forwards;
+  color: rgba(124, 194, 255, 0.96);
+  text-shadow:
+    0 0 8px rgba(171, 221, 255, 0.92),
+    0 0 16px rgba(102, 184, 255, 0.76);
+  font-size: 18px;
+  animation: bubbleRise 1100ms ease-out forwards;
 }
 
 .bathBubbles span:nth-child(1) { left: 28%; bottom: 16%; animation-delay: 0ms; }
 .bathBubbles span:nth-child(2) { left: 44%; bottom: 12%; animation-delay: 120ms; }
 .bathBubbles span:nth-child(3) { left: 60%; bottom: 18%; animation-delay: 210ms; }
 .bathBubbles span:nth-child(4) { left: 70%; bottom: 10%; animation-delay: 300ms; }
+.bathBubbles span:nth-child(5) { left: 34%; bottom: 20%; animation-delay: 80ms; }
+.bathBubbles span:nth-child(6) { left: 52%; bottom: 8%; animation-delay: 180ms; }
+.bathBubbles span:nth-child(7) { left: 66%; bottom: 22%; animation-delay: 260ms; }
+
+.playSparks span {
+  position: absolute;
+  font-size: 20px;
+  line-height: 1;
+  color: #ffd84d;
+  -webkit-text-stroke: 0.4px rgba(120, 74, 0, 0.45);
+  text-shadow:
+    0 0 6px rgba(255, 237, 166, 0.95),
+    0 0 14px rgba(255, 213, 76, 0.95),
+    0 0 24px rgba(255, 178, 36, 0.85);
+  animation: playSpark 980ms ease-out forwards;
+}
+
+.playSparks span:nth-child(1) { left: 20%; top: 30%; animation-delay: 0ms; }
+.playSparks span:nth-child(2) { left: 30%; top: 18%; animation-delay: 70ms; }
+.playSparks span:nth-child(3) { left: 46%; top: 12%; animation-delay: 120ms; }
+.playSparks span:nth-child(4) { right: 30%; top: 18%; animation-delay: 180ms; }
+.playSparks span:nth-child(5) { right: 18%; top: 32%; animation-delay: 240ms; }
+.playSparks span:nth-child(6) { left: 34%; bottom: 18%; animation-delay: 140ms; }
+.playSparks span:nth-child(7) { right: 32%; bottom: 14%; animation-delay: 220ms; }
+
+.sleepDream span {
+  position: absolute;
+  color: rgba(111, 132, 255, 0.98);
+  text-shadow:
+    0 0 10px rgba(92, 118, 244, 0.9),
+    0 0 18px rgba(71, 94, 214, 0.74);
+  animation: sleepFloat 1250ms ease-in-out forwards;
+}
+
+.sleepDream span:nth-child(1) { left: 20%; top: 24%; font-size: 20px; animation-delay: 0ms; }
+.sleepDream span:nth-child(2) { left: 32%; top: 16%; font-size: 15px; animation-delay: 100ms; }
+.sleepDream span:nth-child(3) { right: 30%; top: 14%; font-size: 17px; animation-delay: 180ms; }
+.sleepDream span:nth-child(4) { right: 20%; top: 28%; font-size: 16px; animation-delay: 260ms; }
+.sleepDream span:nth-child(5) { left: 44%; top: 8%; font-size: 14px; animation-delay: 320ms; }
 
 .comboBadge {
   position: absolute;
@@ -365,9 +430,9 @@
 
 @keyframes petShake {
   0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  50% { transform: translateX(4px); }
-  75% { transform: translateX(-3px); }
+  20% { transform: translateX(-7px) rotate(-1.2deg); }
+  50% { transform: translateX(8px) rotate(1.1deg); }
+  80% { transform: translateX(-5px) rotate(-0.9deg); }
 }
 
 @keyframes legendaryFlash {
@@ -379,13 +444,49 @@
 @keyframes feedBurst {
   0% { opacity: 0; transform: translateY(6px) scale(0.7); }
   30% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-16px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-26px) scale(1.28); }
 }
 
 @keyframes bubbleRise {
   0% { opacity: 0; transform: translateY(8px) scale(0.7); }
   35% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-24px) scale(1.2); }
+  100% { opacity: 0; transform: translateY(-36px) scale(1.35); }
+}
+
+@keyframes playPulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  40% { transform: scale(1.04); filter: brightness(1.24) saturate(1.18); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes sleepGlow {
+  0% { filter: brightness(1) saturate(1); }
+  40% { filter: brightness(1.2) saturate(1.1); }
+  100% { filter: brightness(1) saturate(1); }
+}
+
+@keyframes feedGlow {
+  0% { filter: brightness(1); }
+  45% { filter: brightness(1.3) saturate(1.16); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes bathGlow {
+  0% { filter: brightness(1) saturate(1); }
+  45% { filter: brightness(1.25) saturate(1.25); }
+  100% { filter: brightness(1) saturate(1); }
+}
+
+@keyframes playSpark {
+  0% { opacity: 0; transform: translateY(8px) scale(0.72); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-24px) scale(1.28); }
+}
+
+@keyframes sleepFloat {
+  0% { opacity: 0; transform: translateY(12px) scale(0.76); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-24px) scale(1.12); }
 }
 
 @keyframes comboPop {

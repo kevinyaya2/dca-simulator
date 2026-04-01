@@ -504,10 +504,10 @@ function computeMood(status) {
   const negativeLoad = causes.reduce((sum, item) => sum + item.score, 0);
   const moodScore = Math.round(55 + positiveBoost - negativeLoad * 1.1);
 
-  let label = "普通發揮";
+  let label = "正常發揮";
   if (moodScore < 20) label = "心態爆炸";
   else if (moodScore < 38) label = "悶悶不樂";
-  else if (moodScore < 58) label = "普通發揮";
+  else if (moodScore < 58) label = "正常發揮";
   else if (moodScore < 78) label = "心情不錯";
   else label = "心情超好";
 
@@ -735,7 +735,8 @@ export default function PetBuddy() {
   const triggerActionFx = (fxName) => {
     setActionFx(fxName);
     window.clearTimeout(actionFxTimerRef.current);
-    actionFxTimerRef.current = window.setTimeout(() => setActionFx(""), 950);
+    const duration = fxName === "sleep" ? 1450 : fxName === "play" ? 1200 : 1050;
+    actionFxTimerRef.current = window.setTimeout(() => setActionFx(""), duration);
   };
 
   const registerCombo = () => {
@@ -865,7 +866,7 @@ export default function PetBuddy() {
               ) : null}
 
               <div
-                className={`petSpriteWrap ${effectiveShiny ? "isShinyWrap" : ""} ${isEntering ? "isEntering" : ""} ${actionFx === "play" ? "isShake" : ""} ${isEntering && data.pet.rarity.id === "legendary" ? "isLegendaryEntry" : ""}`}
+                className={`petSpriteWrap ${effectiveShiny ? "isShinyWrap" : ""} ${isEntering ? "isEntering" : ""} ${actionFx === "play" ? "isShake isPlayBurst" : ""} ${actionFx === "sleep" ? "isSleepDrift" : ""} ${actionFx === "feed" ? "isFeedBurst" : ""} ${actionFx === "bath" ? "isBathSplash" : ""} ${isEntering && data.pet.rarity.id === "legendary" ? "isLegendaryEntry" : ""}`}
                 onClick={handlePet}
               >
                 {effectiveShiny ? (
@@ -883,6 +884,9 @@ export default function PetBuddy() {
                     <span>•</span>
                     <span>•</span>
                     <span>•</span>
+                    <span>✦</span>
+                    <span>•</span>
+                    <span>✧</span>
                   </div>
                 ) : null}
                 {actionFx === "bath" ? (
@@ -891,6 +895,29 @@ export default function PetBuddy() {
                     <span>O</span>
                     <span>°</span>
                     <span>o</span>
+                    <span>O</span>
+                    <span>°</span>
+                    <span>o</span>
+                  </div>
+                ) : null}
+                {actionFx === "play" ? (
+                  <div className="playSparks" aria-hidden="true">
+                    <span>✦</span>
+                    <span>✧</span>
+                    <span>✦</span>
+                    <span>✧</span>
+                    <span>✦</span>
+                    <span>✧</span>
+                    <span>✦</span>
+                  </div>
+                ) : null}
+                {actionFx === "sleep" ? (
+                  <div className="sleepDream" aria-hidden="true">
+                    <span>☾</span>
+                    <span>z</span>
+                    <span>Z</span>
+                    <span>⋆</span>
+                    <span>z</span>
                   </div>
                 ) : null}
                 {comboCount >= 2 ? <div className="comboBadge">COMBO x{comboCount}</div> : null}
