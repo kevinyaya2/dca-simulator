@@ -707,11 +707,11 @@ export default function PetBuddy() {
       if (!sequence) return;
 
       const start = ctx.currentTime + 0.005;
-      const masterVolume = 0.44;
+      const masterVolume = 8.44;
       sequence.forEach(({ f, d, v, t, at }) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        const volume = Math.min(0.46, v * masterVolume);
+        const volume = Math.min(8.46, v * masterVolume);
         osc.type = t;
         osc.frequency.setValueAtTime(f, start + at);
         gain.gain.setValueAtTime(0.0001, start + at);
