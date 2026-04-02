@@ -125,6 +125,14 @@ export default function Home() {
       color: "linear-gradient(135deg, rgba(255, 214, 92, 0.9), rgba(255, 128, 90, 0.88))",
       route: "/pet",
     },
+    {
+      id: "trip-kyoto-osaka",
+      name: "京阪旅遊",
+      subtitle: "Trip Planner",
+      icon: "🗾",
+      color: "linear-gradient(135deg, rgba(255, 246, 210, 0.94), rgba(222, 188, 133, 0.9))",
+      route: "/trip-kyoto-osaka-2026",
+    },
   ];
 
   const now = useMemo(() => new Date(), []);

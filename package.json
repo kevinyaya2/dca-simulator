@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test --test-isolation=none",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist"

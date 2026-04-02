@@ -524,6 +524,9 @@ export default function PetBuddy() {
   const comboTimerRef = useRef();
   const comboRef = useRef({ count: 0, lastAt: 0 });
   const audioCtxRef = useRef(null);
+  const tickRef = useRef(0);
+  const statusRef = useRef(null);
+  const bubbleStartTickRef = useRef(-BUBBLE_TICKS);
 
   const [data, setData] = useState(() => {
     const saved = normalizeSavedData(readSaved());
@@ -536,7 +539,7 @@ export default function PetBuddy() {
 
   const [tick, setTick] = useState(0);
   const [speech, setSpeech] = useState("歡迎回來，今天也準備好被我吐槽了嗎？");
-  const [bubbleAge, setBubbleAge] = useState(BUBBLE_TICKS);
+  const [bubbleStartTick, setBubbleStartTick] = useState(-BUBBLE_TICKS);
   const [petting, setPetting] = useState(false);
   const [actionFx, setActionFx] = useState("");
   const [isEntering, setIsEntering] = useState(false);
@@ -544,8 +547,21 @@ export default function PetBuddy() {
   const effectiveShiny = data.shinyMode || data.pet.shiny;
   const petColor = data.pet.rarity.color;
 
+  const bubbleAge = speech ? tick - bubbleStartTick : BUBBLE_TICKS;
   const speaking = bubbleAge < BUBBLE_TICKS;
   const fading = speaking && bubbleAge >= BUBBLE_TICKS - FADE_TICKS;
+
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
+
+  useEffect(() => {
+    statusRef.current = data.status;
+  }, [data.status]);
+
+  useEffect(() => {
+    bubbleStartTickRef.current = bubbleStartTick;
+  }, [bubbleStartTick]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setTick((t) => t + 1), TICK_MS);
@@ -553,17 +569,14 @@ export default function PetBuddy() {
   }, []);
 
   useEffect(() => {
-    if (speech) setBubbleAge((age) => age + 1);
-  }, [tick, speech]);
-
-  useEffect(() => {
     const id = window.setInterval(() => {
-      if (bubbleAge < BUBBLE_TICKS) return;
-      setSpeech(pickIdleLine(data.status));
-      setBubbleAge(0);
+      const age = tickRef.current - bubbleStartTickRef.current;
+      if (age < BUBBLE_TICKS) return;
+      setSpeech(pickIdleLine(statusRef.current));
+      setBubbleStartTick(tickRef.current);
     }, IDLE_INTERVAL);
     return () => window.clearInterval(id);
-  }, [bubbleAge, data.status]);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, lastSeenAt: Date.now() }));
@@ -729,7 +742,7 @@ export default function PetBuddy() {
 
   const showBubble = (text) => {
     setSpeech(text);
-    setBubbleAge(0);
+    setBubbleStartTick(tickRef.current);
   };
 
   const triggerActionFx = (fxName) => {
@@ -858,17 +871,16 @@ export default function PetBuddy() {
             </div>
 
             <div className="petSpriteRow">
-              {speaking ? (
-                <div className={`petTalk ${fading ? "isFading" : ""}`}>
-                  <div className="petTalkBubble" style={{ borderColor: data.pet.rarity.color }}>{speech}</div>
-                  <div className="petTalkTail" style={{ color: data.pet.rarity.color }}>\\</div>
-                </div>
-              ) : null}
-
               <div
                 className={`petSpriteWrap ${effectiveShiny ? "isShinyWrap" : ""} ${isEntering ? "isEntering" : ""} ${actionFx === "play" ? "isShake isPlayBurst" : ""} ${actionFx === "sleep" ? "isSleepDrift" : ""} ${actionFx === "feed" ? "isFeedBurst" : ""} ${actionFx === "bath" ? "isBathSplash" : ""} ${isEntering && data.pet.rarity.id === "legendary" ? "isLegendaryEntry" : ""}`}
                 onClick={handlePet}
               >
+                {speaking ? (
+                  <div className={`petTalk ${fading ? "isFading" : ""}`}>
+                    <div className="petTalkBubble" style={{ borderColor: data.pet.rarity.color }}>{speech}</div>
+                    <div className="petTalkTail" style={{ color: data.pet.rarity.color }}>\\</div>
+                  </div>
+                ) : null}
                 {effectiveShiny ? (
                   <div className="shinyStars" aria-hidden="true">
                     <span>✦</span>
