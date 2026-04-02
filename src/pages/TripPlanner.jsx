@@ -3,16 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createInitialTripPlan } from "../data/tripKyotoOsaka2026";
 import "./TripPlanner.css";
 import {
-  TRIP_MODE_EDIT,
-  TRIP_MODE_VIEW,
   TRIP_STORAGE_KEY,
   buildDayRouteLegs,
   computeDayBudget,
   computePassEstimate,
   computeTripBudget,
   createEmptyTripItem,
-  estimateDayWalkingSummary,
-  formatMoneyTwd,
   getDayMapEmbedUrl,
   getItemNavigationUrl,
   getMockWeather,
@@ -65,6 +61,18 @@ const DAY_COVERS = {
   day8: { symbol: "🛫", area: "KIX", title: "返程日", tone: "linear-gradient(135deg,#d0ddf8,#eadcf8,#f9e5c7)" },
 };
 
+const TWD_TO_JPY_RATE = 4.6;
+const twdFormatter = new Intl.NumberFormat("zh-TW", {
+  style: "currency",
+  currency: "TWD",
+  maximumFractionDigits: 0,
+});
+const jpyFormatter = new Intl.NumberFormat("ja-JP", {
+  style: "currency",
+  currency: "JPY",
+  maximumFractionDigits: 0,
+});
+
 function deepCopy(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -106,6 +114,12 @@ function formatDuration(minute) {
   const hour = Math.floor(value / 60);
   const min = value % 60;
   return min > 0 ? `${hour} 小時 ${min} 分` : `${hour} 小時`;
+}
+
+function formatMoneyDual(value) {
+  const twd = Math.round(toSafeNumber(value, 0));
+  const jpy = Math.round(twd * TWD_TO_JPY_RATE);
+  return `🇹🇼 ${twdFormatter.format(twd)} / 🇯🇵 ${jpyFormatter.format(jpy)}`;
 }
 
 function reorderItemsByInsertIndex(items, fromIndex, insertIndex) {
@@ -201,12 +215,11 @@ export default function TripPlanner() {
   const [status, setStatus] = useState({ text: "", tone: "info" });
   const [dropState, setDropState] = useState(null);
   const [dragState, setDragState] = useState(null);
+  const [editingItemId, setEditingItemId] = useState("");
   const [isOffline, setIsOffline] = useState(
     typeof navigator !== "undefined" ? !navigator.onLine : false,
   );
 
-  const mode = searchParams.get("mode") === TRIP_MODE_VIEW ? TRIP_MODE_VIEW : TRIP_MODE_EDIT;
-  const isEditMode = mode === TRIP_MODE_EDIT;
   const dayQuery = searchParams.get("day");
 
   const sortedDays = useMemo(() => [...plan.days].sort(compareDayDate), [plan.days]);
@@ -253,23 +266,34 @@ export default function TripPlanner() {
     const next = new URLSearchParams(searchParams);
     next.delete("layout");
     next.delete("variant");
+    next.delete("mode");
     if (patch.day) next.set("day", patch.day);
-    if (patch.mode) next.set("mode", patch.mode);
     setSearchParams(next, { replace: false });
   }
 
   useEffect(() => {
     if (!selectedDay?.id) return;
     const currentDay = searchParams.get("day");
-    const currentMode = searchParams.get("mode");
-    if (currentDay === selectedDay.id && currentMode) return;
-    updateSearch({ day: selectedDay.id, mode });
+    const hasLegacyMode = searchParams.has("mode");
+    if (currentDay === selectedDay.id && !hasLegacyMode) return;
+    updateSearch({ day: selectedDay.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay?.id]);
 
   const dayModel = useMemo(() => ({ ...selectedDay, items: activeItems }), [selectedDay, activeItems]);
+  const routeLegs = useMemo(() => buildDayRouteLegs(dayModel), [dayModel]);
+  const walking = useMemo(() => {
+    const walkLegs = routeLegs.filter((leg) => leg.transportType === "walk");
+    const routeDistanceKm = walkLegs.reduce((sum, leg) => sum + (leg.distanceKm || 0), 0);
+    const routeMinutes = walkLegs.reduce((sum, leg) => sum + (Number(leg.durationMin) || 0), 0);
+
+    return {
+      distanceKm: Number(routeDistanceKm.toFixed(1)),
+      minutes: Math.max(0, Math.round(routeMinutes)),
+      legCount: walkLegs.length,
+    };
+  }, [routeLegs]);
   const dayBudget = useMemo(() => computeDayBudget(dayModel), [dayModel]);
-  const walking = useMemo(() => estimateDayWalkingSummary(dayModel), [dayModel]);
   const weather = useMemo(() => getMockWeather(selectedDay?.date), [selectedDay?.date]);
   const pass = useMemo(() => computePassEstimate(dayModel), [dayModel]);
   const tripBudget = useMemo(() => computeTripBudget(plan), [plan]);
@@ -301,7 +325,13 @@ export default function TripPlanner() {
     () => getDayMapEmbedUrl(mapItems, focusedMapItemId),
     [mapItems, focusedMapItemId],
   );
-  const routeLegs = useMemo(() => buildDayRouteLegs(dayModel), [dayModel]);
+
+  useEffect(() => {
+    if (!editingItemId) return;
+    if (!activeItems.some((item) => item.id === editingItemId)) {
+      setEditingItemId("");
+    }
+  }, [activeItems, editingItemId]);
 
   const cover = DAY_COVERS[selectedDay?.id] || {
     symbol: "🧳",
@@ -387,7 +417,6 @@ export default function TripPlanner() {
   }
 
   function handleDragStart(event, itemId, index) {
-    if (!isEditMode) return;
     const payload = { dayId: selectedDay.id, itemId, index };
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", JSON.stringify(payload));
@@ -401,7 +430,6 @@ export default function TripPlanner() {
   }
 
   function handleDragOver(event, index, mode = "item") {
-    if (!isEditMode) return;
     event.preventDefault();
     event.stopPropagation();
     if (mode === "list") {
@@ -412,7 +440,6 @@ export default function TripPlanner() {
   }
 
   function handleDrop(event, index, mode = "item") {
-    if (!isEditMode) return;
     event.preventDefault();
     event.stopPropagation();
     const raw = event.dataTransfer.getData("text/plain");
@@ -510,6 +537,13 @@ export default function TripPlanner() {
     }));
   }
 
+  function handleCardToggle(event, itemId) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("a,button,input,select,textarea,label")) return;
+    setEditingItemId((prev) => (prev === itemId ? "" : itemId));
+  }
+
   if (!selectedDay) return null;
 
   return (
@@ -521,14 +555,6 @@ export default function TripPlanner() {
               回到首頁
             </button>
             <div className="toolbarGroup">
-              <button
-                className="iosGhostBtn"
-                onClick={() =>
-                  updateSearch({ mode: isEditMode ? TRIP_MODE_VIEW : TRIP_MODE_EDIT })
-                }
-              >
-                {isEditMode ? "切換為檢視" : "切換為編輯"}
-              </button>
               <button className="iosGhostBtn danger" onClick={resetPlan}>
                 還原預設
               </button>
@@ -546,7 +572,7 @@ export default function TripPlanner() {
                 </p>
               </div>
               <div className="heroStats">
-                <span>旅程總預算 {formatMoneyTwd(tripBudget.estimated)}</span>
+                <span>旅程總預算 {formatMoneyDual(tripBudget.estimated)}</span>
                 <span>今日完成率 {progressPct}%</span>
                 <span>今日景點數 {mapItems.length}</span>
               </div>
@@ -576,7 +602,7 @@ export default function TripPlanner() {
             >
               <span>第 {day.dayNumber} 天</span>
               <strong>{day.title}</strong>
-              <span>{formatMoneyTwd(tripBudget.byDay[day.id]?.estimated || 0)}</span>
+              <span>{formatMoneyDual(tripBudget.byDay[day.id]?.estimated || 0)}</span>
             </button>
           ))}
         </div>
@@ -587,8 +613,8 @@ export default function TripPlanner() {
               <h2>{selectedDay.title}</h2>
               <p>{new Date(selectedDay.date).toLocaleDateString("zh-TW", { dateStyle: "full" })}</p>
               <p>
-                今日預估 {formatMoneyTwd(dayBudget.estimated)} · 今日實際{" "}
-                {formatMoneyTwd(dayBudget.actual)}
+                今日預估 {formatMoneyDual(dayBudget.estimated)} · 今日實際{" "}
+                {formatMoneyDual(dayBudget.actual)}
               </p>
               <div className="insightGrid">
                 <div className="insightCard weatherCard">
@@ -617,18 +643,18 @@ export default function TripPlanner() {
                   <div className="statMeter walkingMeter">
                     <span style={{ width: `${walkingIntensity}%` }} />
                   </div>
-                  <small>依地圖點與交通段推估，共 {walking.legCount} 段步行</small>
+                  <small>與右側地圖+交通線同源，共 {walking.legCount} 段步行</small>
                 </div>
                 <div className="insightCard passCard">
                   <div className="passFx" aria-hidden="true">
                     <span className="passRing" />
                   </div>
                   <h3>票券試算</h3>
-                  <p>單程 {formatMoneyTwd(pass.singleFare)}</p>
+                  <p>單程 {formatMoneyDual(pass.singleFare)}</p>
                   <div className="statMeter passMeter">
                     <span style={{ width: `${passSavingRatio}%` }} />
                   </div>
-                  <small>最佳 {pass.best.name}，省 {formatMoneyTwd(pass.best.saving)}</small>
+                  <small>最佳 {pass.best.name}，省 {formatMoneyDual(pass.best.saving)}</small>
                 </div>
               </div>
             </div>
@@ -638,7 +664,7 @@ export default function TripPlanner() {
               onDragOver={(event) => handleDragOver(event, activeItems.length, "list")}
               onDrop={(event) => handleDrop(event, activeItems.length, "list")}
             >
-              {isEditMode && dragState && dropState === 0 ? (
+              {dragState && dropState === 0 ? (
                 <div className="dropIndicator" aria-hidden="true" />
               ) : null}
               {activeItems.map((item, index) => {
@@ -649,14 +675,15 @@ export default function TripPlanner() {
                       className={`tripItem ${slot.className} ${item.done ? "done" : ""} ${
                         dropState === index ? "dropTarget" : ""
                       } ${dragState?.itemId === item.id ? "dragging" : ""} ${
-                        isEditMode ? "editable" : ""
+                        "editable"
                       }`}
                       style={{ "--lineColor": getTransportLineColor(item) }}
-                      draggable={isEditMode}
+                      draggable
                       onDragStart={(event) => handleDragStart(event, item.id, index)}
                       onDragEnd={handleDragEnd}
                       onDragOver={(event) => handleDragOver(event, index, "item")}
                       onDrop={(event) => handleDrop(event, index, "item")}
+                      onClick={(event) => handleCardToggle(event, item.id)}
                     >
                       <div className="itemTop">
                         <span>
@@ -673,33 +700,30 @@ export default function TripPlanner() {
                           </button>
                         </div>
                       </div>
-                      <h3>{item.title}</h3>
+                      <h3
+                        className={`itemTitleToggle ${editingItemId === item.id ? "open" : ""}`}
+                      >
+                        {item.title}
+                      </h3>
                       <p className="itemLoc">{item.location || "尚未填寫地點"}</p>
                       {item.done ? <div className="stampMark">已蓋章</div> : null}
                       <div className="itemCost">
-                        <span>預估 {formatMoneyTwd(item.estimatedCost)}</span>
-                        <span>實際 {formatMoneyTwd(item.actualCost)}</span>
+                        <span>預估 {formatMoneyDual(item.estimatedCost)}</span>
+                        <span>實際 {formatMoneyDual(item.actualCost)}</span>
                       </div>
                       <div className="itemActions">
                         <a href={getItemNavigationUrl(item)} target="_blank" rel="noreferrer">
                           導航
                         </a>
-                        {Number.isFinite(item.lat) && Number.isFinite(item.lng) ? (
-                          <button onClick={() => setFocusedMapItemId(item.id)}>定位</button>
-                        ) : null}
-                        {isEditMode ? (
-                          <>
-                            <button onClick={() => moveItem(item.id, -1)}>上移</button>
-                            <button onClick={() => moveItem(item.id, 1)}>下移</button>
-                            <button onClick={() => duplicateItem(item.id)}>複製</button>
-                            <button className="danger" onClick={() => removeItem(item.id)}>
-                              刪除
-                            </button>
-                          </>
-                        ) : null}
+                        <button onClick={() => moveItem(item.id, -1)}>上移</button>
+                        <button onClick={() => moveItem(item.id, 1)}>下移</button>
+                        <button onClick={() => duplicateItem(item.id)}>複製</button>
+                        <button className="danger" onClick={() => removeItem(item.id)}>
+                          刪除
+                        </button>
                       </div>
 
-                      {isEditMode ? (
+                      {editingItemId === item.id ? (
                         <div className="editGrid">
                           <label>
                             標題
@@ -820,7 +844,7 @@ export default function TripPlanner() {
                         </div>
                       ) : null}
                     </article>
-                    {isEditMode && dragState && dropState === index + 1 ? (
+                    {dragState && dropState === index + 1 ? (
                       <div className="dropIndicator" aria-hidden="true" />
                     ) : null}
                   </div>
@@ -828,11 +852,9 @@ export default function TripPlanner() {
               })}
             </div>
 
-            {isEditMode ? (
-              <button className="addBtn" onClick={addItem}>
-                + 新增行程項目
-              </button>
-            ) : null}
+            <button className="addBtn" onClick={addItem}>
+              + 新增行程項目
+            </button>
           </section>
 
           <aside className="rightCol">
@@ -872,7 +894,7 @@ export default function TripPlanner() {
                     </span>
                     <em>
                       {leg.transportLabel} · {formatDuration(leg.durationMin)} ·{" "}
-                      {leg.estimatedCost > 0 ? formatMoneyTwd(leg.estimatedCost) : "費用待補"} ·{" "}
+                      {leg.estimatedCost > 0 ? formatMoneyDual(leg.estimatedCost) : "💸 費用待補"} ·{" "}
                       {leg.distanceKm} km
                       {leg.durationSource === "estimate" ? "（系統估算）" : ""}
                     </em>
@@ -907,29 +929,27 @@ export default function TripPlanner() {
                         <span>{item.dueDate || "未設定日期"}</span>
                         <span>{item.channel || "未設定來源"}</span>
                       </div>
-                      {isEditMode ? (
-                        <>
-                          <input
-                            value={item.title}
-                            onChange={(event) =>
-                              updateReservation(item.id, { title: event.target.value })
-                            }
-                          />
-                          <input
-                            type="date"
-                            value={item.dueDate || ""}
-                            onChange={(event) =>
-                              updateReservation(item.id, { dueDate: event.target.value })
-                            }
-                          />
-                          <input
-                            value={item.channel || ""}
-                            onChange={(event) =>
-                              updateReservation(item.id, { channel: event.target.value })
-                            }
-                          />
-                        </>
-                      ) : null}
+                      <>
+                        <input
+                          value={item.title}
+                          onChange={(event) =>
+                            updateReservation(item.id, { title: event.target.value })
+                          }
+                        />
+                        <input
+                          type="date"
+                          value={item.dueDate || ""}
+                          onChange={(event) =>
+                            updateReservation(item.id, { dueDate: event.target.value })
+                          }
+                        />
+                        <input
+                          value={item.channel || ""}
+                          onChange={(event) =>
+                            updateReservation(item.id, { channel: event.target.value })
+                          }
+                        />
+                      </>
                     </div>
                   ))
                 ) : (
@@ -941,11 +961,9 @@ export default function TripPlanner() {
             <div className="glassCard checklist">
               <div className="checklistHead">
                 <h3>行前待辦</h3>
-                {isEditMode ? (
-                  <button className="iosGhostBtn" onClick={addChecklistItem}>
-                    + 新增
-                  </button>
-                ) : null}
+                <button className="iosGhostBtn" onClick={addChecklistItem}>
+                  + 新增
+                </button>
               </div>
               <p className="pending">
                 已完成 {checklistDone} / {checklistItems.length}
@@ -976,22 +994,20 @@ export default function TripPlanner() {
                         />
                         <span>{item.title}</span>
                       </label>
-                      {isEditMode ? (
-                        <div className="checklistActions">
-                          <input
-                            value={item.title}
-                            onChange={(event) =>
-                              updateChecklistItem(item.id, { title: event.target.value })
-                            }
-                          />
-                          <button
-                            className="iosGhostBtn danger"
-                            onClick={() => removeChecklistItem(item.id)}
-                          >
-                            刪除
-                          </button>
-                        </div>
-                      ) : null}
+                      <div className="checklistActions">
+                        <input
+                          value={item.title}
+                          onChange={(event) =>
+                            updateChecklistItem(item.id, { title: event.target.value })
+                          }
+                        />
+                        <button
+                          className="iosGhostBtn danger"
+                          onClick={() => removeChecklistItem(item.id)}
+                        >
+                          刪除
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (

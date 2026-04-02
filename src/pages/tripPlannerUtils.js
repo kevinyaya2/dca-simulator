@@ -745,7 +745,7 @@ export function buildDayRouteLegs(day) {
 
     let transportType = (() => {
       if (!transportItem) {
-        return distanceKm > 2.5 ? "transit" : "walk";
+        return "walk";
       }
       if (isLikelyWalkLabel(transportLabel)) return "walk";
       if (isLikelyMetroLabel(transportLabel)) return "metro";
@@ -756,6 +756,10 @@ export function buildDayRouteLegs(day) {
 
     // Day 1 從機場出發的首段，避免被誤判成步行。
     if (i === 0 && transportType === "walk" && isAirportPoint(fromItem)) {
+      transportType = "transit";
+    }
+    // 任一端為機場且缺少交通資訊時，優先視為大眾運輸。
+    if (!transportItem && transportType === "walk" && (isAirportPoint(fromItem) || isAirportPoint(toItem))) {
       transportType = "transit";
     }
 
@@ -787,6 +791,7 @@ export function buildDayRouteLegs(day) {
       id: `${fromItem.id}-${toItem.id}-${i}`,
       from: fromItem,
       to: toItem,
+      transportItemId: transportItem?.id || "",
       transportLabel,
       transportType,
       distanceKm,

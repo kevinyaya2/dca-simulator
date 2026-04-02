@@ -883,6 +883,20 @@
   font-size: 20px;
 }
 
+.itemTitleToggle {
+  cursor: pointer;
+  transition: color 0.16s ease, transform 0.16s ease;
+}
+
+.itemTitleToggle:hover {
+  color: #1f5fd2;
+}
+
+.itemTitleToggle.open {
+  color: #1f5fd2;
+  transform: translateX(2px);
+}
+
 .itemLoc {
   margin: 0;
   font-size: 13px;
