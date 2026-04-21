@@ -374,7 +374,6 @@ export default function AngryBirdLike() {
   const [paused, setPaused] = useState(false);
   const [gameSpeed, setGameSpeed] = useState(1);
   const [aimInfo, setAimInfo] = useState({ active: false, power: 0, angle: 0 });
-  const [portraitMobile, setPortraitMobile] = useState(false);
   const [mobileLandscape, setMobileLandscape] = useState(false);
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [campaignSummary, setCampaignSummary] = useState({
@@ -626,34 +625,20 @@ export default function AngryBirdLike() {
       document.body.style.overflowX = prevOverflowX;
       document.body.style.overflowY = prevOverflowY;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      try {
-        window.screen?.orientation?.unlock?.();
-      } catch {
-        // no-op
-      }
     };
   }, [resetLevel]);
 
   useEffect(() => {
     const check = () => {
       const coarse = window.matchMedia("(pointer: coarse)").matches;
-      const portrait = coarse && window.innerHeight > window.innerWidth;
       const landscape = coarse && window.innerWidth > window.innerHeight;
-      setPortraitMobile(portrait);
       setMobileLandscape(landscape);
       if (!landscape) setMobileSettingsOpen(false);
     };
     check();
     window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", check);
-    try {
-      window.screen?.orientation?.lock?.("landscape").catch(() => {});
-    } catch {
-      // no-op
-    }
     return () => {
       window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
     };
   }, []);
 
@@ -1753,14 +1738,6 @@ export default function AngryBirdLike() {
         </section>
       </div>
 
-      {portraitMobile && (
-        <div className="angry-rotate-mask">
-          <div className="angry-rotate-card">
-            <h3>請旋轉裝置</h3>
-            <p>請將手機轉為橫向後再進行遊戲。</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
