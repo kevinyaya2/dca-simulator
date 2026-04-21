@@ -527,8 +527,26 @@
 .homeContent {
   flex: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
   padding: 20px 0;
+}
+
+.homePager {
+  width: 100%;
+  overflow: hidden;
+}
+
+.homePages {
+  width: 100%;
+  display: flex;
+  transition: transform 260ms ease;
+  will-change: transform;
+}
+
+.appPage {
+  width: 100%;
+  flex: 0 0 100%;
 }
 
 .appGrid {
@@ -537,6 +555,31 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 24px 18px;
   padding: 0 6px;
+}
+
+.homePageDots {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  justify-content: center;
+}
+
+.homePageDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  border: 0;
+  padding: 0;
+  background: rgba(16, 16, 22, 0.26);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.homePageDot.active {
+  background: rgba(16, 16, 22, 0.8);
+  transform: scale(1.28);
 }
 
 .appIcon {
@@ -1612,6 +1655,9 @@
   .appGrid {
     grid-template-columns: repeat(4, 1fr);
     gap: 20px 14px;
+  }
+  .homePageDots {
+    margin-top: 12px;
   }
 
   .gameRules {

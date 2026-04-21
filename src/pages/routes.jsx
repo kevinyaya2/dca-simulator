@@ -16,6 +16,7 @@ const SpicyGame = lazy(() => import("./SpicyGame"));
 const BombGame = lazy(() => import("./BombGame"));
 const CrossyRoad = lazy(() => import("./CrossyRoad"));
 const PetBuddy = lazy(() => import("./PetBuddy"));
+const AngryBirdLike = lazy(() => import("./AngryBirdLike"));
 
 const routes = [
   { path: "/", element: <Home />, title: "Home" },
@@ -33,6 +34,7 @@ const routes = [
   { path: "/mandelbrot", element: <MandelbrotExplorer />, title: "Mandelbrot" },
   { path: "/bomb", element: <BombGame />, title: "Bomberman" },
   { path: "/crossy", element: <CrossyRoad />, title: "Crossy Shiba" },
+  { path: "/angry", element: <AngryBirdLike />, title: "Angry-like" },
   { path: "/pet", element: <PetBuddy />, title: "Pet Buddy" },
 ];
 

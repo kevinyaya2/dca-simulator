@@ -1,8 +1,11 @@
-﻿import { useMemo } from "react";
+﻿import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Home() {
   const navigate = useNavigate();
+  const touchStartXRef = useRef(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const APPS_PER_PAGE = 16;
 
   const apps = [
     {
@@ -118,6 +121,14 @@ export default function Home() {
       route: "/crossy",
     },
     {
+      id: "angry",
+      name: "彈射拆塔",
+      subtitle: "Angry-like",
+      icon: "🎯",
+      color: "linear-gradient(135deg, rgba(255, 157, 86, 0.92), rgba(255, 94, 94, 0.9))",
+      route: "/angry",
+    },
+    {
       id: "pet",
       name: "電子寵物",
       subtitle: "Pet Buddy",
@@ -129,8 +140,36 @@ export default function Home() {
 
   const now = useMemo(() => new Date(), []);
 
+  const appPages = useMemo(() => {
+    const pages = [];
+    for (let i = 0; i < apps.length; i += APPS_PER_PAGE) {
+      pages.push(apps.slice(i, i + APPS_PER_PAGE));
+    }
+    return pages;
+  }, [apps]);
+
   const handleAppClick = (app) => {
     if (app.route) navigate(app.route);
+  };
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(0, Math.min(page, appPages.length - 1)));
+  };
+
+  const handleTouchStart = (event) => {
+    touchStartXRef.current = event.changedTouches[0]?.clientX ?? 0;
+  };
+
+  const handleTouchEnd = (event) => {
+    const endX = event.changedTouches[0]?.clientX ?? 0;
+    const deltaX = endX - touchStartXRef.current;
+    const SWIPE_THRESHOLD = 42;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+    if (deltaX < 0) {
+      goToPage(currentPage + 1);
+      return;
+    }
+    goToPage(currentPage - 1);
   };
 
   return (
@@ -146,22 +185,44 @@ export default function Home() {
         </header>
 
         <main className="homeContent">
-          <div className="appGrid">
-            {apps.map((app) => (
-              <div
-                key={app.id}
-                className={`appIcon ${!app.route ? "disabled" : ""}`}
-                onClick={() => handleAppClick(app)}
-                style={{ "--iconColor": app.color }}
-              >
-                <div className="appIconInner">
-                  <div className="appIconEmoji">{app.icon}</div>
+          <div className="homePager" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            <div className="homePages" style={{ transform: `translateX(-${currentPage * 100}%)` }}>
+              {appPages.map((pageApps, pageIndex) => (
+                <div className="appPage" key={`page-${pageIndex}`}>
+                  <div className="appGrid">
+                    {pageApps.map((app) => (
+                      <div
+                        key={app.id}
+                        className={`appIcon ${!app.route ? "disabled" : ""}`}
+                        onClick={() => handleAppClick(app)}
+                        style={{ "--iconColor": app.color }}
+                      >
+                        <div className="appIconInner">
+                          <div className="appIconEmoji">{app.icon}</div>
+                        </div>
+                        <div className="appName">{app.name}</div>
+                        <div className="appSubtitle">{app.subtitle}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="appName">{app.name}</div>
-                <div className="appSubtitle">{app.subtitle}</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {appPages.length > 1 && (
+            <div className="homePageDots" aria-label="App pages">
+              {appPages.map((_, idx) => (
+                <button
+                  key={`dot-${idx}`}
+                  className={`homePageDot ${idx === currentPage ? "active" : ""}`}
+                  onClick={() => goToPage(idx)}
+                  aria-label={`Go to page ${idx + 1}`}
+                  type="button"
+                />
+              ))}
+            </div>
+          )}
         </main>
 
         <footer className="homeFooter">
