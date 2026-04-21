@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --text: rgba(16, 16, 22, 0.92);
   --muted: rgba(16, 16, 22, 0.58);
 
@@ -10,7 +10,7 @@
   --shadowM: 0 14px 40px rgba(16, 16, 30, 0.12);
   --shadowS: 0 10px 22px rgba(16, 16, 30, 0.1);
 
-  /* 更飽和的主色，用在 range 填滿 */
+  /* ?湧ˊ??銝餉嚗??range 憛急遛 */
   --fill: linear-gradient(
     90deg,
     rgba(255, 85, 170, 0.98) 0%,
@@ -29,7 +29,7 @@
   overflow: hidden;
 }
 
-/* 右下角 One UI 雲朵彩霧 */
+/* ?喃?閫?One UI ?脫敶拚 */
 .oneui::before {
   content: "";
   position: absolute;
@@ -63,7 +63,7 @@
   pointer-events: none;
 }
 
-/* 小星星點點 */
+/* 撠???暺?*/
 .oneui::after {
   content: "";
   position: absolute;
@@ -144,7 +144,7 @@
   padding: 0 4px 0;
 }
 
-/* ======= 卡片：更 3D、更精緻 ======= */
+/* ======= ?∠?嚗 3D?蝎曄溶 ======= */
 .card {
   position: relative;
   border-radius: 28px;
@@ -161,7 +161,7 @@
   overflow: hidden;
 }
 
-/* 卡片高光：像玻璃上面那道光 */
+/* ?∠?擃?嚗??餌?銝?????*/
 .card::before {
   content: "";
   position: absolute;
@@ -176,7 +176,7 @@
   pointer-events: none;
 }
 
-/* 卡片內陰影：更立體 */
+/* ?∠??折敶梧??渡?擃?*/
 .card::after {
   content: "";
   position: absolute;
@@ -313,7 +313,7 @@
   box-shadow: 0 10px 18px rgba(16, 16, 30, 0.1);
 }
 
-/* ======= 彩色滑桿：重點「不再灰」 ======= */
+/* ======= 敶抵皛▼嚗?暺????======= */
 .range {
   --p: 50%;
   --track: rgba(255, 255, 255, 0.5);
@@ -475,7 +475,7 @@
   height: 12px;
 }
 
-/* ======= 返回按鈕 ======= */
+/* ======= 餈??? ======= */
 .backBtn {
   font-size: 15px;
   font-weight: 950;
@@ -491,13 +491,44 @@
   opacity: 0.75;
 }
 
-/* ======= Home 頁面樣式（One UI 風格手機桌面）======= */
+/* ======= Home ?璅??嚗ne UI 憸冽??獢嚗?====== */
+.launchpadRoot {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(132, 190, 255, 0.55), transparent 48%),
+    radial-gradient(circle at 80% 20%, rgba(255, 168, 196, 0.5), transparent 44%),
+    radial-gradient(circle at 58% 80%, rgba(255, 214, 146, 0.38), transparent 40%),
+    linear-gradient(165deg, #d8e4fa 0%, #f1d9e8 45%, #f3dfc8 100%);
+}
+
+.launchpadGlow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.launchpadGlowA {
+  width: min(56vw, 560px);
+  height: min(56vw, 560px);
+  top: -12%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(193, 225, 255, 0.72), rgba(193, 225, 255, 0));
+}
+
+.launchpadGlowB {
+  width: min(54vw, 540px);
+  height: min(54vw, 540px);
+  right: -8%;
+  bottom: -18%;
+  background: radial-gradient(circle, rgba(255, 201, 160, 0.68), rgba(255, 201, 160, 0));
+}
+
 .homeShell {
   width: 100%;
-  max-width: 480px;
   min-height: 100vh;
-  margin: 0 auto;
-  padding: 24px 20px;
+  margin: 0;
+  padding: 24px clamp(14px, 4vw, 40px) max(12px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   position: relative;
@@ -505,217 +536,225 @@
 }
 
 .homeHeader {
-  padding: 18px 6px;
+  padding: 10px 8px 18px;
   text-align: center;
 }
 
 .homeTime {
-  font-size: 72px;
-  font-weight: 950;
-  letter-spacing: -1px;
-  color: var(--text);
-  text-shadow: 0 2px 4px rgba(16, 16, 30, 0.12);
+  font-size: clamp(48px, 9vw, 82px);
+  font-weight: 820;
+  letter-spacing: -1.8px;
+  color: rgba(17, 19, 34, 0.88);
+  text-shadow: 0 5px 14px rgba(255, 255, 255, 0.38);
 }
 
 .homeDate {
-  margin-top: 8px;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--muted);
+  margin-top: 5px;
+  font-size: clamp(13px, 2.4vw, 18px);
+  font-weight: 560;
+  color: rgba(17, 19, 34, 0.58);
 }
 
 .homeContent {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 20px 0;
-}
-
-.homePager {
-  width: 100%;
-  overflow: hidden;
-}
-
-.homePages {
-  width: 100%;
-  display: flex;
-  transition: transform 260ms ease;
-  will-change: transform;
-}
-
-.appPage {
-  width: 100%;
-  flex: 0 0 100%;
+  padding: 8px 0 20px;
 }
 
 .appGrid {
-  width: 100%;
+  width: min(1260px, 100%);
+  margin: 0 auto;
+  padding: 8px 6px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px 18px;
-  padding: 0 6px;
-}
-
-.homePageDots {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-  justify-content: center;
-}
-
-.homePageDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  border: 0;
-  padding: 0;
-  background: rgba(16, 16, 22, 0.26);
-  cursor: pointer;
-  transition:
-    transform 120ms ease,
-    background 120ms ease;
-}
-
-.homePageDot.active {
-  background: rgba(16, 16, 22, 0.8);
-  transform: scale(1.28);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px 14px;
 }
 
 .appIcon {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  text-align: center;
+  padding: 4px;
+  border-radius: 18px;
   cursor: pointer;
-  transition: transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .appIcon:active {
-  transform: scale(0.92);
+  transform: scale(0.95);
 }
 
 .appIcon.disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-.appIcon.disabled:active {
-  transform: none;
+  opacity: 0.42;
+  pointer-events: none;
 }
 
 .appIconInner {
-  width: 68px;
-  height: 68px;
-  border-radius: 18px;
+  width: 66px;
+  height: 66px;
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-
+  overflow: hidden;
   background: var(--iconColor);
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow:
-    var(--shadowL),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65);
-
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  overflow: hidden;
+    0 8px 22px rgba(17, 19, 34, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -9px 14px rgba(15, 19, 34, 0.14);
 }
 
-/* 圖示高光 */
 .appIconInner::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    180px 100px at 30% 20%,
-    rgba(255, 255, 255, 0.65) 0%,
-    rgba(255, 255, 255, 0.15) 45%,
-    rgba(255, 255, 255, 0) 75%
+  background: linear-gradient(
+    162deg,
+    rgba(255, 255, 255, 0.66) 0%,
+    rgba(255, 255, 255, 0.1) 48%,
+    rgba(255, 255, 255, 0) 78%
   );
-  opacity: 0.92;
   pointer-events: none;
 }
 
-.appIconEmoji {
-  font-size: 32px;
-  line-height: 1;
+.appIconGlyph {
+  width: 34px;
+  height: 34px;
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   position: relative;
   z-index: 1;
 }
 
+.uiIcon {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.uiIcon-sm {
+  width: 18px;
+  height: 18px;
+}
+
+.uiIcon-md {
+  width: 24px;
+  height: 24px;
+}
+
+.uiIcon-lg {
+  width: 32px;
+  height: 32px;
+}
+
 .appName {
+  width: 100%;
+  max-width: 96px;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  text-align: center;
-  line-height: 1.2;
-  max-width: 80px;
+  font-weight: 640;
+  color: rgba(18, 20, 35, 0.9);
+  line-height: 1.16;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .appSubtitle {
+  width: 100%;
+  max-width: 98px;
   font-size: 10px;
   font-weight: 500;
-  color: var(--muted);
-  text-align: center;
-  line-height: 1.2;
+  color: rgba(18, 20, 35, 0.56);
+  line-height: 1.12;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .homeFooter {
-  padding: 12px 6px 6px;
+  padding: 10px 0 8px;
+  display: flex;
+  justify-content: center;
 }
 
 .homeDock {
   display: flex;
-  justify-content: center;
-  gap: 20px;
-  padding: 14px 20px;
-  border-radius: 26px;
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--cardA), var(--cardB));
-  box-shadow: var(--shadowL);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.16));
+  box-shadow:
+    0 20px 45px rgba(16, 20, 36, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(1.05);
   position: relative;
-  overflow: hidden;
 }
 
-/* Dock 高光 */
 .homeDock::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    800px 120px at 50% 0%,
-    rgba(255, 255, 255, 0.72) 0%,
-    rgba(255, 255, 255, 0.22) 40%,
-    rgba(255, 255, 255, 0) 70%
-  );
-  opacity: 0.88;
+  inset: 1px 1px auto;
+  height: 46%;
+  border-radius: 20px 20px 14px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0));
   pointer-events: none;
 }
 
 .dockIcon {
-  font-size: 28px;
+  appearance: none;
+  border: 0;
   width: 56px;
   height: 56px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.18));
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  box-shadow:
+    0 10px 22px rgba(14, 18, 32, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  color: rgba(16, 19, 35, 0.82);
   cursor: pointer;
-  transition: transform 0.12s ease;
   position: relative;
   z-index: 1;
+  transition: transform 170ms ease;
+}
+
+.dockGlyph {
+  width: 28px;
+  height: 28px;
 }
 
 .dockIcon:active {
-  transform: scale(0.9);
+  transform: scale(0.93);
 }
 
-/* ======= 投資遊戲樣式 ======= */
+/* ======= ???璅?? ======= */
 .gameIntro {
   text-align: center;
   padding: 24px 18px;
@@ -929,7 +968,7 @@
   color: var(--text);
 }
 
-/* ======= 投資卡牌遊戲樣式 ======= */
+/* ======= ???∠??璅?? ======= */
 .cardGameIntro {
   text-align: center;
   padding: 24px 18px;
@@ -1066,7 +1105,7 @@
   overflow: hidden;
 }
 
-/* 卡牌高光效果 */
+/* ?∠?擃??? */
 .gameCard::before {
   content: "";
   position: absolute;
@@ -1174,7 +1213,7 @@
   color: var(--muted);
 }
 
-/* ======= 柴剛格鬥遊戲樣式 ======= */
+/* ======= ?游??潮洛?璅?? ======= */
 .fightShell {
   max-width: 480px;
 }
@@ -1197,7 +1236,7 @@
   z-index: 1;
 }
 
-/* 戰鬥區域 */
+/* ?圈洛???*/
 .fightArena {
   display: flex;
   flex-direction: column;
@@ -1213,7 +1252,7 @@
   padding: 4px 0;
 }
 
-/* 角色卡片 */
+/* 閫?∠? */
 .fighterCard {
   border-radius: 22px;
   padding: 14px;
@@ -1257,7 +1296,7 @@
   z-index: 1;
 }
 
-/* HP 條 */
+/* HP 璇?*/
 .hpBarContainer {
   position: relative;
   height: 22px;
@@ -1302,7 +1341,7 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* 角色圖片 */
+/* 閫?? */
 .fighterSprite {
   display: flex;
   justify-content: center;
@@ -1317,7 +1356,7 @@
   transition: transform 0.15s ease;
 }
 
-/* 敵人攻擊技能彈出圖示 */
+/* ?萎犖?餅???賢??箏?蝷?*/
 .activeSkillPopup {
   position: absolute;
   bottom: 100%;
@@ -1382,7 +1421,7 @@
   }
 }
 
-/* 動畫狀態 */
+/* ????*/
 .fighterSprite.attacking img {
   animation: attackAnim 0.4s ease;
 }
@@ -1465,7 +1504,7 @@
   }
 }
 
-/* 技能區 */
+/* ??賢? */
 .skillSection {
   margin-bottom: 14px;
 }
@@ -1558,7 +1597,7 @@
   line-height: 1.2;
 }
 
-/* 遊戲結束 */
+/* ?蝯? */
 .gameOverSection {
   margin-bottom: 14px;
 }
@@ -1604,7 +1643,7 @@
   margin-bottom: 20px;
 }
 
-/* 戰鬥紀錄 */
+/* ?圈洛蝝??*/
 .battleLogSection {
   border-radius: 18px;
   padding: 14px;
@@ -1649,15 +1688,52 @@
     font-size: 30px;
   }
 
+  .homeShell {
+    padding: 16px 10px max(10px, env(safe-area-inset-bottom));
+  }
   .homeTime {
-    font-size: 64px;
+    font-size: 52px;
+  }
+  .homeDate {
+    font-size: 13px;
   }
   .appGrid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px 14px;
+    padding: 14px 8px;
+    border-radius: 26px;
+    gap: 18px 10px;
   }
-  .homePageDots {
-    margin-top: 12px;
+  .appIcon {
+    gap: 6px;
+  }
+  .appIconInner {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+  }
+  .appIconGlyph {
+    width: 28px;
+    height: 28px;
+  }
+  .appName {
+    font-size: 11px;
+    max-width: 74px;
+  }
+  .appSubtitle {
+    font-size: 9px;
+    max-width: 78px;
+  }
+  .homeDock {
+    gap: 10px;
+    padding: 8px 10px;
+  }
+  .dockIcon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+  .dockGlyph {
+    width: 24px;
+    height: 24px;
   }
 
   .gameRules {
@@ -1698,8 +1774,130 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1199px) {
+  .homeShell {
+    padding: 26px clamp(20px, 4vw, 34px) max(14px, env(safe-area-inset-bottom));
+  }
+
+  .appGrid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 24px 16px;
+    padding: 20px 14px;
+  }
+
+  .appIconInner {
+    width: 72px;
+    height: 72px;
+    border-radius: 22px;
+  }
+
+  .appIconGlyph {
+    width: 36px;
+    height: 36px;
+  }
+
+  .appName {
+    font-size: 12.5px;
+  }
+
+  .appSubtitle {
+    font-size: 10px;
+  }
+
+  .dockIcon {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .homeShell {
+    padding: 30px clamp(26px, 4vw, 52px) max(16px, env(safe-area-inset-bottom));
+  }
+
+  .homeHeader {
+    padding-top: 2px;
+    padding-bottom: 18px;
+  }
+
+  .homeTime {
+    font-size: 82px;
+  }
+
+  .homeContent {
+    padding-top: 12px;
+  }
+
+  .appGrid {
+    width: min(1300px, 100%);
+    padding: 26px 20px 20px;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 28px 22px;
+    border-radius: 38px;
+  }
+
+  .appIcon {
+    gap: 11px;
+    padding: 8px 6px 12px;
+    border-radius: 22px;
+  }
+
+  .appIconInner {
+    width: 82px;
+    height: 82px;
+    border-radius: 24px;
+  }
+
+  .appIconGlyph {
+    width: 40px;
+    height: 40px;
+  }
+
+  .appName {
+    max-width: 110px;
+    font-size: 13.5px;
+  }
+
+  .appSubtitle {
+    max-width: 110px;
+    font-size: 11px;
+  }
+
+  .homeFooter {
+    padding-top: 12px;
+  }
+
+  .homeDock {
+    gap: 16px;
+    padding: 12px 16px;
+  }
+
+  .dockIcon {
+    width: 62px;
+    height: 62px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .appIcon:hover {
+    transform: translateY(-7px) scale(1.03);
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 18px 36px rgba(16, 16, 30, 0.2);
+  }
+
+  .appIcon.disabled:hover {
+    transform: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .dockIcon:hover {
+    transform: translateY(-4px) scale(1.04);
+  }
+}
+
 /* ========================================
-   跳跳遊戲 Jump Game
+   頝唾歲? Jump Game
    ======================================== */
 
 .jumpShell {
@@ -1714,7 +1912,7 @@
   z-index: 1;
 }
 
-/* 頂部導航 */
+/* ?撠 */
 .jumpHeader {
   width: 100%;
   display: flex;
@@ -1748,7 +1946,7 @@
   margin: 0;
 }
 
-/* 分數欄 */
+/* ?甈?*/
 .jumpScoreBar {
   width: 100%;
   display: flex;
@@ -1802,7 +2000,7 @@
   border-radius: 10px;
 }
 
-/* 遊戲區域 */
+/* ????*/
 .jumpGameArea {
   position: relative;
   background: linear-gradient(
@@ -1820,7 +2018,7 @@
   user-select: none;
 }
 
-/* 平台 */
+/* 撟喳 */
 .jumpPlatform {
   position: absolute;
   left: 0;
@@ -1871,7 +2069,7 @@
   }
 }
 
-/* 玩家 */
+/* ?拙振 */
 .jumpPlayer {
   position: absolute;
   left: 0;
@@ -1880,7 +2078,7 @@
   will-change: transform;
 }
 
-/* 平台容器 */
+/* 撟喳摰孵 */
 .jumpPlatformContainer {
   position: absolute;
   left: 0;
@@ -1932,7 +2130,7 @@
   border-radius: 50%;
 }
 
-/* 遊戲覆蓋層 */
+/* ?閬?撅?*/
 .jumpOverlay {
   position: absolute;
   top: 0;
@@ -2019,7 +2217,7 @@
   }
 }
 
-/* 開始按鈕 */
+/* ???? */
 .jumpStartBtn {
   margin-top: 12px;
   padding: 14px 32px;
@@ -2045,7 +2243,7 @@
   box-shadow: 0 4px 12px rgba(255, 130, 80, 0.4);
 }
 
-/* 結算畫面樣式 */
+/* 蝯??恍璅?? */
 .jumpOverlayEmoji.bounce {
   animation: resultBounce 0.6s ease infinite alternate;
 }
@@ -2132,7 +2330,7 @@
   margin: 8px 0 !important;
 }
 
-/* 手機控制按鈕 */
+/* ???批?? */
 .jumpControls {
   margin-top: 16px;
   display: flex;
@@ -2184,7 +2382,7 @@
   transform: scale(0.9);
 }
 
-/* 控制提示 */
+/* ?批?內 */
 .jumpControlHint {
   margin-top: 12px;
   display: flex;
@@ -2203,7 +2401,7 @@
   backdrop-filter: blur(8px);
 }
 
-/* RWD 調整 */
+/* RWD 隤踵 */
 @media (max-width: 400px) {
   .jumpShell {
     padding: 12px;
@@ -2228,7 +2426,7 @@
   }
 }
 
-/* 桌機隱藏手機控制按鈕 */
+/* 獢??梯????批?? */
 @media (min-width: 768px) {
   .jumpControls {
     opacity: 0.5;
@@ -2239,9 +2437,9 @@
   }
 }
 
-/* ========== 跳跳遊戲新功能樣式 ========== */
+/* ========== 頝唾歲??啣??賣見撘?========== */
 
-/* 易碎平台 */
+/* ??撟喳 */
 .jumpPlatform.cracked {
   background: linear-gradient(180deg, #a1887f, #795548);
   box-shadow:
@@ -2306,7 +2504,7 @@
   }
 }
 
-/* 平台踩到閃爍 */
+/* 撟喳頦拙?? */
 .jumpPlatform.flash {
   animation: platformFlash 0.3s ease infinite;
   box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
@@ -2324,7 +2522,7 @@
   }
 }
 
-/* 道具樣式 */
+/* ?璅?? */
 .jumpPowerupContainer {
   position: absolute;
   left: 0;
@@ -2417,7 +2615,7 @@
   }
 }
 
-/* 敵人樣式 */
+/* ?萎犖璅?? */
 .jumpEnemyContainer {
   position: absolute;
   left: 0;
@@ -2439,7 +2637,7 @@
   transition: all 0.15s ease;
 }
 
-/* 被踩後的敵人 - 明顯的壓扁和旋轉效果 */
+/* 鋡怨萱敺??萎犖 - ?＊???????? */
 .jumpEnemy.bounced {
   filter: drop-shadow(0 6px 12px rgba(255, 100, 100, 0.6)) brightness(1.5)
     contrast(1.3);
@@ -2470,7 +2668,7 @@
   }
 }
 
-/* 黑洞樣式 */
+/* 暺?璅?? */
 .jumpBlackholeContainer {
   position: absolute;
   left: 0;
@@ -2529,7 +2727,7 @@
   }
 }
 
-/* 玩家道具效果 */
+/* ?拙振??? */
 .jumpPlayer.boosting .jumpJetpackFlame {
   display: block;
 }
@@ -2603,7 +2801,7 @@
   }
 }
 
-/* 安全網特效 */
+/* 摰蝬脩??*/
 .jumpPlayer.hasSafetyNet .jumpSafetyNetAura {
   display: block;
 }
@@ -2640,7 +2838,7 @@
   }
 }
 
-/* 翻牆視覺效果 */
+/* 蝧餌?閬死?? */
 .jumpPlayer.wrapping {
   animation: wrapFlash 0.15s ease-out;
 }
@@ -2674,7 +2872,7 @@
   }
 }
 
-/* 傳送門視覺效果 */
+/* ?喲?閬死?? */
 .jumpPlayer.teleporting {
   animation: teleportFlash 0.15s ease-in-out;
 }
@@ -2725,12 +2923,12 @@
     0 0 10px rgba(3, 169, 244, 0.5);
 }
 
-/* 玩家 squash/stretch 動畫 - 基礎已在 transform 中處理 */
+/* ?拙振 squash/stretch ? - ?箇?撌脣 transform 銝剛???*/
 .jumpPlayer {
   transform-origin: center bottom;
 }
 
-/* Game Over 掉落動畫 */
+/* Game Over ?? */
 .jumpPlayer.falling {
   animation: playerFall 1s ease-in forwards;
 }
@@ -2745,7 +2943,7 @@
   }
 }
 
-/* 分數跳動動畫 */
+/* ?頝喳?? */
 .jumpScoreValue.scoreBounce {
   animation: scoreBounce 0.3s ease;
 }
@@ -2762,7 +2960,7 @@
   }
 }
 
-/* 道具狀態顯示 */
+/* ???＊蝷?*/
 .jumpEffects {
   display: flex;
   gap: 8px;
@@ -2836,7 +3034,7 @@
   }
 }
 
-/* 成就彈窗 */
+/* ?停敶? */
 .jumpAchievementPopup {
   position: fixed;
   top: 80px;
@@ -2888,7 +3086,7 @@
   color: #795548;
 }
 
-/* 分數稱號彈窗 */
+/* ?蝔梯?敶? */
 .jumpTitlePopup {
   position: fixed;
   top: 100px;
@@ -2963,7 +3161,7 @@
   color: #888;
 }
 
-/* 道具指南 */
+/* ??? */
 .jumpPowerupGuide {
   display: flex;
   gap: 12px;
@@ -3247,3 +3445,4 @@
     opacity: 0.6;
   }
 }
+
