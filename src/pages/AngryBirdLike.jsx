@@ -375,6 +375,8 @@ export default function AngryBirdLike() {
   const [gameSpeed, setGameSpeed] = useState(1);
   const [aimInfo, setAimInfo] = useState({ active: false, power: 0, angle: 0 });
   const [portraitMobile, setPortraitMobile] = useState(false);
+  const [mobileLandscape, setMobileLandscape] = useState(false);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [campaignSummary, setCampaignSummary] = useState({
     startedAt: Date.now(),
     completedAt: null,
@@ -616,9 +618,13 @@ export default function AngryBirdLike() {
   useEffect(() => {
     audioRef.current = createAudioEngine();
     resetLevel(0, { newCampaign: true });
-    document.body.classList.add("angry-landscape-page");
+    const prevOverflowX = document.body.style.overflowX;
+    const prevOverflowY = document.body.style.overflowY;
+    document.body.style.overflowX = "hidden";
+    document.body.style.overflowY = "auto";
     return () => {
-      document.body.classList.remove("angry-landscape-page");
+      document.body.style.overflowX = prevOverflowX;
+      document.body.style.overflowY = prevOverflowY;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       try {
         window.screen?.orientation?.unlock?.();
@@ -631,7 +637,11 @@ export default function AngryBirdLike() {
   useEffect(() => {
     const check = () => {
       const coarse = window.matchMedia("(pointer: coarse)").matches;
-      setPortraitMobile(coarse && window.innerHeight > window.innerWidth);
+      const portrait = coarse && window.innerHeight > window.innerWidth;
+      const landscape = coarse && window.innerWidth > window.innerHeight;
+      setPortraitMobile(portrait);
+      setMobileLandscape(landscape);
+      if (!landscape) setMobileSettingsOpen(false);
     };
     check();
     window.addEventListener("resize", check);
@@ -1652,6 +1662,55 @@ export default function AngryBirdLike() {
                 </div>
               </div>
             )}
+
+            {mobileLandscape && (
+              <>
+                <button
+                  className="angry-mobile-settings-btn"
+                  onClick={() => setMobileSettingsOpen((prev) => !prev)}
+                  aria-expanded={mobileSettingsOpen}
+                  aria-label="開啟遊戲資訊與設定"
+                >
+                  ⚙️
+                </button>
+                {mobileSettingsOpen && (
+                  <div className="angry-mobile-settings-panel">
+                    <div className="angry-mobile-settings-grid">
+                      <div><span>關卡</span><strong>{hud.level} / {LEVELS.length}</strong></div>
+                      <div><span>分數</span><strong>{hud.score.toLocaleString()}</strong></div>
+                      <div><span>目標</span><strong>{hud.targetsLeft}</strong></div>
+                      <div><span>★</span><strong>{currentLevelStars} / 3</strong></div>
+                    </div>
+                    <div className="angry-mobile-settings-row">
+                      <button className="angry-btn angry-ghost" onClick={togglePause}>{paused ? "繼續" : "暫停"}</button>
+                      <button
+                        className="angry-btn"
+                        onClick={() => {
+                          const idx = LEVELS.findIndex((v) => v.id === worldRef.current.cfg.id);
+                          resetLevel(idx);
+                        }}
+                      >
+                        重來
+                      </button>
+                    </div>
+                    <div className="angry-mobile-settings-row">
+                      <button className={`angry-speed-btn${Math.abs(gameSpeed - 0.8) < 0.01 ? " active" : ""}`} onClick={() => applySpeed(0.8)}>0.8x</button>
+                      <button className={`angry-speed-btn${Math.abs(gameSpeed - 1) < 0.01 ? " active" : ""}`} onClick={() => applySpeed(1)}>1.0x</button>
+                      <button className={`angry-speed-btn${Math.abs(gameSpeed - 1.2) < 0.01 ? " active" : ""}`} onClick={() => applySpeed(1.2)}>1.2x</button>
+                    </div>
+                    <div className="angry-mobile-queue-title">待發射：{nextBirds.length}</div>
+                    <div className="angry-mobile-queue">
+                      {nextBirds.length ? nextBirds.map((b) => (
+                        <div className="angry-queue-item" key={`m-${b.id}`}>
+                          <span className="angry-dot small" style={{ background: b.type.color }} />
+                          <span>{b.type.name}</span>
+                        </div>
+                      )) : <div className="angry-empty">沒有剩餘小鳥</div>}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <aside className="angry-panel card">
@@ -1705,5 +1764,3 @@ export default function AngryBirdLike() {
     </div>
   );
 }
-
-
