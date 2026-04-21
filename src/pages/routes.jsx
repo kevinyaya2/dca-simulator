@@ -1,96 +1,39 @@
-import Home from "./Home";
-import DCA from "./DCA";
-import MDCalculator from "./MDCalculator";
-import MonteCarloPi from "./MonteCarloPi";
-import RandomWalk from "./RandomWalk";
-import MandelbrotExplorer from "./MandelbrotExplorer";
-import CardGame from "./CardGame";
-import FightGame from "./FightGame";
-import JumpGame from "./JumpGame";
-import AutoBattle from "./AutoBattle";
-import ToeicVocab from "./ToeicVocab";
-import FlappySalaryGame from "./FlappySalaryGame";
-import SpicyGame from "./SpicyGame";
-import BombGame from "./BombGame";
-import CrossyRoad from "./CrossyRoad";
+﻿import { lazy } from "react";
 
-// 路由配置：集中管理所有頁面路由
+const Home = lazy(() => import("./Home"));
+const DCA = lazy(() => import("./DCA"));
+const MDCalculator = lazy(() => import("./MDCalculator"));
+const MonteCarloPi = lazy(() => import("./MonteCarloPi"));
+const RandomWalk = lazy(() => import("./RandomWalk"));
+const MandelbrotExplorer = lazy(() => import("./MandelbrotExplorer"));
+const CardGame = lazy(() => import("./CardGame"));
+const FightGame = lazy(() => import("./FightGame"));
+const JumpGame = lazy(() => import("./JumpGame"));
+const AutoBattle = lazy(() => import("./AutoBattle"));
+const ToeicVocab = lazy(() => import("./ToeicVocab"));
+const FlappySalaryGame = lazy(() => import("./FlappySalaryGame"));
+const SpicyGame = lazy(() => import("./SpicyGame"));
+const BombGame = lazy(() => import("./BombGame"));
+const CrossyRoad = lazy(() => import("./CrossyRoad"));
+const PetBuddy = lazy(() => import("./PetBuddy"));
+
 const routes = [
-  {
-    path: "/",
-    element: <Home />,
-    title: "首頁",
-  },
-  {
-    path: "/dca",
-    element: <DCA />,
-    title: "定期定額模擬器",
-  },
-  {
-    path: "/cards",
-    element: <CardGame />,
-    title: "投資卡牌",
-  },
-  {
-    path: "/fight",
-    element: <FightGame />,
-    title: "柴剛格鬥",
-  },
-  {
-    path: "/jump",
-    element: <JumpGame />,
-    title: "柴剛跳跳",
-  },
-  {
-    path: "/autobattle",
-    element: <AutoBattle />,
-    title: "柴剛推線",
-  },
-  {
-    path: "/toeic",
-    element: <ToeicVocab />,
-    title: "多益單字",
-  },
-  {
-    path: "/flappy",
-    element: <FlappySalaryGame />,
-    title: "薪水小鳥",
-  },
-  {
-    path: "/spicy",
-    element: <SpicyGame />,
-    title: "辣度挑戰",
-  },
-  {
-    path: "/md-calc",
-    element: <MDCalculator />,
-    title: "MD 段位計算器",
-  },
-  {
-    path: "/monte-carlo",
-    element: <MonteCarloPi />,
-    title: "蒙特卡洛 π",
-  },
-  {
-    path: "/random-walk",
-    element: <RandomWalk />,
-    title: "隨機漫步",
-  },
-  {
-    path: "/mandelbrot",
-    element: <MandelbrotExplorer />,
-    title: "曼德博集合",
-  },
-  {
-    path: "/bomb",
-    element: <BombGame />,
-    title: "炸彈超人",
-  },
-  {
-    path: "/crossy",
-    element: <CrossyRoad />,
-    title: "天天過馬路",
-  },
+  { path: "/", element: <Home />, title: "Home" },
+  { path: "/dca", element: <DCA />, title: "DCA Simulator" },
+  { path: "/cards", element: <CardGame />, title: "Deck Builder" },
+  { path: "/fight", element: <FightGame />, title: "Fight Game" },
+  { path: "/jump", element: <JumpGame />, title: "Jump Game" },
+  { path: "/autobattle", element: <AutoBattle />, title: "Auto Battle" },
+  { path: "/toeic", element: <ToeicVocab />, title: "TOEIC Vocab" },
+  { path: "/flappy", element: <FlappySalaryGame />, title: "Flappy Salary" },
+  { path: "/spicy", element: <SpicyGame />, title: "Spicy Game" },
+  { path: "/md-calc", element: <MDCalculator />, title: "MD Calculator" },
+  { path: "/monte-carlo", element: <MonteCarloPi />, title: "Monte Carlo Pi" },
+  { path: "/random-walk", element: <RandomWalk />, title: "Random Walk" },
+  { path: "/mandelbrot", element: <MandelbrotExplorer />, title: "Mandelbrot" },
+  { path: "/bomb", element: <BombGame />, title: "Bomberman" },
+  { path: "/crossy", element: <CrossyRoad />, title: "Crossy Shiba" },
+  { path: "/pet", element: <PetBuddy />, title: "Pet Buddy" },
 ];
 
 export default routes;
