@@ -716,8 +716,8 @@ export default function SnackMerge() {
         ctx.fillStyle = "rgba(255, 239, 211, 0.92)";
         ctx.fillText("今天的夜市太熱鬧，攤位已經擠不下了。", WIDTH / 2, 234);
         ctx.font = "800 16px sans-serif";
-        ctx.fillText(`?砍?? ${game.score.toLocaleString()}`, WIDTH / 2, 268);
-        ctx.fillText(`?擃? ${game.best.toLocaleString()}`, WIDTH / 2, 294);
+        ctx.fillText(`💰營收 ${game.score.toLocaleString()}`, WIDTH / 2, 268);
+        ctx.fillText(`🏆最佳 ${game.best.toLocaleString()}`, WIDTH / 2, 294);
         ctx.restore();
       }
     };
