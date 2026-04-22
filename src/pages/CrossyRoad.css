@@ -97,31 +97,38 @@
 }
 
 /* ── Combo ── */
-.crossy-combo {
-  position: relative;
+.crossy-combo-overlay {
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 9px 20px;
-  margin-bottom: 10px;
   border-radius: 20px;
   overflow: hidden;
-  animation: combo-pop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 4;
+  white-space: nowrap;
+  animation: crossy-combo-float 0.9s ease-out forwards;
 }
 
-@keyframes combo-pop {
+@keyframes crossy-combo-float {
   0% {
-    transform: scale(0.55) translateY(-10px);
+    transform: translate(-50%, -28%) scale(0.72);
     opacity: 0;
   }
-  65% {
-    transform: scale(1.14) translateY(2px);
+  18% {
+    transform: translate(-50%, -52%) scale(1);
+    opacity: 1;
+  }
+  72% {
+    transform: translate(-50%, -70%) scale(1);
     opacity: 1;
   }
   100% {
-    transform: scale(1) translateY(0);
-    opacity: 1;
+    transform: translate(-50%, -94%) scale(0.98);
+    opacity: 0;
   }
 }
 
@@ -150,8 +157,8 @@
     0 4px 24px rgba(255, 80, 0, 0.32),
     inset 0 1px 0 rgba(255, 180, 100, 0.12);
   animation:
-    combo-pop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both,
-    combo-hot-glow 0.9s ease-in-out infinite 0.38s;
+    crossy-combo-float 0.9s ease-out forwards,
+    combo-hot-glow 0.9s ease-in-out infinite 0.18s;
 }
 
 @keyframes combo-hot-glow {
@@ -176,8 +183,8 @@
     0 4px 28px rgba(200, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 140, 140, 0.13);
   animation:
-    combo-pop 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both,
-    combo-inferno-shake 0.12s linear infinite 0.38s;
+    crossy-combo-float 0.9s ease-out forwards,
+    combo-inferno-shake 0.12s linear infinite 0.18s;
 }
 
 @keyframes combo-inferno-shake {

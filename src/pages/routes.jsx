@@ -3,7 +3,7 @@
 const Home = lazy(() => import("./Home"));
 const DCA = lazy(() => import("./DCA"));
 const MDCalculator = lazy(() => import("./MDCalculator"));
-const MonteCarloPi = lazy(() => import("./MonteCarloPi"));
+const SnackMerge = lazy(() => import("./SnackMerge"));
 const RandomWalk = lazy(() => import("./RandomWalk"));
 const MandelbrotExplorer = lazy(() => import("./MandelbrotExplorer"));
 const CardGame = lazy(() => import("./CardGame"));
@@ -29,7 +29,7 @@ const routes = [
   { path: "/flappy", element: <FlappySalaryGame />, title: "Flappy Salary" },
   { path: "/spicy", element: <SpicyGame />, title: "Spicy Game" },
   { path: "/md-calc", element: <MDCalculator />, title: "MD Calculator" },
-  { path: "/monte-carlo", element: <MonteCarloPi />, title: "Monte Carlo Pi" },
+  { path: "/snack-merge", element: <SnackMerge />, title: "Taiwan Snack Merge" },
   { path: "/random-walk", element: <RandomWalk />, title: "Random Walk" },
   { path: "/mandelbrot", element: <MandelbrotExplorer />, title: "Mandelbrot" },
   { path: "/bomb", element: <BombGame />, title: "Bomberman" },

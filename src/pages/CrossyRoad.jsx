@@ -523,8 +523,10 @@ export default function CrossyRoad() {
     }
   });
   const [displayCombo, setDisplayCombo] = useState(0);
+  const [displayComboPopup, setDisplayComboPopup] = useState(null);
   const [displayMaxRow, setDisplayMaxRow] = useState(0);
   const [displayGameOverMsg, setDisplayGameOverMsg] = useState("");
+  const comboPopupTimeoutRef = useRef(null);
 
   // 遊戲核心狀態全用 ref，避免 re-render
   const gs = useRef({
@@ -585,6 +587,7 @@ export default function CrossyRoad() {
     setDisplayState("playing");
     setDisplayScore(0);
     setDisplayCombo(0);
+    setDisplayComboPopup(null);
     setDisplayMaxRow(0);
     setDisplayGameOverMsg("");
   }, [displayHighScore]);
@@ -647,6 +650,7 @@ export default function CrossyRoad() {
         if (state.comboTimer <= 0) {
           state.combo = 0;
           setDisplayCombo(0);
+          setDisplayComboPopup(null);
         }
       }
 
@@ -919,6 +923,27 @@ export default function CrossyRoad() {
               newRow,
               comboColor,
             );
+
+            const popupX = newCol * TILE + TILE / 2;
+            const popupY =
+              CANVAS_H -
+              (newRow - state.cameraRow + CANVAS_H / TILE / 2) * TILE -
+              TILE * 0.65;
+            const popupData = {
+              key: `${Date.now()}-${state.combo}`,
+              combo: state.combo,
+              bonus: Math.floor(state.combo / 3),
+              x: popupX,
+              y: popupY,
+            };
+            setDisplayComboPopup(popupData);
+            if (comboPopupTimeoutRef.current) {
+              window.clearTimeout(comboPopupTimeoutRef.current);
+            }
+            comboPopupTimeoutRef.current = window.setTimeout(() => {
+              setDisplayComboPopup(null);
+              comboPopupTimeoutRef.current = null;
+            }, 900);
           }
         }
 
@@ -1041,6 +1066,15 @@ export default function CrossyRoad() {
     };
   }, [endGame, update, draw]);
 
+  useEffect(
+    () => () => {
+      if (comboPopupTimeoutRef.current) {
+        window.clearTimeout(comboPopupTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   // 觸控 / 手勢
   const touchStartRef = useRef(null);
   const handleTouchStart = useCallback((e) => {
@@ -1106,31 +1140,32 @@ export default function CrossyRoad() {
             <span className="crossy-score-value">{displayHighScore}</span>
           </div>
         </div>
-        {displayCombo > 1 && (
-          <div
-            key={displayCombo}
-            className={`crossy-combo ${
-              displayCombo >= 10
-                ? "combo-inferno"
-                : displayCombo >= 5
-                  ? "combo-hot"
-                  : "combo-warm"
-            }`}
-          >
-            <span className="combo-fire">
-              {displayCombo >= 10 ? "🔥🔥" : "🔥"}
-            </span>
-            <span className="combo-text">COMBO</span>
-            <span className="combo-count">×{displayCombo}</span>
-            {displayCombo >= 5 && (
-              <span className="combo-bonus">
-                +{Math.floor(displayCombo / 3)} pts
-              </span>
-            )}
-          </div>
-        )}
-
         <div className="crossy-game-area">
+          {displayComboPopup && (
+            <div
+              key={displayComboPopup.key}
+              className={`crossy-combo-overlay ${
+                displayComboPopup.combo >= 10
+                  ? "combo-inferno"
+                  : displayComboPopup.combo >= 5
+                    ? "combo-hot"
+                    : "combo-warm"
+              }`}
+              style={{
+                left: `${displayComboPopup.x}px`,
+                top: `${displayComboPopup.y}px`,
+              }}
+            >
+              <span className="combo-fire">
+                {displayComboPopup.combo >= 10 ? "🔥🔥" : "🔥"}
+              </span>
+              <span className="combo-text">COMBO</span>
+              <span className="combo-count">×{displayComboPopup.combo}</span>
+              {displayComboPopup.combo >= 5 && (
+                <span className="combo-bonus">+{displayComboPopup.bonus} pts</span>
+              )}
+            </div>
+          )}
           <canvas
             ref={canvasRef}
             width={CANVAS_W}

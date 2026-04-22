@@ -10,7 +10,6 @@
   --shadowM: 0 14px 40px rgba(16, 16, 30, 0.12);
   --shadowS: 0 10px 22px rgba(16, 16, 30, 0.1);
 
-  /* ?湧ˊ??銝餉嚗??range 憛急遛 */
   --fill: linear-gradient(
     90deg,
     rgba(255, 85, 170, 0.98) 0%,
@@ -29,7 +28,6 @@
   overflow: hidden;
 }
 
-/* ?喃?閫?One UI ?脫敶拚 */
 .oneui::before {
   content: "";
   position: absolute;
@@ -63,7 +61,6 @@
   pointer-events: none;
 }
 
-/* 撠???暺?*/
 .oneui::after {
   content: "";
   position: absolute;
@@ -144,7 +141,6 @@
   padding: 0 4px 0;
 }
 
-/* ======= ?∠?嚗 3D?蝎曄溶 ======= */
 .card {
   position: relative;
   border-radius: 28px;
@@ -161,7 +157,6 @@
   overflow: hidden;
 }
 
-/* ?∠?擃?嚗??餌?銝?????*/
 .card::before {
   content: "";
   position: absolute;
@@ -176,7 +171,6 @@
   pointer-events: none;
 }
 
-/* ?∠??折敶梧??渡?擃?*/
 .card::after {
   content: "";
   position: absolute;
@@ -313,7 +307,6 @@
   box-shadow: 0 10px 18px rgba(16, 16, 30, 0.1);
 }
 
-/* ======= 敶抵皛▼嚗?暺????======= */
 .range {
   --p: 50%;
   --track: rgba(255, 255, 255, 0.5);
@@ -371,7 +364,6 @@
     inset 0 1px 1px rgba(255, 255, 255, 0.75);
 }
 
-/* Firefox */
 .range::-moz-range-track {
   height: 12px;
   border-radius: 999px;
@@ -475,7 +467,6 @@
   height: 12px;
 }
 
-/* ======= 餈??? ======= */
 .backBtn {
   font-size: 15px;
   font-weight: 950;
@@ -491,7 +482,6 @@
   opacity: 0.75;
 }
 
-/* ======= Home ?璅??嚗ne UI 憸冽??獢嚗?====== */
 .launchpadRoot {
   background:
     radial-gradient(circle at 18% 12%, rgba(132, 190, 255, 0.55), transparent 48%),
@@ -754,7 +744,377 @@
   transform: scale(0.93);
 }
 
-/* ======= ???璅?? ======= */
+.snackMergeHero {
+  background:
+    radial-gradient(circle at top left, rgba(255, 221, 152, 0.28), transparent 38%),
+    linear-gradient(180deg, rgba(255, 248, 238, 0.88), rgba(255, 228, 194, 0.62));
+}
+
+.snackMergeNightFont {
+  font-family: DFKai-SB, "Microsoft JhengHei", "Segoe UI", sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.snackMergeHeaderActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.snackMergeToggle {
+  border: 1px solid rgba(255, 223, 157, 0.32);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(102, 53, 33, 0.95), rgba(73, 33, 22, 0.95));
+  color: rgba(255, 237, 205, 0.96);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(33, 15, 10, 0.18);
+}
+
+.snackMergeToggle:active {
+  transform: translateY(1px);
+}
+
+.snackMergeRibbon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 104px;
+  margin-bottom: 12px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d14836, #f06f39);
+  color: #fff4d9;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(140, 48, 36, 0.2);
+  position: relative;
+  z-index: 1;
+}
+
+.snackMergeHeroBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(99, 49, 29, 0.95), rgba(139, 68, 34, 0.95));
+  color: #ffe2a9;
+  box-shadow: 0 12px 28px rgba(70, 33, 23, 0.24);
+  position: relative;
+  z-index: 1;
+}
+
+.snackMergeHeroBanner strong {
+  font-size: 15px;
+  letter-spacing: 0.3px;
+}
+
+.snackMergeHeroBanner span {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.88;
+}
+
+.snackMergeWoodPill,
+.snackMergeWoodMini {
+  background:
+    linear-gradient(180deg, rgba(118, 67, 42, 0.9), rgba(80, 42, 25, 0.94)),
+    rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 218, 157, 0.3);
+  color: #ffe8c3;
+}
+
+.snackMergeWoodPill .pillTop,
+.snackMergeWoodMini .label,
+.snackMergeWoodMini .hint {
+  color: rgba(255, 226, 188, 0.72);
+}
+
+.snackMergeWoodMini .value {
+  color: rgba(255, 244, 224, 0.96);
+}
+
+.snackMergeNightCard {
+  background:
+    radial-gradient(circle at top right, rgba(255, 196, 113, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(55, 23, 31, 0.82), rgba(93, 39, 34, 0.72));
+}
+
+.snackMergeNightTitle {
+  color: rgba(255, 227, 171, 0.95);
+}
+
+.snackMergeBoard {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+  padding-top: 8px;
+  min-height: 520px;
+}
+
+.snackMergeCanvas {
+  width: 100%;
+  max-width: 320px;
+  display: block;
+  border-radius: 28px;
+  border: 1.5px solid rgba(255, 230, 186, 0.38);
+  box-shadow:
+    0 16px 36px rgba(8, 4, 11, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  touch-action: none;
+}
+
+.snackMergeLantern {
+  position: absolute;
+  top: -4px;
+  width: 30px;
+  height: 42px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffb347, #ff6b35);
+  box-shadow:
+    0 0 24px rgba(255, 164, 80, 0.42),
+    inset 0 -5px 8px rgba(122, 37, 18, 0.32);
+}
+
+.snackMergeLantern::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 2px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: rgba(255, 221, 162, 0.76);
+}
+
+.snackMergeLanternLeft {
+  left: 12px;
+}
+
+.snackMergeLanternRight {
+  right: 12px;
+}
+
+.snackMergeBanner {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(210, 57, 42, 0.96), rgba(145, 38, 31, 0.96));
+  color: #ffe8a6;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  z-index: 2;
+  box-shadow: 0 10px 22px rgba(81, 17, 15, 0.25);
+}
+
+.snackMergeSteam {
+  position: absolute;
+  bottom: 96px;
+  width: 34px;
+  height: 74px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
+  filter: blur(6px);
+  opacity: 0.42;
+  pointer-events: none;
+  animation: snackMergeSteamFloat 3.8s ease-in-out infinite;
+  z-index: 2;
+}
+
+.snackMergeSteamA {
+  left: 82px;
+}
+
+.snackMergeSteamB {
+  left: 150px;
+  animation-delay: 1.2s;
+}
+
+.snackMergeSteamC {
+  right: 76px;
+  animation-delay: 2s;
+}
+
+.snackMergeLegend {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(255, 225, 181, 0.88);
+  position: relative;
+  z-index: 1;
+}
+
+.snackMergeComboOverlay {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 168px;
+  max-width: calc(100% - 40px);
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: rgba(255, 211, 141, 0.16);
+  border: 1px solid rgba(255, 210, 132, 0.28);
+  box-shadow: var(--shadowM);
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 231, 196, 0.98);
+  text-align: center;
+  z-index: 4;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: snackMergeComboFloat 850ms ease-out forwards;
+}
+
+@keyframes snackMergeComboFloat {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -32%);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -58%);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -72%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -92%);
+  }
+}
+
+.snackMergeTrack {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.snackMergeStep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 214, 149, 0.18);
+  background:
+    linear-gradient(180deg, rgba(126, 68, 42, 0.94), rgba(76, 37, 27, 0.96)),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadowM);
+}
+
+.snackMergeEmoji {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 240, 214, 0.92);
+  font-size: 24px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.snackMergeMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.snackMergeMeta strong {
+  font-size: 13px;
+  color: rgba(255, 242, 218, 0.96);
+}
+
+.snackMergeMeta span {
+  font-size: 11px;
+  color: rgba(255, 220, 179, 0.66);
+}
+
+.snackMergePriceTag {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 5px 14px rgba(25, 10, 6, 0.18);
+  white-space: nowrap;
+}
+
+.snackMergeBurst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.snackMergeParticle {
+  position: absolute;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 12px currentColor;
+}
+
+.snackMergeShake-soft {
+  animation: snackMergeSoftShake 180ms ease;
+}
+
+.snackMergeShake-hard {
+  animation: snackMergeHardShake 220ms ease;
+}
+
+@keyframes snackMergeSoftShake {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes snackMergeHardShake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-5px, 1px); }
+  40% { transform: translate(5px, -1px); }
+  60% { transform: translate(-3px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes snackMergeSteamFloat {
+  0% {
+    transform: translateY(8px) scale(0.9);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.34;
+  }
+  60% {
+    opacity: 0.26;
+  }
+  100% {
+    transform: translateY(-54px) scale(1.2);
+    opacity: 0;
+  }
+}
+
 .gameIntro {
   text-align: center;
   padding: 24px 18px;
@@ -968,7 +1328,6 @@
   color: var(--text);
 }
 
-/* ======= ???∠??璅?? ======= */
 .cardGameIntro {
   text-align: center;
   padding: 24px 18px;
@@ -1105,7 +1464,6 @@
   overflow: hidden;
 }
 
-/* ?∠?擃??? */
 .gameCard::before {
   content: "";
   position: absolute;
@@ -1213,7 +1571,6 @@
   color: var(--muted);
 }
 
-/* ======= ?游??潮洛?璅?? ======= */
 .fightShell {
   max-width: 480px;
 }
@@ -1236,7 +1593,6 @@
   z-index: 1;
 }
 
-/* ?圈洛???*/
 .fightArena {
   display: flex;
   flex-direction: column;
@@ -1252,7 +1608,6 @@
   padding: 4px 0;
 }
 
-/* 閫?∠? */
 .fighterCard {
   border-radius: 22px;
   padding: 14px;
@@ -1296,7 +1651,6 @@
   z-index: 1;
 }
 
-/* HP 璇?*/
 .hpBarContainer {
   position: relative;
   height: 22px;
@@ -1341,7 +1695,6 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* 閫?? */
 .fighterSprite {
   display: flex;
   justify-content: center;
@@ -1356,7 +1709,6 @@
   transition: transform 0.15s ease;
 }
 
-/* ?萎犖?餅???賢??箏?蝷?*/
 .activeSkillPopup {
   position: absolute;
   bottom: 100%;
@@ -1421,7 +1773,6 @@
   }
 }
 
-/* ????*/
 .fighterSprite.attacking img {
   animation: attackAnim 0.4s ease;
 }
@@ -1504,7 +1855,6 @@
   }
 }
 
-/* ??賢? */
 .skillSection {
   margin-bottom: 14px;
 }
@@ -1597,7 +1947,6 @@
   line-height: 1.2;
 }
 
-/* ?蝯? */
 .gameOverSection {
   margin-bottom: 14px;
 }
@@ -1643,7 +1992,6 @@
   margin-bottom: 20px;
 }
 
-/* ?圈洛蝝??*/
 .battleLogSection {
   border-radius: 18px;
   padding: 14px;
@@ -1896,10 +2244,6 @@
   }
 }
 
-/* ========================================
-   頝唾歲? Jump Game
-   ======================================== */
-
 .jumpShell {
   max-width: 420px;
   margin: 0 auto;
@@ -1912,7 +2256,6 @@
   z-index: 1;
 }
 
-/* ?撠 */
 .jumpHeader {
   width: 100%;
   display: flex;
@@ -1946,7 +2289,6 @@
   margin: 0;
 }
 
-/* ?甈?*/
 .jumpScoreBar {
   width: 100%;
   display: flex;
@@ -2000,7 +2342,6 @@
   border-radius: 10px;
 }
 
-/* ????*/
 .jumpGameArea {
   position: relative;
   background: linear-gradient(
@@ -2018,7 +2359,6 @@
   user-select: none;
 }
 
-/* 撟喳 */
 .jumpPlatform {
   position: absolute;
   left: 0;
@@ -2069,7 +2409,6 @@
   }
 }
 
-/* ?拙振 */
 .jumpPlayer {
   position: absolute;
   left: 0;
@@ -2078,7 +2417,6 @@
   will-change: transform;
 }
 
-/* 撟喳摰孵 */
 .jumpPlatformContainer {
   position: absolute;
   left: 0;
@@ -2130,7 +2468,6 @@
   border-radius: 50%;
 }
 
-/* ?閬?撅?*/
 .jumpOverlay {
   position: absolute;
   top: 0;
@@ -2217,7 +2554,6 @@
   }
 }
 
-/* ???? */
 .jumpStartBtn {
   margin-top: 12px;
   padding: 14px 32px;
@@ -2243,7 +2579,6 @@
   box-shadow: 0 4px 12px rgba(255, 130, 80, 0.4);
 }
 
-/* 蝯??恍璅?? */
 .jumpOverlayEmoji.bounce {
   animation: resultBounce 0.6s ease infinite alternate;
 }
@@ -2330,7 +2665,6 @@
   margin: 8px 0 !important;
 }
 
-/* ???批?? */
 .jumpControls {
   margin-top: 16px;
   display: flex;
@@ -2382,7 +2716,6 @@
   transform: scale(0.9);
 }
 
-/* ?批?內 */
 .jumpControlHint {
   margin-top: 12px;
   display: flex;
@@ -2401,7 +2734,6 @@
   backdrop-filter: blur(8px);
 }
 
-/* RWD 隤踵 */
 @media (max-width: 400px) {
   .jumpShell {
     padding: 12px;
@@ -2426,7 +2758,6 @@
   }
 }
 
-/* 獢??梯????批?? */
 @media (min-width: 768px) {
   .jumpControls {
     opacity: 0.5;
@@ -2437,9 +2768,6 @@
   }
 }
 
-/* ========== 頝唾歲??啣??賣見撘?========== */
-
-/* ??撟喳 */
 .jumpPlatform.cracked {
   background: linear-gradient(180deg, #a1887f, #795548);
   box-shadow:
@@ -2504,7 +2832,6 @@
   }
 }
 
-/* 撟喳頦拙?? */
 .jumpPlatform.flash {
   animation: platformFlash 0.3s ease infinite;
   box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
@@ -2522,7 +2849,6 @@
   }
 }
 
-/* ?璅?? */
 .jumpPowerupContainer {
   position: absolute;
   left: 0;
@@ -2615,7 +2941,6 @@
   }
 }
 
-/* ?萎犖璅?? */
 .jumpEnemyContainer {
   position: absolute;
   left: 0;
@@ -2637,7 +2962,6 @@
   transition: all 0.15s ease;
 }
 
-/* 鋡怨萱敺??萎犖 - ?＊???????? */
 .jumpEnemy.bounced {
   filter: drop-shadow(0 6px 12px rgba(255, 100, 100, 0.6)) brightness(1.5)
     contrast(1.3);
@@ -2668,7 +2992,6 @@
   }
 }
 
-/* 暺?璅?? */
 .jumpBlackholeContainer {
   position: absolute;
   left: 0;
@@ -2727,7 +3050,6 @@
   }
 }
 
-/* ?拙振??? */
 .jumpPlayer.boosting .jumpJetpackFlame {
   display: block;
 }
@@ -2801,7 +3123,6 @@
   }
 }
 
-/* 摰蝬脩??*/
 .jumpPlayer.hasSafetyNet .jumpSafetyNetAura {
   display: block;
 }
@@ -2838,7 +3159,6 @@
   }
 }
 
-/* 蝧餌?閬死?? */
 .jumpPlayer.wrapping {
   animation: wrapFlash 0.15s ease-out;
 }
@@ -2872,7 +3192,6 @@
   }
 }
 
-/* ?喲?閬死?? */
 .jumpPlayer.teleporting {
   animation: teleportFlash 0.15s ease-in-out;
 }
@@ -2923,12 +3242,10 @@
     0 0 10px rgba(3, 169, 244, 0.5);
 }
 
-/* ?拙振 squash/stretch ? - ?箇?撌脣 transform 銝剛???*/
 .jumpPlayer {
   transform-origin: center bottom;
 }
 
-/* Game Over ?? */
 .jumpPlayer.falling {
   animation: playerFall 1s ease-in forwards;
 }
@@ -2943,7 +3260,6 @@
   }
 }
 
-/* ?頝喳?? */
 .jumpScoreValue.scoreBounce {
   animation: scoreBounce 0.3s ease;
 }
@@ -2960,7 +3276,6 @@
   }
 }
 
-/* ???＊蝷?*/
 .jumpEffects {
   display: flex;
   gap: 8px;
@@ -3034,7 +3349,6 @@
   }
 }
 
-/* ?停敶? */
 .jumpAchievementPopup {
   position: fixed;
   top: 80px;
@@ -3086,7 +3400,6 @@
   color: #795548;
 }
 
-/* ?蝔梯?敶? */
 .jumpTitlePopup {
   position: fixed;
   top: 100px;
@@ -3161,7 +3474,6 @@
   color: #888;
 }
 
-/* ??? */
 .jumpPowerupGuide {
   display: flex;
   gap: 12px;
@@ -3177,10 +3489,6 @@
   border-radius: 8px;
   color: var(--text);
 }
-
-/* =============================
-   Auto Battle (no canvas)
-   ============================= */
 
 .ab-hpRail {
   height: 10px;
@@ -3445,4 +3753,5 @@
     opacity: 0.6;
   }
 }
+
 

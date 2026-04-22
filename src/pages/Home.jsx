@@ -15,7 +15,7 @@ export default function Home() {
     { id: "flappy", name: "薪水小鳥", subtitle: "Flappy Salary", icon: "bird", color: "linear-gradient(145deg, #7086ea, #8155b8)", route: "/flappy" },
     { id: "spicy", name: "麻辣遊戲", subtitle: "Spicy Game", icon: "pepper", color: "linear-gradient(145deg, #ff7c7c, #ffad62)", route: "/spicy" },
     { id: "md-calc", name: "MD 計算機", subtitle: "Rank Calculator", icon: "chart", color: "linear-gradient(145deg, #2fd3a7, #2f8dff)", route: "/md-calc" },
-    { id: "monte-carlo", name: "蒙地卡羅", subtitle: "Pi Estimator", icon: "dice", color: "linear-gradient(145deg, #8a76ff, #b668ff)", route: "/monte-carlo" },
+    { id: "snack-merge", name: "小吃合成", subtitle: "Night Market Merge", icon: "bowl", color: "linear-gradient(145deg, #ffb26b, #ff6f61)", route: "/snack-merge" },
     { id: "random-walk", name: "隨機漫步", subtitle: "Multi Walker", icon: "walk", color: "linear-gradient(145deg, #44d6bd, #4fa4ff)", route: "/random-walk" },
     { id: "mandelbrot", name: "曼德博集合", subtitle: "Fractal Explorer", icon: "spiral", color: "linear-gradient(145deg, #2f59c2, #6e85ff)", route: "/mandelbrot" },
     { id: "bomb", name: "炸彈人", subtitle: "Bomberman", icon: "bomb", color: "linear-gradient(145deg, #df7345, #f7ac44)", route: "/bomb" },
