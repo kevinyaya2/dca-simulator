@@ -6,6 +6,7 @@ const HEIGHT = 520;
 const DROP_LINE_Y = 106;
 const GAME_OVER_LINE_Y = 142;
 const OVERFLOW_GRACE_MS = 3000;
+const OVERFLOW_IMMUNITY_MS = 900;
 const WALL_PADDING = 14;
 const GRAVITY = 0.22;
 const AIR_DRAG = 0.996;
@@ -51,6 +52,7 @@ function createFood(id, level, x) {
     vy: 0,
     r: SNACKS[level].radius,
     mergedAt: 0,
+    bornAt: (typeof performance !== "undefined" ? performance.now() : Date.now()),
   };
 }
 
@@ -839,7 +841,11 @@ export default function SnackMerge() {
           saveBestIfNeeded();
         }
 
-        const hasOverflow = game.foods.some((food) => food.y - food.r < GAME_OVER_LINE_Y);
+        const hasOverflow = game.foods.some(
+          (food) =>
+            food.y - food.r < GAME_OVER_LINE_Y &&
+            timestamp - (food.bornAt || 0) > OVERFLOW_IMMUNITY_MS,
+        );
 
         if (hasOverflow) {
           if (game.topDangerMs <= 0) game.topDangerMs = OVERFLOW_GRACE_MS;
