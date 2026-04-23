@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const WIDTH = 320;
 const HEIGHT = 520;
 const DROP_LINE_Y = 106;
 const GAME_OVER_LINE_Y = 142;
+const OVERFLOW_GRACE_MS = 3000;
 const WALL_PADDING = 14;
 const GRAVITY = 0.22;
 const AIR_DRAG = 0.996;
@@ -147,6 +148,7 @@ export default function SnackMerge() {
     started: false,
     paused: false,
     gameOver: false,
+    topDangerMs: 0,
     comboPopups: [],
   }));
 
@@ -162,6 +164,7 @@ export default function SnackMerge() {
       started: game.started,
       paused: game.paused,
       gameOver: game.gameOver,
+      topDangerMs: game.topDangerMs,
       comboPopups: game.comboPopups,
     });
   }, []);
@@ -836,13 +839,16 @@ export default function SnackMerge() {
           saveBestIfNeeded();
         }
 
-        const touchingDangerLine = game.foods.some(
-          (food) => food.y - food.r < GAME_OVER_LINE_Y && food.vy < 0.45,
-        );
+        const hasOverflow = game.foods.some((food) => food.y - food.r < GAME_OVER_LINE_Y);
 
-        game.topDangerMs = touchingDangerLine ? game.topDangerMs + delta : 0;
+        if (hasOverflow) {
+          if (game.topDangerMs <= 0) game.topDangerMs = OVERFLOW_GRACE_MS;
+          game.topDangerMs = Math.max(0, game.topDangerMs - delta);
+        } else if (game.topDangerMs > 0) {
+          game.topDangerMs = 0;
+        }
 
-        if (game.topDangerMs > 1200) {
+        if (hasOverflow && game.topDangerMs <= 0) {
           game.gameOver = true;
           game.paused = false;
           saveBestIfNeeded();
@@ -1006,6 +1012,111 @@ export default function SnackMerge() {
                 height={HEIGHT}
                 className="snackMergeCanvas"
               />
+              <div
+                style={{
+                  position: "absolute",
+                  top: -35,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  gap: 6,
+                  zIndex: 6,
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {!ui.started ? (
+                  <button
+                    type="button"
+                    onClick={startGame}
+                    aria-label="開始"
+                    title="開始"
+                    style={{
+                      border: "1px solid rgba(255, 215, 156, 0.7)",
+                      background: "linear-gradient(180deg, rgba(255, 183, 87, 0.92), rgba(214, 120, 34, 0.9))",
+                      color: "#3d1f0f",
+                      fontWeight: 900,
+                      fontSize: 15,
+                      lineHeight: 1,
+                      borderRadius: 999,
+                      width: 34,
+                      height: 34,
+                      display: "grid",
+                      placeItems: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ▶
+                  </button>
+                ) : ui.paused ? (
+                  <button
+                    type="button"
+                    onClick={resumeGame}
+                    aria-label="繼續"
+                    title="繼續"
+                    style={{
+                      border: "1px solid rgba(181, 214, 255, 0.7)",
+                      background: "linear-gradient(180deg, rgba(170, 210, 255, 0.92), rgba(81, 128, 194, 0.9))",
+                      color: "#10243f",
+                      fontWeight: 900,
+                      fontSize: 15,
+                      lineHeight: 1,
+                      borderRadius: 999,
+                      width: 34,
+                      height: 34,
+                      display: "grid",
+                      placeItems: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ⏵
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={pauseGame}
+                    aria-label="暫停"
+                    title="暫停"
+                    style={{
+                      border: "1px solid rgba(255, 219, 173, 0.7)",
+                      background: "linear-gradient(180deg, rgba(255, 224, 177, 0.92), rgba(203, 137, 64, 0.9))",
+                      color: "#4c2811",
+                      fontWeight: 900,
+                      fontSize: 15,
+                      lineHeight: 1,
+                      borderRadius: 999,
+                      width: 34,
+                      height: 34,
+                      display: "grid",
+                      placeItems: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ⏸
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={resetGame}
+                  aria-label="重置"
+                  title="重置"
+                  style={{
+                    border: "1px solid rgba(255, 170, 170, 0.72)",
+                    background: "linear-gradient(180deg, rgba(255, 156, 156, 0.94), rgba(196, 76, 76, 0.9))",
+                    color: "#4a1313",
+                    fontWeight: 900,
+                    fontSize: 15,
+                    lineHeight: 1,
+                    borderRadius: 999,
+                    width: 34,
+                    height: 34,
+                    display: "grid",
+                    placeItems: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  ↺
+                </button>
+              </div>
               <div className="snackMergeLantern snackMergeLanternLeft" />
               <div className="snackMergeLantern snackMergeLanternRight" />
               <div className="snackMergeSteam snackMergeSteamA" />
@@ -1076,29 +1187,8 @@ export default function SnackMerge() {
 
           <div className="spacer" />
         </main>
-
-        <div className="bottomBar">
-          <button className="btn ghost" onClick={() => navigate("/")}>
-            回首頁
-          </button>
-          {!ui.started ? (
-            <button className="btn solid" onClick={startGame}>
-              開始營業
-            </button>
-          ) : ui.paused ? (
-            <button className="btn solid" onClick={resumeGame}>
-              繼續營業
-            </button>
-          ) : (
-            <button className="btn ghost" onClick={pauseGame}>
-              暫停
-            </button>
-          )}
-          <button className="btn solid" onClick={resetGame}>
-            {ui.gameOver ? "再來一局" : "重新擺攤"}
-          </button>
-        </div>
       </div>
     </div>
   );
 }
+

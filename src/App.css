@@ -979,6 +979,26 @@
   animation: snackMergeComboFloat 850ms ease-out forwards;
 }
 
+.snackMergeDangerToast {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(92%, 380px);
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 133, 117, 0.58);
+  background: linear-gradient(180deg, rgba(122, 20, 20, 0.84), rgba(72, 10, 10, 0.86));
+  color: rgba(255, 239, 222, 0.98);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 22px rgba(66, 11, 11, 0.35);
+  z-index: 5;
+  pointer-events: none;
+}
+
 @keyframes snackMergeComboFloat {
   0% {
     opacity: 0;
