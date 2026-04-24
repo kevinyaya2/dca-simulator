@@ -17,7 +17,7 @@ export default function Home() {
     { id: "md-calc", name: "MD 計算機", subtitle: "Rank Calculator", icon: "chart", color: "linear-gradient(145deg, #2fd3a7, #2f8dff)", route: "/md-calc" },
     { id: "snack-merge", name: "小吃合成", subtitle: "Night Market Merge", icon: "bowl", color: "linear-gradient(145deg, #ffb26b, #ff6f61)", route: "/snack-merge" },
     { id: "random-walk", name: "隨機漫步", subtitle: "Multi Walker", icon: "walk", color: "linear-gradient(145deg, #44d6bd, #4fa4ff)", route: "/random-walk" },
-    { id: "mandelbrot", name: "曼德博集合", subtitle: "Fractal Explorer", icon: "spiral", color: "linear-gradient(145deg, #2f59c2, #6e85ff)", route: "/mandelbrot" },
+    { id: "agar", name: "果凍吞噬", subtitle: "Neon Agar", icon: "cell", color: "linear-gradient(145deg, #25d8ff, #ff79ce)", route: "/mandelbrot" },
     { id: "bomb", name: "炸彈人", subtitle: "Bomberman", icon: "bomb", color: "linear-gradient(145deg, #df7345, #f7ac44)", route: "/bomb" },
     { id: "crossy", name: "柴柴過馬路", subtitle: "Crossy Shiba", icon: "road", color: "linear-gradient(145deg, #97d26a, #5cb0e6)", route: "/crossy" },
     { id: "angry", name: "彈射拆塔", subtitle: "Angry-like", icon: "target", color: "linear-gradient(145deg, #ffb173, #ff6d72)", route: "/angry" },

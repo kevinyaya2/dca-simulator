@@ -5,7 +5,7 @@ const DCA = lazy(() => import("./DCA"));
 const MDCalculator = lazy(() => import("./MDCalculator"));
 const SnackMerge = lazy(() => import("./SnackMerge"));
 const RandomWalk = lazy(() => import("./RandomWalk"));
-const MandelbrotExplorer = lazy(() => import("./MandelbrotExplorer"));
+const AgarNebula = lazy(() => import("./AgarNebula"));
 const CardGame = lazy(() => import("./CardGame"));
 const FightGame = lazy(() => import("./FightGame"));
 const JumpGame = lazy(() => import("./JumpGame"));
@@ -31,7 +31,7 @@ const routes = [
   { path: "/md-calc", element: <MDCalculator />, title: "MD Calculator" },
   { path: "/snack-merge", element: <SnackMerge />, title: "Taiwan Snack Merge" },
   { path: "/random-walk", element: <RandomWalk />, title: "Random Walk" },
-  { path: "/mandelbrot", element: <MandelbrotExplorer />, title: "Mandelbrot" },
+  { path: "/mandelbrot", element: <AgarNebula />, title: "Neon Agar" },
   { path: "/bomb", element: <BombGame />, title: "Bomberman" },
   { path: "/crossy", element: <CrossyRoad />, title: "Crossy Shiba" },
   { path: "/angry", element: <AngryBirdLike />, title: "Angry-like" },
