@@ -1,4 +1,13 @@
 import { useMemo, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useNavigate } from "react-router-dom";
 
 const fmtMoney = (n) =>
@@ -26,6 +35,79 @@ function calcFV({ principal, monthly, ratePct, years }) {
   const fv = principal * pow + monthly * ((pow - 1) / r); // 月末投入，不再乘(1+r)
 
   return { fv, months };
+}
+
+function buildTrajectory({ principal, monthly, ratePct, years }) {
+  const months = Math.max(0, Math.round(years * 12));
+  const monthlyRate = ratePct / 100 / 12;
+
+  let totalAsset = principal;
+  const rows = [
+    {
+      month: 0,
+      year: 0,
+      totalAsset,
+      totalInvest: principal,
+      profit: totalAsset - principal,
+      roiPct: principal > 0 ? ((totalAsset - principal) / principal) * 100 : 0,
+    },
+  ];
+
+  for (let month = 1; month <= months; month += 1) {
+    totalAsset = totalAsset * (1 + monthlyRate) + monthly;
+    const totalInvest = principal + monthly * month;
+    const profit = totalAsset - totalInvest;
+    const roiPct = totalInvest > 0 ? (profit / totalInvest) * 100 : 0;
+
+    rows.push({
+      month,
+      year: month / 12,
+      totalAsset,
+      totalInvest,
+      profit,
+      roiPct,
+    });
+  }
+
+  return rows;
+}
+
+function fmtAxisMoney(value) {
+  if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
+  return `${Math.round(value)}`;
+}
+
+function DcaTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload;
+  if (!point) return null;
+
+  return (
+    <div className="dcaChartTooltip">
+      <div className="dcaChartTooltipTitle">第 {point.month} 個月</div>
+      <div className="dcaChartTooltipRow">
+        <span>總資產</span>
+        <strong>{fmtMoney(point.totalAsset)}</strong>
+      </div>
+      <div className="dcaChartTooltipRow">
+        <span>總投入</span>
+        <strong>{fmtMoney(point.totalInvest)}</strong>
+      </div>
+      <div className="dcaChartTooltipRow">
+        <span>累積獲利</span>
+        <strong className={point.profit >= 0 ? "pos" : "neg"}>
+          {fmtMoney(point.profit)}
+        </strong>
+      </div>
+      <div className="dcaChartTooltipRow">
+        <span>報酬率</span>
+        <strong className={point.roiPct >= 0 ? "pos" : "neg"}>
+          {point.roiPct.toFixed(2)}%
+        </strong>
+      </div>
+    </div>
+  );
 }
 
 export default function DCA() {
@@ -86,6 +168,17 @@ export default function DCA() {
     const v = clamp(result.safeYears || 1, min, max);
     return `${((v - min) / (max - min)) * 100}%`;
   }, [result.safeYears]);
+
+  const trajectory = useMemo(
+    () =>
+      buildTrajectory({
+        principal: result.safePrincipal,
+        monthly: result.safeMonthly,
+        ratePct: result.safeRate,
+        years: result.safeYears,
+      }),
+    [result.safePrincipal, result.safeMonthly, result.safeRate, result.safeYears],
+  );
 
   function resetAll() {
     setMonthly(10000);
@@ -173,6 +266,53 @@ export default function DCA() {
           </section>
 
           {/* 參數設定 */}
+          <section className="card">
+            <div className="sectionTitle">資產波動（互動圖）</div>
+            <div className="dcaChartWrap">
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={trajectory} margin={{ top: 10, right: 14, left: 2, bottom: 2 }}>
+                  <CartesianGrid stroke="rgba(16,16,22,0.12)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="rgba(16,16,22,0.52)"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value) => `${Math.round(value / 12)}y`}
+                    minTickGap={22}
+                  />
+                  <YAxis
+                    stroke="rgba(16,16,22,0.52)"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={fmtAxisMoney}
+                    width={52}
+                  />
+                  <Tooltip content={<DcaTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="totalAsset"
+                    stroke="#2f8dff"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 0, fill: "#2f8dff" }}
+                    name="totalAsset"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="totalInvest"
+                    stroke="#ff9f4d"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: "#ff9f4d" }}
+                    name="totalInvest"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="hint">
+              滑過曲線可查看每個月份的資產、投入、獲利與報酬率細節。
+            </div>
+          </section>
+
           <section className="card">
             <div className="sectionTitle">參數設定</div>
 

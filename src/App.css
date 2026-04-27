@@ -5074,3 +5074,57 @@
     justify-self: start;
   }
 }
+
+/* DCA chart */
+.dcaChartWrap {
+  width: 100%;
+  border-radius: 20px;
+  padding: 8px 8px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background:
+    radial-gradient(
+      500px 180px at 20% -20%,
+      rgba(90, 170, 255, 0.2) 0%,
+      rgba(90, 170, 255, 0) 60%
+    ),
+    radial-gradient(
+      460px 220px at 85% 130%,
+      rgba(255, 175, 120, 0.18) 0%,
+      rgba(255, 175, 120, 0) 62%
+    ),
+    rgba(255, 255, 255, 0.52);
+  box-shadow:
+    0 14px 32px rgba(16, 16, 30, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.dcaChartTooltip {
+  min-width: 190px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: 0 14px 30px rgba(16, 16, 30, 0.2);
+  padding: 10px 11px;
+}
+
+.dcaChartTooltipTitle {
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(16, 16, 22, 0.84);
+  margin-bottom: 7px;
+}
+
+.dcaChartTooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(16, 16, 22, 0.7);
+  margin-top: 5px;
+}
+
+.dcaChartTooltipRow strong {
+  font-size: 12px;
+  color: rgba(16, 16, 22, 0.9);
+}
