@@ -1,4 +1,4 @@
-﻿import { lazy } from "react";
+import { lazy } from "react";
 
 const Home = lazy(() => import("./Home"));
 const DCA = lazy(() => import("./DCA"));
@@ -30,7 +30,7 @@ const routes = [
   { path: "/spicy", element: <SpicyGame />, title: "Spicy Game" },
   { path: "/md-calc", element: <MDCalculator />, title: "MD Calculator" },
   { path: "/snack-merge", element: <SnackMerge />, title: "Taiwan Snack Merge" },
-  { path: "/random-walk", element: <RandomWalk />, title: "Random Walk" },
+  { path: "/maze", element: <RandomWalk />, title: "Maze Escape" },
   { path: "/mandelbrot", element: <AgarNebula />, title: "Neon Agar" },
   { path: "/bomb", element: <BombGame />, title: "Bomberman" },
   { path: "/crossy", element: <CrossyRoad />, title: "Crossy Shiba" },

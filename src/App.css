@@ -307,6 +307,204 @@
   box-shadow: 0 10px 18px rgba(16, 16, 30, 0.1);
 }
 
+.mazeControlCard {
+  padding: 14px;
+  border-radius: 30px;
+  background:
+    radial-gradient(
+      220px 140px at 14% -8%,
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(255, 255, 255, 0) 72%
+    ),
+    radial-gradient(
+      280px 170px at 88% 120%,
+      rgba(197, 219, 255, 0.34) 0%,
+      rgba(197, 219, 255, 0) 72%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.52));
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 22px 46px rgba(18, 24, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -14px 24px rgba(20, 28, 44, 0.06);
+}
+
+.mazeControlHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.mazeAssistChip {
+  background: rgba(65, 134, 255, 0.14);
+  border-color: rgba(65, 134, 255, 0.4);
+  color: rgba(40, 94, 194, 0.95);
+  box-shadow: 0 8px 16px rgba(45, 112, 224, 0.14);
+}
+
+.mazeInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.mazeInfoChip {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 18px;
+  background:
+    radial-gradient(
+      130px 48px at 24% -2%,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0) 72%
+    ),
+    rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 8px 16px rgba(20, 30, 48, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  padding: 10px 11px;
+}
+
+.mazeInfoLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.55);
+  letter-spacing: 0.02em;
+}
+
+.mazeInfoValue {
+  margin-top: 3px;
+  font-size: 34px;
+  font-weight: 950;
+  color: rgba(16, 16, 22, 0.92);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mazeInfoHint {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(16, 16, 22, 0.48);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mazeControlHint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(16, 16, 22, 0.66);
+  position: relative;
+  z-index: 1;
+}
+
+.mazeBestRow {
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 9px 18px rgba(20, 30, 48, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.mazeBestSummary {
+  min-width: 0;
+}
+
+.mazeBestTitle {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(16, 16, 22, 0.56);
+  letter-spacing: 0.02em;
+}
+
+.mazeBestValue {
+  margin-top: 3px;
+  font-size: 14px;
+  font-weight: 900;
+  color: rgba(16, 16, 22, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mazeTextBtn {
+  border: none;
+  background: transparent;
+  color: rgba(36, 98, 204, 0.9);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 6px 4px;
+  border-radius: 10px;
+  transition: background 120ms ease;
+}
+
+.mazeTextBtn:hover {
+  background: rgba(39, 104, 215, 0.08);
+}
+
+.mazeTextBtn:active {
+  transform: translateY(1px);
+}
+
+.mazeDpad {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  position: relative;
+  z-index: 1;
+}
+
+.btn.mazePadBtn {
+  flex: 0 0 auto;
+  min-height: 50px;
+  border-radius: 18px;
+  padding: 10px 8px;
+  font-size: 24px;
+  font-weight: 900;
+  border-color: rgba(255, 255, 255, 0.84);
+  background:
+    radial-gradient(
+      120px 40px at 50% 0%,
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0) 76%
+    ),
+    rgba(255, 255, 255, 0.64);
+  box-shadow:
+    0 11px 20px rgba(18, 25, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+@media (max-width: 560px) {
+  .mazeInfoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mazeInfoValue {
+    font-size: 28px;
+  }
+
+  .mazeBestValue {
+    font-size: 13px;
+  }
+}
+
 .range {
   --p: 50%;
   --track: rgba(255, 255, 255, 0.5);
