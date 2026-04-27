@@ -336,7 +336,62 @@ function drawFood(ctx, camera, width, height, food, timeMs) {
 }
 
 function drawEffects(ctx, camera, width, height, state) {
+  const drawFusionEffect = (effect) => {
+    const center = worldToScreen(camera, width, height, effect.x, effect.y);
+    const life = clamp(effect.ttl / effect.maxTtl, 0, 1);
+    const progress = 1 - life;
+    const ease = 1 - (1 - progress) ** 3;
+    const auraRadius = effect.radius * (0.72 + progress * 0.55) * camera.zoom;
+    const coreRadius = effect.radius * (0.18 + progress * 0.22) * camera.zoom;
+
+    for (const source of effect.sources || []) {
+      const start = worldToScreen(camera, width, height, source.x, source.y);
+      const sx = start.x + (center.x - start.x) * ease;
+      const sy = start.y + (center.y - start.y) * ease;
+
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(sx, sy);
+      ctx.lineWidth = Math.max(1, source.radius * 0.065 * camera.zoom);
+      ctx.strokeStyle = rgba(effect.color, 0.14 + life * 0.34);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(1.8, source.radius * 0.13 * camera.zoom), 0, Math.PI * 2);
+      ctx.fillStyle = rgba(mix(effect.color, "#ffffff", 0.58), 0.2 + life * 0.72);
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, auraRadius, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(effect.color, 0.1 + life * 0.1);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.4, auraRadius * 0.04);
+    ctx.strokeStyle = rgba("#ffffff", 0.16 + life * 0.22);
+    ctx.stroke();
+
+    const core = ctx.createRadialGradient(
+      center.x,
+      center.y,
+      Math.max(1, coreRadius * 0.2),
+      center.x,
+      center.y,
+      Math.max(2, coreRadius * 2.2),
+    );
+    core.addColorStop(0, rgba("#ffffff", 0.9));
+    core.addColorStop(0.55, rgba(mix(effect.color, "#d5ffff", 0.52), 0.58));
+    core.addColorStop(1, rgba(effect.color, 0));
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, coreRadius * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
   for (const effect of state.effects) {
+    if (effect.type === "fusion") {
+      drawFusionEffect(effect);
+      continue;
+    }
     const pos = worldToScreen(camera, width, height, effect.x, effect.y);
     const life = effect.ttl / effect.maxTtl;
     const radius = effect.radius * (1 + (1 - life) * 0.6) * camera.zoom;

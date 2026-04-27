@@ -1,13 +1,23 @@
 const WORLD_WIDTH = 5600;
 const WORLD_HEIGHT = 5600;
 const FOOD_TARGET = 1800;
-const VIRUS_TARGET = 22;
+const VIRUS_TARGET = 12;
 const BOT_TARGET = 26;
 const SPEED_MULTIPLIER = 5;
 const BOT_SPEED_MULTIPLIER = 0.78;
-const PLAYER_SPEED_MULTIPLIER = 2;
+const PLAYER_SPEED_MULTIPLIER = 2.35;
 const PLAYER_START_MASS = 52;
 const PLAYER_RESPAWN_SECONDS = 3.2;
+const PLAYER_SPLIT_MERGE_LOCK_SECONDS = 3.2;
+const VIRUS_SPLIT_MERGE_LOCK_SECONDS = 1.8;
+const MERGE_FOOD_LOCK_SECONDS = 0.45;
+const VIRUS_AUTO_MERGE_CHAIN_SECONDS = 6;
+const VIRUS_AUTO_MERGE_CONTACT_EPSILON = 2;
+const VIRUS_AUTO_MERGE_POST_LOCK_PULL_MULTIPLIER = 2.2;
+const AUTO_MERGE_ATTRACT_EXTRA_RANGE = 860;
+const AUTO_MERGE_ATTRACT_PULL_PER_SECOND = 260;
+const MANUAL_FUSION_LOCK_SECONDS = 0.28;
+const MANUAL_FUSION_ANIM_SECONDS = 0.62;
 const EJECT_MIN_MASS = 32;
 const BOOST_MIN_MASS = 24;
 const BOOST_MULTIPLIER = 3.44;
@@ -142,6 +152,8 @@ function createCell(ownerId, x, y, mass, color, name) {
     color,
     name,
     mergeLockUntil: 0,
+    autoMergeSource: null,
+    autoMergeUntil: 0,
     wobbleSeed: Math.random() * 1000,
   };
 }
@@ -427,6 +439,59 @@ function makeBurst(state, x, y, color, radius, ttl, count = 12) {
   }
 }
 
+function makeFusionEffect(state, x, y, color, sources, totalMass) {
+  state.effects.push({
+    id: id("fx"),
+    type: "fusion",
+    x,
+    y,
+    color,
+    radius: Math.max(48, radiusFromMass(totalMass) * 1.2),
+    ttl: MANUAL_FUSION_ANIM_SECONDS,
+    maxTtl: MANUAL_FUSION_ANIM_SECONDS,
+    sources: sources.map((source) => ({
+      x: source.x,
+      y: source.y,
+      radius: source.radius,
+      mass: source.mass,
+    })),
+  });
+}
+
+function mergeActorCells(actor, state) {
+  if (!actor || actor.cells.length < 2) return false;
+  const center = centerOfCells(actor.cells);
+  const sources = actor.cells.map((cell) => ({
+    x: cell.x,
+    y: cell.y,
+    radius: radiusFromMass(cell.mass),
+    mass: cell.mass,
+  }));
+
+  let totalMass = 0;
+  let vx = 0;
+  let vy = 0;
+  for (const cell of actor.cells) {
+    totalMass += cell.mass;
+    vx += cell.vx * cell.mass;
+    vy += cell.vy * cell.mass;
+  }
+
+  const merged = createCell(actor.id, center.x, center.y, totalMass, actor.color, actor.name);
+  merged.vx = vx / Math.max(1, totalMass);
+  merged.vy = vy / Math.max(1, totalMass);
+  merged.mergeLockUntil = state.time + MANUAL_FUSION_LOCK_SECONDS;
+  merged.autoMergeSource = null;
+  merged.autoMergeUntil = 0;
+  actor.cells = [merged];
+  actor.splitCooldown = Math.max(actor.splitCooldown, MANUAL_FUSION_LOCK_SECONDS);
+
+  makeFusionEffect(state, center.x, center.y, actor.color, sources, totalMass);
+  makeBurst(state, center.x, center.y, "#ffffff", Math.max(36, radiusFromMass(totalMass) * 1.05), 0.24, 16);
+  if (actor.id === state.player.id) addNotice(state, "融合啟動：細胞合而為一", "#9ffbff", 1.8);
+  return true;
+}
+
 function splitSingleCell(actor, cellIndex, aimX, aimY, state) {
   const cell = actor.cells[cellIndex];
   if (!cell || cell.mass < 40) return false;
@@ -447,9 +512,13 @@ function splitSingleCell(actor, cellIndex, aimX, aimY, state) {
   clone.vy = direction.y * force;
   cell.vx -= direction.x * force * 0.15;
   cell.vy -= direction.y * force * 0.15;
-  const lock = state.time + 5600;
+  const lock = state.time + PLAYER_SPLIT_MERGE_LOCK_SECONDS;
   cell.mergeLockUntil = lock;
+  cell.autoMergeSource = null;
+  cell.autoMergeUntil = 0;
   clone.mergeLockUntil = lock;
+  clone.autoMergeSource = null;
+  clone.autoMergeUntil = 0;
   actor.cells.push(clone);
   makeBurst(state, clone.x, clone.y, actor.color, radius * 0.86, 0.26, 9);
   return true;
@@ -539,6 +608,63 @@ function repelCells(a, b) {
   b.y += ny * push;
 }
 
+function isVirusAutoMergeCell(cell, now) {
+  return cell.autoMergeSource === "virus" && now <= cell.autoMergeUntil;
+}
+
+function isVirusAutoMergePair(cellA, cellB, now) {
+  return isVirusAutoMergeCell(cellA, now) && isVirusAutoMergeCell(cellB, now);
+}
+
+function carryVirusAutoMergeState(target, source) {
+  target.autoMergeSource = "virus";
+  target.autoMergeUntil = Math.max(target.autoMergeUntil || 0, source.autoMergeUntil || 0);
+}
+
+function applyAutoMergeAttraction(actor, now, dt, world) {
+  if (actor.cells.length < 2) return;
+  for (let i = 0; i < actor.cells.length - 1; i += 1) {
+    const cellA = actor.cells[i];
+    for (let j = i + 1; j < actor.cells.length; j += 1) {
+      const cellB = actor.cells[j];
+      if (!isVirusAutoMergePair(cellA, cellB, now)) continue;
+      const ra = radiusFromMass(cellA.mass);
+      const rb = radiusFromMass(cellB.mass);
+      const mergeDist = Math.max(0, ra + rb - VIRUS_AUTO_MERGE_CONTACT_EPSILON);
+      const attractRange = mergeDist + AUTO_MERGE_ATTRACT_EXTRA_RANGE;
+      const dx = cellB.x - cellA.x;
+      const dy = cellB.y - cellA.y;
+      const dist = Math.hypot(dx, dy) || 0.0001;
+      if (dist <= mergeDist || dist >= attractRange) continue;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const ratio = clamp((attractRange - dist) / Math.max(1, attractRange - mergeDist), 0, 1);
+      const postLockBoost = now >= cellA.mergeLockUntil && now >= cellB.mergeLockUntil
+        ? VIRUS_AUTO_MERGE_POST_LOCK_PULL_MULTIPLIER
+        : 1;
+      const pull = AUTO_MERGE_ATTRACT_PULL_PER_SECOND * postLockBoost * ratio * ratio * dt;
+      const totalMass = Math.max(1, cellA.mass + cellB.mass);
+      const moveA = pull * clamp(cellB.mass / totalMass, 0.2, 0.8);
+      const moveB = pull * clamp(cellA.mass / totalMass, 0.2, 0.8);
+
+      cellA.x += nx * moveA;
+      cellA.y += ny * moveA;
+      cellB.x -= nx * moveB;
+      cellB.y -= ny * moveB;
+
+      cellA.vx += nx * moveA * 28;
+      cellA.vy += ny * moveA * 28;
+      cellB.vx -= nx * moveB * 28;
+      cellB.vy -= ny * moveB * 28;
+
+      cellA.x = clamp(cellA.x, ra, world.width - ra);
+      cellA.y = clamp(cellA.y, ra, world.height - ra);
+      cellB.x = clamp(cellB.x, rb, world.width - rb);
+      cellB.y = clamp(cellB.y, rb, world.height - rb);
+    }
+  }
+}
+
 function canAbsorbCell(attacker, defender, distance) {
   const ratio = attacker.mass / Math.max(1, defender.mass);
   if (ratio <= 1.001) return false;
@@ -583,9 +709,6 @@ function moveCell(cell, aimX, aimY, dt, world, speedMultiplier = 1) {
     cell.vy *= -0.26;
   }
 
-  if (cell.mass > 32) {
-    cell.mass = Math.max(18, cell.mass - cell.mass * 0.00072 * dt);
-  }
 }
 
 function absorbCell(attacker, defender, state) {
@@ -619,7 +742,7 @@ function applyFoodEffect(state, actor, food) {
     addNotice(state, "新星食物：全細胞增重並短暫加速", "#ffffff", 2.6);
   } else if (food.type === "merge") {
     for (const cell of actor.cells) {
-      cell.mergeLockUntil = Math.min(cell.mergeLockUntil, now + 650);
+      cell.mergeLockUntil = Math.min(cell.mergeLockUntil, now + MERGE_FOOD_LOCK_SECONDS);
     }
     actor.splitCooldown = Math.max(0, actor.splitCooldown - 0.7);
     addNotice(state, "融合食物：細胞更快合體", "#a78bfa", 2.2);
@@ -692,7 +815,7 @@ function isInsideZone(zone, x, y) {
 function zoneSpeedMultiplier(state, x, y) {
   let multiplier = 1;
   for (const zone of state.zones) {
-    if (zone.type === "nebula" && isInsideZone(zone, x, y)) multiplier *= 0.56;
+    if (zone.type === "nebula" && isInsideZone(zone, x, y)) multiplier *= 0.74;
   }
   return multiplier;
 }
@@ -719,7 +842,7 @@ function spawnZoneFood(state, zone, count) {
 function applyAreaEvents(state, dt) {
   const actors = [state.player, ...state.bots];
   const safe = state.safeZone;
-  safe.radius = clamp(SAFE_ZONE_START_RADIUS - state.time * 7.5, SAFE_ZONE_MIN_RADIUS, SAFE_ZONE_START_RADIUS);
+  safe.radius = clamp(SAFE_ZONE_START_RADIUS - state.time * 5.0, SAFE_ZONE_MIN_RADIUS, SAFE_ZONE_START_RADIUS);
 
   for (const zone of state.zones) {
     zone.pulse += dt;
@@ -733,7 +856,7 @@ function applyAreaEvents(state, dt) {
       const safeDist = Math.hypot(cell.x - safe.x, cell.y - safe.y);
       if (safeDist > safe.radius) {
         const pressure = clamp((safeDist - safe.radius) / 700, 0.25, 1.8);
-        cell.mass = Math.max(14, cell.mass - (cell.mass * 0.026 + 2.5) * pressure * dt);
+        cell.mass = Math.max(14, cell.mass - (cell.mass * 0.014 + 1.2) * pressure * dt);
       }
 
       for (const zone of state.zones) {
@@ -743,12 +866,12 @@ function applyAreaEvents(state, dt) {
         if (dist <= 0.001 || dist > zone.radius) continue;
         const amount = 1 - dist / zone.radius;
         if (zone.type === "storm") {
-          cell.mass = Math.max(14, cell.mass - (cell.mass * 0.018 + 1.8) * amount * dt);
+          cell.mass = Math.max(14, cell.mass - (cell.mass * 0.01 + 0.9) * amount * dt);
         } else if (zone.type === "blackhole") {
           const force = 520 * amount * amount;
           cell.vx += (dx / dist) * force * dt;
           cell.vy += (dy / dist) * force * dt;
-          if (dist < 72) cell.mass = Math.max(12, cell.mass - (cell.mass * 0.04 + 3) * dt);
+          if (dist < 72) cell.mass = Math.max(12, cell.mass - (cell.mass * 0.022 + 1.6) * dt);
         }
       }
     }
@@ -1046,13 +1169,16 @@ function handleVirusInteractions(state, actor) {
       const dx = virus.x - cell.x;
       const dy = virus.y - cell.y;
       const dist = Math.hypot(dx, dy);
-      if (dist < cr + vr - 5 && cell.mass > 130) {
+      if (dist < cr + vr - 5 && cell.mass > 170) {
         const availableSlots = Math.max(0, 16 - actor.cells.length);
-        const pieces = clamp(Math.floor(cell.mass / 95), 2, Math.max(2, availableSlots + 1));
+        const maxPieces = Math.min(6, Math.max(2, availableSlots + 1));
+        const pieces = clamp(Math.floor(cell.mass / 160), 2, maxPieces);
         const unitMass = cell.mass / pieces;
         cell.mass = unitMass;
-        const lock = state.time + 5200;
+        const lock = state.time + VIRUS_SPLIT_MERGE_LOCK_SECONDS;
         cell.mergeLockUntil = lock;
+        cell.autoMergeSource = "virus";
+        cell.autoMergeUntil = lock + VIRUS_AUTO_MERGE_CHAIN_SECONDS;
         for (let p = 1; p < pieces; p += 1) {
           const angle = (Math.PI * 2 * p) / pieces + rand(-0.15, 0.15);
           const part = createCell(
@@ -1067,6 +1193,8 @@ function handleVirusInteractions(state, actor) {
           part.vx = Math.cos(angle) * impulse;
           part.vy = Math.sin(angle) * impulse;
           part.mergeLockUntil = lock;
+          part.autoMergeSource = "virus";
+          part.autoMergeUntil = lock + VIRUS_AUTO_MERGE_CHAIN_SECONDS;
           actor.cells.push(part);
         }
         makeBurst(state, cell.x, cell.y, "#b6ff5c", cr, 0.28, 18);
@@ -1100,17 +1228,25 @@ function resolveCellVsCell(state) {
             const sameOwner = actorA.id === actorB.id;
 
             if (sameOwner) {
-              if (state.time >= cellA.mergeLockUntil && state.time >= cellB.mergeLockUntil && dist < Math.max(ra, rb) * 0.52) {
+              const canMergeNow = state.time >= cellA.mergeLockUntil && state.time >= cellB.mergeLockUntil;
+              const virusAutoPair = isVirusAutoMergePair(cellA, cellB, state.time);
+              const mergeDistance = virusAutoPair
+                ? Math.max(0, ra + rb - VIRUS_AUTO_MERGE_CONTACT_EPSILON)
+                : Math.max(ra, rb) * 0.82;
+              if (canMergeNow && dist < mergeDistance) {
                 if (cellA.mass >= cellB.mass) {
                   cellA.mass += cellB.mass;
+                  if (virusAutoPair) carryVirusAutoMergeState(cellA, cellB);
                   actorB.cells.splice(bci, 1);
                 } else {
                   cellB.mass += cellA.mass;
+                  if (virusAutoPair) carryVirusAutoMergeState(cellB, cellA);
                   actorA.cells.splice(aci, 1);
                 }
                 hasChange = true;
                 break;
               }
+              if (virusAutoPair && canMergeNow) continue;
               if (dist < ra + rb - 3) repelCells(cellA, cellB);
               continue;
             }
@@ -1230,7 +1366,7 @@ function feedViruses(state) {
         virus.mass = clamp(virus.mass + blob.mass * 0.14, 90, 140);
         const direction = normalizeVector(blob.vx, blob.vy);
         state.ejected.splice(ei, 1);
-        if (virus.feed >= 7) {
+        if (virus.feed >= 11) {
           virus.feed = 0;
           const sx = virus.x + direction.x * vr * 1.7;
           const sy = virus.y + direction.y * vr * 1.7;
@@ -1409,6 +1545,7 @@ export function updateGame(state, dtMs, input) {
     bot.ejectCooldown = Math.max(0, bot.ejectCooldown - dt);
   }
 
+  if (playerAlive && input.mergeQueued) mergeActorCells(state.player, state);
   if (playerAlive && input.splitQueued) {
     const didSplit = splitActor(state.player, input.aimX, input.aimY, state);
     if (didSplit) state.playerRun.splits += 1;
@@ -1432,10 +1569,12 @@ export function updateGame(state, dtMs, input) {
   if (state.player.cells.length > 0) {
     handleFoodAndMassIntake(state, state.player);
     handleVirusInteractions(state, state.player);
+    applyAutoMergeAttraction(state.player, state.time, dt, state.world);
   }
   for (const bot of state.bots) {
     handleFoodAndMassIntake(state, bot);
     handleVirusInteractions(state, bot);
+    applyAutoMergeAttraction(bot, state.time, dt, state.world);
   }
 
   resolveCellVsCell(state);
@@ -1463,7 +1602,7 @@ export function updateGame(state, dtMs, input) {
   while (state.foods.length < FOOD_TARGET) spawnFood(state, Math.min(18, FOOD_TARGET - state.foods.length));
   if (state.foods.length > FOOD_TARGET + 180) state.foods.splice(0, state.foods.length - (FOOD_TARGET + 180));
   while (state.viruses.length < VIRUS_TARGET) spawnVirus(state);
-  if (state.viruses.length > VIRUS_TARGET + 8) state.viruses.splice(0, state.viruses.length - (VIRUS_TARGET + 8));
+  if (state.viruses.length > VIRUS_TARGET + 4) state.viruses.splice(0, state.viruses.length - (VIRUS_TARGET + 4));
   if (state.ejected.length > 420) state.ejected.splice(0, state.ejected.length - 420);
   if (state.particles.length > 700) state.particles.splice(0, state.particles.length - 700);
 

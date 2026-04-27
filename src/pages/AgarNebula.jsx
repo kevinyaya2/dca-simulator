@@ -19,7 +19,7 @@ export default function AgarNebula() {
   const uiTickRef = useRef(0);
   const joystickRef = useRef({ active: false, pointerId: null, x: 0, y: 0 });
   const keyboardMoveRef = useRef({ up: false, down: false, left: false, right: false, active: false });
-  const inputRef = useRef({ aimX: 0.2, aimY: -0.2, splitQueued: false, ejectPressed: false, boostPressed: false });
+  const inputRef = useRef({ aimX: 0.2, aimY: -0.2, splitQueued: false, mergeQueued: false, ejectPressed: false, boostPressed: false });
   const [joystickUi, setJoystickUi] = useState({ x: 0, y: 0 });
   const [running, setRunning] = useState(true);
   const [ui, setUi] = useState({
@@ -59,9 +59,14 @@ export default function AgarNebula() {
     inputRef.current.splitQueued = true;
   }, []);
 
+  const mergeAction = useCallback(() => {
+    inputRef.current.mergeQueued = true;
+  }, []);
+
   const restartGame = useCallback(() => {
     stateRef.current = createInitialState();
     inputRef.current.splitQueued = false;
+    inputRef.current.mergeQueued = false;
     inputRef.current.ejectPressed = false;
     inputRef.current.boostPressed = false;
     lastTsRef.current = 0;
@@ -158,6 +163,7 @@ export default function AgarNebula() {
       renderGame(ctx, state, viewportRef.current, ts);
 
       inputRef.current.splitQueued = false;
+      inputRef.current.mergeQueued = false;
       uiTickRef.current += 1;
       if (uiTickRef.current % 6 === 0) updateUi();
     };
@@ -178,6 +184,9 @@ export default function AgarNebula() {
       if (key === "j") {
         event.preventDefault();
         splitAction();
+      } else if (key === "h") {
+        event.preventDefault();
+        mergeAction();
       } else if (event.key === "ArrowUp" || key === "w") {
         event.preventDefault();
         keyboardMoveRef.current.up = true;
@@ -226,6 +235,7 @@ export default function AgarNebula() {
     };
 
     const onBlur = () => {
+      inputRef.current.mergeQueued = false;
       setEjectPressed(false);
       setBoostPressed(false);
       keyboardMoveRef.current = { up: false, down: false, left: false, right: false, active: false };
@@ -241,7 +251,7 @@ export default function AgarNebula() {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [setBoostPressed, setEjectPressed, splitAction, syncKeyboardAim]);
+  }, [mergeAction, setBoostPressed, setEjectPressed, splitAction, syncKeyboardAim]);
 
   const startJoystick = useCallback((event) => {
     const container = event.currentTarget;
@@ -304,6 +314,7 @@ export default function AgarNebula() {
   }, [ui.danger]);
 
   const splitReady = ui.splitCooldown <= 0;
+  const mergeReady = ui.cells > 1 && ui.respawnMs <= 0;
   const ejectReady = ui.ejectCooldown <= 0 && ui.canEject;
   const boostReady = ui.canBoost && ui.respawnMs <= 0;
   const missionProgress = ui.mission ? clamp(ui.mission.progress / Math.max(1, ui.mission.goal), 0, 1) : 0;
@@ -322,7 +333,7 @@ export default function AgarNebula() {
                 返回首頁
               </button>
               <div className="title">霓虹果凍競技場</div>
-              <div className="subtitle">方向鍵或 WSAD 移動、J 分裂、K 噴質量、L 加速；手機可用虛擬搖桿。</div>
+              <div className="subtitle">方向鍵或 WSAD 移動、J 分裂、H 融合、K 噴質量、L 加速；一般移動不掉質量，僅加速/危險區/噴質量會減少。</div>
             </div>
             <div className="agarNeoTopActions">
               <button
@@ -417,7 +428,7 @@ export default function AgarNebula() {
                     ui.effects.magnet > 0 ? `磁吸 ${ui.effects.magnet.toFixed(0)}s` : null,
                     ui.effects.respawnShield > 0 ? `重生保護 ${ui.effects.respawnShield.toFixed(0)}s` : null,
                     ui.boosting ? "加速中" : null,
-                  ].filter(Boolean).join(" / ") || "方向鍵/WSAD / J / K / L"}
+                  ].filter(Boolean).join(" / ") || "方向鍵/WSAD / J / H / K / L"}
                 </div>
               </div>
               <div className="mini agarNeoMini agarNeoMissionMini">
@@ -502,6 +513,16 @@ export default function AgarNebula() {
                 >
                   <span>分裂</span>
                   <small>{splitReady ? "READY" : ui.splitCooldown.toFixed(1)}</small>
+                </button>
+                <button
+                  className={`agarNeoAction agarNeoMerge ${mergeReady ? "" : "cooling"}`}
+                  onPointerDown={mergeAction}
+                  onClick={mergeAction}
+                  type="button"
+                  disabled={!mergeReady}
+                >
+                  <span>融合</span>
+                  <small>{ui.cells > 1 ? `${ui.cells} -> 1` : "需 2+"}</small>
                 </button>
                 <button
                   className={`agarNeoAction agarNeoEject ${ejectReady ? "" : "cooling"}`}
