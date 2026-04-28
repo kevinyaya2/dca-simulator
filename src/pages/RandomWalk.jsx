@@ -529,21 +529,14 @@ export default function RandomWalk() {
     setGame((current) => createGameFromLayout(current.level, current.layout));
   }, []);
 
-  const nextLevel = useCallback(() => {
-    setGame((current) => {
-      if (current.phase !== PHASE_CLEARED) return current;
-      return createNewGame(current.level + 1);
-    });
-  }, []);
-
-  const restartRun = useCallback(() => {
-    setGame(createNewGame(1));
-  }, []);
-
   const resetBest = useCallback(() => {
     setBest({ ...DEFAULT_BEST });
     if (typeof window !== "undefined") window.sessionStorage.removeItem(SESSION_KEY);
   }, []);
+
+  const onCanvasClick = useCallback(() => {
+    if (game.phase === PHASE_DEAD) retryLevel();
+  }, [game.phase, retryLevel]);
 
   useEffect(() => {
     const handler = (event) => {
@@ -566,6 +559,18 @@ export default function RandomWalk() {
     window.addEventListener("keydown", handler, { passive: false });
     return () => window.removeEventListener("keydown", handler);
   }, [movePlayer]);
+
+  useEffect(() => {
+    if (game.phase !== PHASE_CLEARED) return undefined;
+    const clearedLevel = game.level;
+    const timerId = window.setTimeout(() => {
+      setGame((current) => {
+        if (current.phase !== PHASE_CLEARED || current.level !== clearedLevel) return current;
+        return createNewGame(current.level + 1);
+      });
+    }, 800);
+    return () => window.clearTimeout(timerId);
+  }, [game.level, game.phase]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -687,7 +692,7 @@ export default function RandomWalk() {
       ctx.fillText(game.phase === PHASE_CLEARED ? "成功過關" : "你陣亡了", canvasW / 2, canvasH / 2 - 6);
       ctx.font = "600 14px sans-serif";
       ctx.fillText(
-        game.phase === PHASE_CLEARED ? "請按「下一關」" : "請按「重試本關」",
+        game.phase === PHASE_CLEARED ? "即將自動前往下一關" : "點擊畫面重試本關",
         canvasW / 2,
         canvasH / 2 + 18,
       );
@@ -741,6 +746,7 @@ export default function RandomWalk() {
               ref={canvasRef}
               width={canvasW}
               height={canvasH}
+              onClick={onCanvasClick}
               style={{
                 borderRadius: 18,
                 border: "1.5px solid rgba(255, 255, 255, 0.8)",
@@ -748,6 +754,7 @@ export default function RandomWalk() {
                 display: "block",
                 maxWidth: "100%",
                 imageRendering: "pixelated",
+                cursor: game.phase === PHASE_DEAD ? "pointer" : "default",
               }}
             />
           </section>
@@ -758,6 +765,49 @@ export default function RandomWalk() {
                 控制中心
               </div>
               <div className={`chip ${game.assisted ? "mazeAssistChip" : ""}`}>{hintStatus}</div>
+            </div>
+
+            <div className="mazeControlHint">鍵盤：方向鍵 / WASD</div>
+
+            <button
+              className="btn ghost mazeHintBtn"
+              onClick={useHint}
+              disabled={game.phase !== PHASE_PLAYING || game.hintAnimating}
+            >
+              顯示提示
+            </button>
+
+            <div className="mazeDpad">
+              <div />
+              <button
+                className="btn ghost mazePadBtn"
+                onClick={() => movePlayer(-1, 0)}
+                disabled={game.hintAnimating}
+              >
+                ↑
+              </button>
+              <div />
+              <button
+                className="btn ghost mazePadBtn"
+                onClick={() => movePlayer(0, -1)}
+                disabled={game.hintAnimating}
+              >
+                ←
+              </button>
+              <button
+                className="btn ghost mazePadBtn"
+                onClick={() => movePlayer(1, 0)}
+                disabled={game.hintAnimating}
+              >
+                ↓
+              </button>
+              <button
+                className="btn ghost mazePadBtn"
+                onClick={() => movePlayer(0, 1)}
+                disabled={game.hintAnimating}
+              >
+                →
+              </button>
             </div>
 
             <div className="mazeInfoGrid">
@@ -797,66 +847,10 @@ export default function RandomWalk() {
               </button>
             </div>
 
-            <div className="mazeControlHint">鍵盤：方向鍵 / WASD</div>
-
-            <div className="mazeDpad">
-              <div />
-          <button
-            className="btn ghost mazePadBtn"
-            onClick={() => movePlayer(-1, 0)}
-            disabled={game.hintAnimating}
-          >
-            ↑
-          </button>
-          <div />
-          <button
-            className="btn ghost mazePadBtn"
-            onClick={() => movePlayer(0, -1)}
-            disabled={game.hintAnimating}
-          >
-            ←
-          </button>
-          <button
-            className="btn ghost mazePadBtn"
-            onClick={() => movePlayer(1, 0)}
-            disabled={game.hintAnimating}
-          >
-            ↓
-          </button>
-          <button
-            className="btn ghost mazePadBtn"
-            onClick={() => movePlayer(0, 1)}
-            disabled={game.hintAnimating}
-          >
-            →
-          </button>
-        </div>
           </section>
 
           <div className="spacer" />
         </main>
-
-        <div className="bottomBar">
-          <button className="btn ghost" onClick={retryLevel}>
-            重試本關
-          </button>
-          <button
-            className="btn ghost"
-            onClick={useHint}
-            disabled={game.phase !== PHASE_PLAYING || game.hintAnimating}
-          >
-            顯示提示
-          </button>
-          {game.phase === PHASE_CLEARED ? (
-            <button className="btn solid" onClick={nextLevel}>
-              下一關
-            </button>
-          ) : (
-            <button className="btn solid" onClick={restartRun}>
-              重新開始
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

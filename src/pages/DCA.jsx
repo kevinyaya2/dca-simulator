@@ -3,6 +3,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -76,6 +77,30 @@ function fmtAxisMoney(value) {
   if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
   if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(0)}K`;
   return `${Math.round(value)}`;
+}
+
+const MONTHS_PER_YEAR = 12;
+const ROI_MILESTONE_STEP = 100;
+const ROI_MILESTONE_PALETTE = [
+  "#2f8dff",
+  "#ff9f4d",
+  "#9b6bff",
+  "#2fbf9b",
+  "#ff6b9a",
+  "#6888ff",
+];
+
+function getMilestoneColor(index) {
+  return ROI_MILESTONE_PALETTE[index % ROI_MILESTONE_PALETTE.length];
+}
+
+function fmtDuration(months) {
+  const safeMonths = Math.max(0, Math.round(months));
+  const years = Math.floor(safeMonths / MONTHS_PER_YEAR);
+  const remainMonths = safeMonths % MONTHS_PER_YEAR;
+  if (years === 0) return `${remainMonths}個月`;
+  if (remainMonths === 0) return `${years}年`;
+  return `${years}年${remainMonths}個月`;
 }
 
 function DcaTooltip({ active, payload }) {
@@ -179,6 +204,55 @@ export default function DCA() {
       }),
     [result.safePrincipal, result.safeMonthly, result.safeRate, result.safeYears],
   );
+
+  const roiMilestones = useMemo(() => {
+    const maxRoiPct = trajectory.reduce(
+      (maxValue, point) => Math.max(maxValue, point.roiPct),
+      Number.NEGATIVE_INFINITY,
+    );
+    const maxTargetPct =
+      Math.floor(maxRoiPct / ROI_MILESTONE_STEP) * ROI_MILESTONE_STEP;
+
+    if (maxTargetPct < ROI_MILESTONE_STEP) return [];
+
+    const targets = Array.from(
+      { length: maxTargetPct / ROI_MILESTONE_STEP },
+      (_, index) => (index + 1) * ROI_MILESTONE_STEP,
+    );
+
+    return targets
+      .map((targetPct, index) => {
+        const hit = trajectory.find(
+          (point) => point.month > 0 && point.roiPct >= targetPct,
+        );
+        if (!hit) return null;
+        return {
+          targetPct,
+          month: hit.month,
+          year: hit.year,
+          roiPct: hit.roiPct,
+          color: getMilestoneColor(index),
+        };
+      })
+      .filter(Boolean);
+  }, [trajectory]);
+
+  const milestoneIntervals = useMemo(() => {
+    if (!roiMilestones.length) return [];
+
+    return roiMilestones.map((milestone, index) => {
+      const prev = roiMilestones[index - 1];
+      const startLabel = prev ? `${prev.targetPct}%` : "起點";
+      const monthsDelta = prev ? milestone.month - prev.month : milestone.month;
+      return {
+        key: `${startLabel}-${milestone.targetPct}`,
+        startLabel,
+        endLabel: `${milestone.targetPct}%`,
+        reachedMonth: milestone.month,
+        durationLabel: fmtDuration(monthsDelta),
+      };
+    });
+  }, [roiMilestones]);
 
   function resetAll() {
     setMonthly(10000);
@@ -286,6 +360,71 @@ export default function DCA() {
                     width={52}
                   />
                   <Tooltip content={<DcaTooltip />} />
+                  {(() => {
+                    const visibleMilestones = roiMilestones.filter(
+                      (milestone) =>
+                        milestone.targetPct >= 100 && milestone.targetPct <= 1000,
+                    );
+                    const minMonthGap = 12;
+                    const spacedMilestones = visibleMilestones.reduce(
+                      (acc, milestone, index) => {
+                        const isFirst = index === 0;
+                        const isLast = index === visibleMilestones.length - 1;
+
+                        if (isFirst) {
+                          acc.push(milestone);
+                          return acc;
+                        }
+
+                        const lastPicked = acc[acc.length - 1];
+                        const monthGap = milestone.month - lastPicked.month;
+
+                        if (isLast) {
+                          if (monthGap < minMonthGap) {
+                            acc[acc.length - 1] = milestone;
+                          } else {
+                            acc.push(milestone);
+                          }
+                          return acc;
+                        }
+
+                        if (monthGap >= minMonthGap) {
+                          acc.push(milestone);
+                        }
+
+                        return acc;
+                      },
+                      [],
+                    );
+                    const baseOffset = 18;
+                    const maxOffset = 180;
+                    const levelCount = Math.max(1, spacedMilestones.length - 1);
+                    const step =
+                      spacedMilestones.length > 1
+                        ? (maxOffset - baseOffset) / levelCount
+                        : 0;
+
+                    return spacedMilestones.map((milestone, index) => {
+                      const labelOffset = Math.round(maxOffset - index * step);
+                      return (
+                        <ReferenceLine
+                          key={milestone.targetPct}
+                          x={milestone.month}
+                          stroke={milestone.color}
+                          strokeDasharray="5 5"
+                          strokeWidth={1.5}
+                          label={{
+                            value: `${milestone.targetPct}%`,
+                            position: "insideTop",
+                            fill: milestone.color,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            offset: labelOffset,
+                          }}
+                        />
+                      );
+                    });
+                  })()}
                   <Line
                     type="monotone"
                     dataKey="totalAsset"
@@ -311,86 +450,115 @@ export default function DCA() {
             <div className="hint">
               滑過曲線可查看每個月份的資產、投入、獲利與報酬率細節。
             </div>
+
+            <div className="dcaMilestoneBlock">
+              <div className="dcaMilestoneTitle">達標間隔</div>
+              {milestoneIntervals.length > 0 ? (
+                <div className="dcaMilestoneList">
+                  {milestoneIntervals.map((item) => (
+                    <div className="dcaMilestoneItem" key={item.key}>
+                      <div className="dcaMilestonePath">
+                        {item.startLabel} → {item.endLabel}
+                      </div>
+                      <div className="dcaMilestoneDuration">{item.durationLabel}</div>
+                      <div className="dcaMilestoneMeta">
+                        於第 {item.reachedMonth} 個月達成 {item.endLabel}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="dcaMilestoneEmpty">
+                  目前設定下尚未達到 100% 報酬。
+                </div>
+              )}
+            </div>
           </section>
 
-          <section className="card">
+          <section className="card dcaControlCard">
             <div className="sectionTitle">參數設定</div>
 
-            <div className="field">
+            <div className="field dcaField">
               <div className="fieldTop">
                 <div className="fieldLabel">每月投入</div>
                 <div className="chip">
                   {fmtMoney(result.safeMonthly).replace("NT$", "NT$ ")}
                 </div>
               </div>
-              <input
-                className="range"
-                type="range"
-                min="0"
-                max="50000"
-                step="500"
-                value={result.safeMonthly}
-                onChange={(e) => setMonthly(Number(e.target.value))}
-                style={{ "--p": pMonthly }}
-              />
-              <input
-                className="input"
-                type="number"
-                value={result.safeMonthly}
-                onChange={(e) => setMonthly(Number(e.target.value))}
-                placeholder="例如 10000"
-              />
+              <div className="dcaAdjustRow">
+                <input
+                  className="range dcaRange"
+                  type="range"
+                  min="0"
+                  max="50000"
+                  step="500"
+                  value={result.safeMonthly}
+                  onChange={(e) => setMonthly(Number(e.target.value))}
+                  style={{ "--p": pMonthly }}
+                />
+                <input
+                  className="input dcaNumberInput"
+                  type="number"
+                  value={result.safeMonthly}
+                  onChange={(e) => setMonthly(Number(e.target.value))}
+                  placeholder="10000"
+                />
+              </div>
             </div>
 
-            <div className="field">
+            <div className="field dcaField">
               <div className="fieldTop">
                 <div className="fieldLabel">年化報酬率</div>
                 <div className="chip">{result.safeRate}%</div>
               </div>
-              <input
-                className="range"
-                type="range"
-                min="0"
-                max="12"
-                step="0.5"
-                value={result.safeRate}
-                onChange={(e) => setRate(Number(e.target.value))}
-                style={{ "--p": pRate }}
-              />
-              <input
-                className="input"
-                type="number"
-                value={result.safeRate}
-                onChange={(e) => setRate(Number(e.target.value))}
-                placeholder="例如 6"
-              />
+              <div className="dcaAdjustRow">
+                <input
+                  className="range dcaRange"
+                  type="range"
+                  min="0"
+                  max="12"
+                  step="0.5"
+                  value={result.safeRate}
+                  onChange={(e) => setRate(Number(e.target.value))}
+                  style={{ "--p": pRate }}
+                />
+                <input
+                  className="input dcaNumberInput"
+                  type="number"
+                  value={result.safeRate}
+                  onChange={(e) => setRate(Number(e.target.value))}
+                  placeholder="6"
+                />
+              </div>
             </div>
 
-            <div className="field">
+            <div className="field dcaField">
               <div className="fieldTop">
                 <div className="fieldLabel">投資年數</div>
                 <div className="chip">{result.safeYears} 年</div>
               </div>
-              <input
-                className="range"
-                type="range"
-                min="1"
-                max="50"
-                step="1"
-                value={result.safeYears}
-                onChange={(e) => setYears(Number(e.target.value))}
-                style={{ "--p": pYears }}
-              />
-              <input
-                className="input"
-                type="number"
-                value={result.safeYears}
-                onChange={(e) => setYears(Number(e.target.value))}
-                placeholder="例如 10"
-              />
+              <div className="dcaAdjustRow">
+                <input
+                  className="range dcaRange"
+                  type="range"
+                  min="1"
+                  max="50"
+                  step="1"
+                  value={result.safeYears}
+                  onChange={(e) => setYears(Number(e.target.value))}
+                  style={{ "--p": pYears }}
+                />
+                <input
+                  className="input dcaNumberInput"
+                  type="number"
+                  value={result.safeYears}
+                  onChange={(e) => setYears(Number(e.target.value))}
+                  placeholder="10"
+                />
+              </div>
             </div>
 
-            <div className="field">
+            <div className="field dcaField">
               <div className="fieldTop">
                 <div className="fieldLabel">起始本金（可選）</div>
                 <div className="chip">
@@ -398,15 +566,13 @@ export default function DCA() {
                 </div>
               </div>
               <input
-                className="input"
+                className="input dcaNumberInput dcaNumberInputFull"
                 type="number"
                 value={result.safePrincipal}
                 onChange={(e) => setPrincipal(Number(e.target.value))}
-                placeholder="例如 0 或 50000"
+                placeholder="0 或 50000"
               />
-              <div className="hint">
-                例：你已經先買一筆 0050，就把那筆金額填進來。
-              </div>
+              <div className="hint dcaHint">已有部位就填本金，沒有可維持 0。</div>
             </div>
           </section>
 

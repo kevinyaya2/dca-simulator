@@ -13,9 +13,7 @@ const VIRUS_SPLIT_MERGE_LOCK_SECONDS = 1.8;
 const MERGE_FOOD_LOCK_SECONDS = 0.45;
 const VIRUS_AUTO_MERGE_CHAIN_SECONDS = 6;
 const VIRUS_AUTO_MERGE_CONTACT_EPSILON = 2;
-const VIRUS_AUTO_MERGE_POST_LOCK_PULL_MULTIPLIER = 2.2;
-const AUTO_MERGE_ATTRACT_EXTRA_RANGE = 860;
-const AUTO_MERGE_ATTRACT_PULL_PER_SECOND = 260;
+const VIRUS_AUTO_MERGE_STEP_SECONDS = 0.42;
 const MANUAL_FUSION_LOCK_SECONDS = 0.28;
 const MANUAL_FUSION_ANIM_SECONDS = 0.62;
 const EJECT_MIN_MASS = 32;
@@ -621,48 +619,8 @@ function carryVirusAutoMergeState(target, source) {
   target.autoMergeUntil = Math.max(target.autoMergeUntil || 0, source.autoMergeUntil || 0);
 }
 
-function applyAutoMergeAttraction(actor, now, dt, world) {
-  if (actor.cells.length < 2) return;
-  for (let i = 0; i < actor.cells.length - 1; i += 1) {
-    const cellA = actor.cells[i];
-    for (let j = i + 1; j < actor.cells.length; j += 1) {
-      const cellB = actor.cells[j];
-      if (!isVirusAutoMergePair(cellA, cellB, now)) continue;
-      const ra = radiusFromMass(cellA.mass);
-      const rb = radiusFromMass(cellB.mass);
-      const mergeDist = Math.max(0, ra + rb - VIRUS_AUTO_MERGE_CONTACT_EPSILON);
-      const attractRange = mergeDist + AUTO_MERGE_ATTRACT_EXTRA_RANGE;
-      const dx = cellB.x - cellA.x;
-      const dy = cellB.y - cellA.y;
-      const dist = Math.hypot(dx, dy) || 0.0001;
-      if (dist <= mergeDist || dist >= attractRange) continue;
-      const nx = dx / dist;
-      const ny = dy / dist;
-      const ratio = clamp((attractRange - dist) / Math.max(1, attractRange - mergeDist), 0, 1);
-      const postLockBoost = now >= cellA.mergeLockUntil && now >= cellB.mergeLockUntil
-        ? VIRUS_AUTO_MERGE_POST_LOCK_PULL_MULTIPLIER
-        : 1;
-      const pull = AUTO_MERGE_ATTRACT_PULL_PER_SECOND * postLockBoost * ratio * ratio * dt;
-      const totalMass = Math.max(1, cellA.mass + cellB.mass);
-      const moveA = pull * clamp(cellB.mass / totalMass, 0.2, 0.8);
-      const moveB = pull * clamp(cellA.mass / totalMass, 0.2, 0.8);
-
-      cellA.x += nx * moveA;
-      cellA.y += ny * moveA;
-      cellB.x -= nx * moveB;
-      cellB.y -= ny * moveB;
-
-      cellA.vx += nx * moveA * 28;
-      cellA.vy += ny * moveA * 28;
-      cellB.vx -= nx * moveB * 28;
-      cellB.vy -= ny * moveB * 28;
-
-      cellA.x = clamp(cellA.x, ra, world.width - ra);
-      cellA.y = clamp(cellA.y, ra, world.height - ra);
-      cellB.x = clamp(cellB.x, rb, world.width - rb);
-      cellB.y = clamp(cellB.y, rb, world.height - rb);
-    }
-  }
+function applyVirusAutoMergeStepLock(cell, now) {
+  cell.mergeLockUntil = Math.max(cell.mergeLockUntil || 0, now + VIRUS_AUTO_MERGE_STEP_SECONDS);
 }
 
 function canAbsorbCell(attacker, defender, distance) {
@@ -1236,11 +1194,17 @@ function resolveCellVsCell(state) {
               if (canMergeNow && dist < mergeDistance) {
                 if (cellA.mass >= cellB.mass) {
                   cellA.mass += cellB.mass;
-                  if (virusAutoPair) carryVirusAutoMergeState(cellA, cellB);
+                  if (virusAutoPair) {
+                    carryVirusAutoMergeState(cellA, cellB);
+                    applyVirusAutoMergeStepLock(cellA, state.time);
+                  }
                   actorB.cells.splice(bci, 1);
                 } else {
                   cellB.mass += cellA.mass;
-                  if (virusAutoPair) carryVirusAutoMergeState(cellB, cellA);
+                  if (virusAutoPair) {
+                    carryVirusAutoMergeState(cellB, cellA);
+                    applyVirusAutoMergeStepLock(cellB, state.time);
+                  }
                   actorA.cells.splice(aci, 1);
                 }
                 hasChange = true;
@@ -1569,12 +1533,10 @@ export function updateGame(state, dtMs, input) {
   if (state.player.cells.length > 0) {
     handleFoodAndMassIntake(state, state.player);
     handleVirusInteractions(state, state.player);
-    applyAutoMergeAttraction(state.player, state.time, dt, state.world);
   }
   for (const bot of state.bots) {
     handleFoodAndMassIntake(state, bot);
     handleVirusInteractions(state, bot);
-    applyAutoMergeAttraction(bot, state.time, dt, state.world);
   }
 
   resolveCellVsCell(state);
