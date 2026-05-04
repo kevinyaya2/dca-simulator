@@ -228,12 +228,49 @@
 
 .otdHitFx {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
-  background: radial-gradient(circle, #fff 0%, #ffd54a 50%, #ff8c4f 100%);
+  background: radial-gradient(circle, #ffffff 0%, #ffe18a 42%, #ff8c4f 72%, #ff5b4f 100%);
   transform: translate(-50%, -50%);
-  animation: otd-hit 240ms ease-out;
+  box-shadow:
+    0 0 0 3px #ffd54a66,
+    0 0 16px #ff8c4fcc,
+    0 0 30px #ff5b4f66;
+  animation: otd-hit 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.otdHitFx::before,
+.otdHitFx::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.otdHitFx::before {
+  border: 2px solid #fff4c0;
+  animation: otd-hit-ring 340ms ease-out;
+}
+
+.otdHitFx::after {
+  inset: 5px;
+  background: radial-gradient(circle, #ffffff 0%, #ffffff00 75%);
+  animation: otd-hit-core 280ms ease-out;
+}
+
+.otdShotFx {
+  position: absolute;
+  height: 4px;
+  transform-origin: 0 50%;
+  border-radius: 999px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #ffffff 0%, #fff2a8 35%, #ff9d4f 70%, #ff5b4f 100%);
+  box-shadow:
+    0 0 8px #ffd54aaa,
+    0 0 14px #ff8c4f88;
 }
 
 .otdEnemyBadge {
@@ -450,8 +487,43 @@
 }
 
 @keyframes otd-hit {
-  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+    filter: brightness(1.15);
+  }
+  65% {
+    transform: translate(-50%, -50%) scale(1.35);
+    opacity: 0.95;
+    filter: brightness(1);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.05);
+    opacity: 0;
+    filter: brightness(0.9);
+  }
+}
+
+@keyframes otd-hit-ring {
+  from {
+    transform: scale(0.45);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.35);
+    opacity: 0;
+  }
+}
+
+@keyframes otd-hit-core {
+  from {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
 }
 
 @keyframes otd-breathe {

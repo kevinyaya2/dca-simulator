@@ -178,6 +178,7 @@ export function makeInitialState() {
     towers: [],
     enemies: [],
     fxBursts: [],
+    fxShots: [],
     waveIndex: 0,
     waveNumber: 1,
     spawnedInWave: 0,

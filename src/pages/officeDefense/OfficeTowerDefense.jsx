@@ -84,6 +84,22 @@ export default function OfficeTowerDefense() {
   }, [countdown, game.gameStatus]);
 
   useEffect(() => {
+    if (!game.fxBursts.length && !game.fxShots.length) return;
+    const id = setInterval(() => {
+      setGame((prev) => ({
+        ...prev,
+        fxBursts: prev.fxBursts
+          .map((burst) => ({ ...burst, ttl: burst.ttl - TICK * speed }))
+          .filter((burst) => burst.ttl > 0),
+        fxShots: prev.fxShots
+          .map((shot) => ({ ...shot, ttl: shot.ttl - TICK * speed }))
+          .filter((shot) => shot.ttl > 0),
+      }));
+    }, 1000 / 60);
+    return () => clearInterval(id);
+  }, [game.fxBursts.length, game.fxShots.length, speed]);
+
+  useEffect(() => {
     if (game.gameStatus !== "running" || countdown > 0) return;
     const id = setInterval(() => {
       if (paused) return;
@@ -99,7 +115,8 @@ export default function OfficeTowerDefense() {
         let spawnTimer = prev.spawnTimer + TICK * speed;
         let spawnedInWave = prev.spawnedInWave;
         const enemies = [...prev.enemies];
-        const fxBursts = prev.fxBursts.map((burst) => ({ ...burst, ttl: burst.ttl - TICK * speed })).filter((burst) => burst.ttl > 0);
+        const fxBursts = [...prev.fxBursts];
+        const fxShots = [...prev.fxShots];
         let banner = prev.banner;
         let waveInProgress = prev.waveInProgress;
 
@@ -155,14 +172,41 @@ export default function OfficeTowerDefense() {
               for (const idx of hitIndices) {
                 movedEnemies[idx] = { ...movedEnemies[idx], hp: movedEnemies[idx].hp - cfg.damage };
                 const targetPos = nextPathPosition(movedEnemies[idx].progress);
+                fxShots.push({
+                  id: `shot-${Date.now()}-${Math.random()}`,
+                  fromRow: tower.row,
+                  fromCol: tower.col,
+                  toRow: targetPos.row,
+                  toCol: targetPos.col,
+                  ttl: 0.16,
+                  maxTtl: 0.16,
+                });
                 fxBursts.push({ id: `fx-${Date.now()}-${Math.random()}`, row: targetPos.row, col: targetPos.col, ttl: 0.24 });
               }
             } else if (cfg.attackType === "slow") {
               movedEnemies[bestIndex] = { ...movedEnemies[bestIndex], hp: movedEnemies[bestIndex].hp - cfg.damage, slowTimer: cfg.slowDuration || 1, slowMultiplier: cfg.slowMultiplier || 0.7 };
               const targetPos = nextPathPosition(movedEnemies[bestIndex].progress);
+              fxShots.push({
+                id: `shot-${Date.now()}-${Math.random()}`,
+                fromRow: tower.row,
+                fromCol: tower.col,
+                toRow: targetPos.row,
+                toCol: targetPos.col,
+                ttl: 0.16,
+                maxTtl: 0.16,
+              });
               fxBursts.push({ id: `fx-${Date.now()}-${Math.random()}`, row: targetPos.row, col: targetPos.col, ttl: 0.24 });
             } else if (cfg.attackType === "splash") {
               const center = nextPathPosition(movedEnemies[bestIndex].progress);
+              fxShots.push({
+                id: `shot-${Date.now()}-${Math.random()}`,
+                fromRow: tower.row,
+                fromCol: tower.col,
+                toRow: center.row,
+                toCol: center.col,
+                ttl: 0.18,
+                maxTtl: 0.18,
+              });
               for (let i = 0; i < movedEnemies.length; i += 1) {
                 const splashDist = getCellDistance(center, nextPathPosition(movedEnemies[i].progress));
                 if (splashDist <= (cfg.splashRadius || 1.1)) movedEnemies[i] = { ...movedEnemies[i], hp: movedEnemies[i].hp - cfg.damage };
@@ -173,10 +217,28 @@ export default function OfficeTowerDefense() {
               const bonus = target.hp / target.maxHp <= (cfg.executeThreshold || 0.2) ? target.hp : cfg.damage;
               movedEnemies[bestIndex] = { ...target, hp: target.hp - bonus };
               const targetPos = nextPathPosition(target.progress);
+              fxShots.push({
+                id: `shot-${Date.now()}-${Math.random()}`,
+                fromRow: tower.row,
+                fromCol: tower.col,
+                toRow: targetPos.row,
+                toCol: targetPos.col,
+                ttl: 0.2,
+                maxTtl: 0.2,
+              });
               fxBursts.push({ id: `fx-${Date.now()}-${Math.random()}`, row: targetPos.row, col: targetPos.col, ttl: 0.24 });
             } else {
               movedEnemies[bestIndex] = { ...movedEnemies[bestIndex], hp: movedEnemies[bestIndex].hp - cfg.damage };
               const targetPos = nextPathPosition(movedEnemies[bestIndex].progress);
+              fxShots.push({
+                id: `shot-${Date.now()}-${Math.random()}`,
+                fromRow: tower.row,
+                fromCol: tower.col,
+                toRow: targetPos.row,
+                toCol: targetPos.col,
+                ttl: 0.16,
+                maxTtl: 0.16,
+              });
               fxBursts.push({ id: `fx-${Date.now()}-${Math.random()}`, row: targetPos.row, col: targetPos.col, ttl: 0.24 });
             }
             cooldown = cfg.cooldown;
@@ -231,7 +293,7 @@ export default function OfficeTowerDefense() {
         setStats((s) => ({ ...s, kills: s.kills + killsGained, leaks: s.leaks + leakedCount, earnedGold: s.earnedGold + earnedGained }));
         if (gameStatus === "lose") banner = "基地失守";
 
-        return { ...prev, towers, enemies: aliveEnemies, fxBursts, gold, baseHp, spawnTimer, spawnedInWave, waveIndex, waveNumber, waveInProgress, banner, gameStatus, checkpointWave };
+        return { ...prev, towers, enemies: aliveEnemies, fxBursts, fxShots, gold, baseHp, spawnTimer, spawnedInWave, waveIndex, waveNumber, waveInProgress, banner, gameStatus, checkpointWave };
       });
     }, 1000 / 60);
     return () => clearInterval(id);
@@ -374,6 +436,26 @@ export default function OfficeTowerDefense() {
                   );
                 })}
 
+                {game.fxShots.map((shot) => {
+                  const progress = Math.min(1, Math.max(0, 1 - shot.ttl / shot.maxTtl));
+                  const dx = (shot.toCol - shot.fromCol) * (100 / GRID_COLS);
+                  const dy = (shot.toRow - shot.fromRow) * (100 / GRID_ROWS);
+                  const length = Math.hypot(dx, dy);
+                  const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                  return (
+                    <div
+                      key={shot.id}
+                      className="otdShotFx"
+                      style={{
+                        top: `${(shot.fromRow / GRID_ROWS) * 100 + 6.25}%`,
+                        left: `${(shot.fromCol / GRID_COLS) * 100 + 4.2}%`,
+                        width: `${length}%`,
+                        transform: `translateY(-50%) rotate(${angle}deg) scaleX(${progress})`,
+                        opacity: Math.max(0, 0.25 + shot.ttl / shot.maxTtl),
+                      }}
+                    />
+                  );
+                })}
                 {game.fxBursts.map((fx) => <div key={fx.id} className="otdHitFx" style={{ top: `${(fx.row / GRID_ROWS) * 100 + 7}%`, left: `${(fx.col / GRID_COLS) * 100 + 4.4}%` }} />)}
                 {floaters.map((f) => <div key={f.id} className="otdFloater" style={{ top: `${(f.row / GRID_ROWS) * 100 + 4}%`, left: `${(f.col / GRID_COLS) * 100 + 4}%`, opacity: f.ttl }}>{f.text}</div>)}
               </div>
