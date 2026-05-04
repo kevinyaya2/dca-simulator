@@ -767,13 +767,37 @@
 .homeContent {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 8px 0 20px;
 }
 
-.appGrid {
+.appPagesViewport {
   width: min(1260px, 100%);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.appPagesViewport::-webkit-scrollbar {
+  display: none;
+}
+
+.appPagesTrack {
+  display: flex;
+  width: 100%;
+}
+
+.appPage {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+}
+
+.appGrid {
+  width: 100%;
   margin: 0 auto;
   padding: 8px 6px;
   border-radius: 0;
@@ -785,6 +809,30 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 22px 14px;
+}
+
+.appPageDots {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.appPageDot {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(17, 19, 34, 0.28);
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.appPageDot.isActive {
+  background: rgba(17, 19, 34, 0.72);
+  transform: scale(1.12);
 }
 
 .appIcon {
@@ -2465,7 +2513,7 @@
   }
 }
 
-@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+@media (hover: hover) and (pointer: fine) {
   .appIcon:hover {
     transform: translateY(-7px) scale(1.03);
     background: rgba(255, 255, 255, 0.16);
@@ -2480,6 +2528,11 @@
 
   .dockIcon:hover {
     transform: translateY(-4px) scale(1.04);
+  }
+
+  .appPageDot:hover {
+    background: rgba(17, 19, 34, 0.5);
+    transform: scale(1.18);
   }
 }
 

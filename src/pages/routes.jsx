@@ -17,6 +17,7 @@ const BombGame = lazy(() => import("./BombGame"));
 const CrossyRoad = lazy(() => import("./CrossyRoad"));
 const PetBuddy = lazy(() => import("./PetBuddy"));
 const AngryBirdLike = lazy(() => import("./AngryBirdLike"));
+const OfficeTowerDefense = lazy(() => import("./officeDefense/OfficeTowerDefense"));
 
 const routes = [
   { path: "/", element: <Home />, title: "Home" },
@@ -36,6 +37,7 @@ const routes = [
   { path: "/crossy", element: <CrossyRoad />, title: "Crossy Shiba" },
   { path: "/angry", element: <AngryBirdLike />, title: "Angry-like" },
   { path: "/pet", element: <PetBuddy />, title: "Pet Buddy" },
+  { path: "/office-td", element: <OfficeTowerDefense />, title: "Office Tower Defense" },
 ];
 
 export default routes;

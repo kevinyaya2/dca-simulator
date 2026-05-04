@@ -135,4 +135,62 @@
       { cx: 12, cy: 12, r: 1.2, fill: "currentColor", stroke: "none" },
     ],
   },
+  kpiMonster: {
+    rects: [{ x: 5, y: 6, width: 14, height: 12, rx: 4 }],
+    circles: [
+      { cx: 10, cy: 11, r: 1, fill: "currentColor", stroke: "none" },
+      { cx: 14, cy: 11, r: 1, fill: "currentColor", stroke: "none" },
+    ],
+    paths: [{ d: "M9 15c1.1 1 2 1.4 3 1.4s1.9-.4 3-1.4" }],
+  },
+  overtimeMonster: {
+    circles: [{ cx: 12, cy: 12, r: 8 }],
+    paths: [{ d: "M12 8v4l3 2" }, { d: "M8.5 15.2c1-.8 2.1-1.2 3.5-1.2 1.4 0 2.5.4 3.5 1.2" }],
+  },
+  urgentMonster: {
+    paths: [{ d: "M12 4l8 15H4z" }, { d: "M12 9v4" }, { d: "M12 16h.01" }],
+  },
+  coffeeTower: {
+    paths: [{ d: "M6 9h10v8a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3z" }, { d: "M16 10h2a2 2 0 0 1 0 4h-2" }],
+  },
+  meetingTower: {
+    rects: [{ x: 4, y: 6, width: 16, height: 11, rx: 3 }],
+    paths: [{ d: "M8 18v2" }, { d: "M16 18v2" }, { d: "M9 11h6" }],
+  },
+  reportTower: {
+    rects: [{ x: 6, y: 4, width: 12, height: 16, rx: 2 }],
+    paths: [{ d: "M9 9h6" }, { d: "M9 13h5" }, { d: "M9 17h4" }],
+  },
+  copierTower: {
+    rects: [{ x: 4, y: 6, width: 9, height: 12, rx: 2 }, { x: 11, y: 4, width: 9, height: 12, rx: 2 }],
+    paths: [{ d: "M7 10h3" }, { d: "M14 8h3" }, { d: "M14 11h3" }],
+  },
+  slideTower: {
+    rects: [{ x: 4, y: 6, width: 16, height: 12, rx: 2 }],
+    paths: [{ d: "M8 14l2-3 2 2 3-4 1.5 2.2" }, { d: "M9 18v2" }, { d: "M15 18v2" }],
+  },
+  legalTower: {
+    paths: [{ d: "M12 5v14" }, { d: "M6 8h12" }, { d: "M8 8l-2 4h4z" }, { d: "M16 8l-2 4h4z" }, { d: "M8 18h8" }],
+  },
+  internTower: {
+    rects: [{ x: 5, y: 7, width: 14, height: 10, rx: 3 }],
+    paths: [{ d: "M9 11h6" }, { d: "M8 18h8" }, { d: "M12 5v2" }],
+  },
+  laborTower: {
+    paths: [{ d: "M6 18h12" }, { d: "M12 6l6 3-6 3-6-3z" }, { d: "M12 12v6" }],
+  },
+  budgetTower: {
+    circles: [{ cx: 12, cy: 12, r: 7 }],
+    paths: [{ d: "M9 9.5h5" }, { d: "M9 12h6" }, { d: "M9 14.5h4" }],
+  },
+  coinToy: {
+    circles: [{ cx: 12, cy: 12, r: 7 }],
+    paths: [{ d: "M9.5 12h5" }, { d: "M12 9.5v5" }],
+  },
+  baseHeart: {
+    paths: [{ d: "M12 20s-7-4.6-7-9.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7 2.7C19 15.4 12 20 12 20z" }],
+  },
+  waveBanner: {
+    paths: [{ d: "M4 7h16l-2.5 5L20 17H4l2.5-5z" }],
+  },
 };
