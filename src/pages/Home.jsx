@@ -20,6 +20,7 @@ const APPS = [
   { id: "angry", name: "彈射拆塔", subtitle: "Angry-like", icon: "target", color: "linear-gradient(145deg, #ffb173, #ff6d72)", route: "/angry" },
   { id: "pet", name: "電子寵物", subtitle: "Pet Buddy", icon: "pet", color: "linear-gradient(145deg, #ffd86d, #ff9871)", route: "/pet" },
   { id: "office-td", name: "職場塔防", subtitle: "Office Tower Defense", icon: "waveBanner", color: "linear-gradient(145deg, #58c0ff, #ffd54a)", route: "/office-td" },
+  { id: "pocket-siege", name: "城堡戰棋", subtitle: "Pocket Siege", icon: "castle", color: "linear-gradient(145deg, #4fb7ff, #ff714f)", route: "/pocket-siege" },
 ];
 
 const DOCK_ITEMS = [
@@ -54,10 +55,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => {
-    const maxPage = Math.max(0, appPages.length - 1);
-    if (activePage > maxPage) setActivePage(maxPage);
-  }, [activePage, appPages.length]);
+  const effectiveActivePage = Math.min(activePage, Math.max(0, appPages.length - 1));
 
   const handleAppClick = (app) => {
     if (app.route) navigate(app.route);
@@ -131,9 +129,9 @@ export default function Home() {
                 <button
                   key={`dot-${index}`}
                   type="button"
-                  className={`appPageDot ${index === activePage ? "isActive" : ""}`}
+                  className={`appPageDot ${index === effectiveActivePage ? "isActive" : ""}`}
                   aria-label={`Go to page ${index + 1}`}
-                  aria-current={index === activePage ? "page" : undefined}
+                  aria-current={index === effectiveActivePage ? "page" : undefined}
                   onClick={() => goToPage(index)}
                 />
               ))}

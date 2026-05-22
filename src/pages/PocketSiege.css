@@ -1,0 +1,1245 @@
+.psPage {
+  --psInk: rgba(16, 16, 22, 0.92);
+  --psMuted: rgba(16, 16, 22, 0.58);
+  --psGlassA: var(--cardA, rgba(255, 255, 255, 0.82));
+  --psGlassB: var(--cardB, rgba(255, 255, 255, 0.55));
+  --psBorder: var(--border, rgba(255, 255, 255, 0.62));
+  --psShadowL: var(--shadowL, 0 26px 70px rgba(16, 16, 30, 0.18));
+  --psShadowM: var(--shadowM, 0 14px 40px rgba(16, 16, 30, 0.12));
+  --psShadowS: var(--shadowS, 0 10px 22px rgba(16, 16, 30, 0.1));
+  --psBlue: #4fb7ff;
+  --psSun: #ffd54a;
+  --psTomato: #ff714f;
+  --psMint: #48d89f;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: grid;
+  place-items: start center;
+  background:
+    radial-gradient(880px 520px at 16% 8%, rgba(79, 183, 255, 0.8), transparent 62%),
+    radial-gradient(780px 560px at 88% 18%, rgba(255, 113, 79, 0.64), transparent 62%),
+    radial-gradient(900px 640px at 54% 92%, rgba(255, 213, 74, 0.72), transparent 64%),
+    linear-gradient(180deg, #cfe0ff 0%, #f8d5ff 42%, #ffd9c8 100%);
+  color: var(--psInk);
+}
+
+.psShell {
+  width: min(900px, calc(100% - 32px));
+  min-height: min(100dvh, 660px);
+  margin: 0 auto;
+  padding: 6px 0 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.psTopbar {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) minmax(120px, 0.68fr) minmax(0, 1fr);
+  gap: 4px;
+  align-items: stretch;
+  padding: 8px;
+  border: 1px solid var(--psBorder);
+  border-radius: 24px;
+  background:
+    radial-gradient(900px 160px at 18% 0%, rgba(255, 255, 255, 0.78), transparent 56%),
+    linear-gradient(180deg, var(--psGlassA), var(--psGlassB));
+  box-shadow:
+    var(--psShadowM),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px) saturate(1.22);
+  -webkit-backdrop-filter: blur(18px) saturate(1.22);
+}
+
+.psBackBtn,
+.psActionBtn {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.95), transparent 44%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56));
+  color: var(--psInk);
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.52);
+  box-shadow: var(--psShadowS);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease, opacity 120ms ease;
+}
+
+.psBackBtn {
+  width: 40px;
+  height: 40px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.psActionBtn {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.psBackBtn:active,
+.psActionBtn:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.psBackBtn:hover:not(:disabled),
+.psActionBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--psShadowM);
+}
+
+.psActionBtn:disabled,
+.psBackBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.psPrimary {
+  color: var(--psInk);
+  background:
+    radial-gradient(circle at 24% 15%, rgba(255, 255, 255, 0.95), transparent 42%),
+    linear-gradient(145deg, #fff7cf, #ffe38f 52%, #ffbe6d);
+  border-color: rgba(255, 255, 255, 0.78);
+}
+
+.psGhost {
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.psHudSide,
+.psHudCenter {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  border-radius: 17px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  color: var(--psInk);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.psHudEnemy {
+  text-align: right;
+}
+
+.psHudCenter {
+  text-align: center;
+  background:
+    radial-gradient(circle at 24% 16%, rgba(255, 255, 255, 0.78), transparent 42%),
+    linear-gradient(145deg, rgba(255, 213, 74, 0.78), rgba(255, 113, 79, 0.62));
+  color: rgba(49, 29, 16, 0.9);
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+.psHudSide span,
+.psHudCenter span {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--psMuted);
+}
+
+.psHudSide strong,
+.psHudCenter strong {
+  font-size: 13px;
+  line-height: 1.1;
+  color: var(--psInk);
+}
+
+.psHudSide small,
+.psHudCenter small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--psMuted);
+}
+
+.psHudResource {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.psHudEnemy .psHudResource {
+  justify-content: flex-end;
+}
+
+.psHudResource b {
+  flex: 0 0 auto;
+  color: rgba(16, 16, 22, 0.78);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.psHudPips {
+  width: min(92px, 100%);
+  display: grid;
+  grid-template-columns: repeat(8, minmax(4px, 1fr));
+  gap: 3px;
+}
+
+.psHudPips span {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(16, 16, 22, 0.12);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.18);
+}
+
+.psHudPips span.isReady {
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.psHudPips span.isFull {
+  background: linear-gradient(90deg, var(--psBlue), var(--psSun));
+}
+
+.psArena {
+  margin-top: 5px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  padding: 0;
+}
+
+.psCastle {
+  position: relative;
+  min-height: 78px;
+  border: 0;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow:
+    0 5px 0 rgba(67, 39, 19, 0.6),
+    0 12px 22px rgba(33, 31, 18, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.psCastle:active {
+  transform: scale(0.98);
+}
+
+.psCastle-player {
+  background: linear-gradient(145deg, #3695ff, #1762c8);
+}
+
+.psCastle-enemy {
+  background: linear-gradient(145deg, #ff6948, #c92831);
+}
+
+.psCastle.isTarget {
+  box-shadow: 0 0 0 4px rgba(255, 246, 135, 0.72), 0 20px 42px rgba(119, 47, 24, 0.26);
+  animation: psPulse 720ms ease-in-out infinite alternate;
+}
+
+.psCastleRoof {
+  width: 34px;
+  height: 18px;
+  clip-path: polygon(0 100%, 16% 38%, 30% 72%, 50% 18%, 70% 72%, 84% 38%, 100% 100%);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.psCastleBody {
+  width: 42px;
+  height: 34px;
+  border-radius: 14px 14px 10px 10px;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  padding-top: 8px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.psCastleBody span {
+  width: 7px;
+  height: 15px;
+  border-radius: 999px 999px 3px 3px;
+  background: rgba(20, 32, 51, 0.3);
+}
+
+.psCastle strong {
+  min-width: 40px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(17, 25, 42, 0.38);
+  font-size: 15px;
+}
+
+.psBoardWrap {
+  position: relative;
+  min-height: clamp(218px, 31vh, 288px);
+  display: grid;
+  place-items: center;
+  border-radius: 28px;
+  padding: clamp(14px, 2.8vh, 22px) 12px 15px;
+  background:
+    radial-gradient(900px 220px at 18% 0%, rgba(255, 255, 255, 0.72), transparent 62%),
+    radial-gradient(720px 260px at 50% 54%, rgba(255, 213, 74, 0.52), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.38)),
+    linear-gradient(145deg, rgba(79, 183, 255, 0.46), rgba(255, 113, 79, 0.38));
+  border: 1px solid var(--psBorder);
+  box-shadow:
+    var(--psShadowL),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    inset 0 -24px 38px rgba(16, 16, 30, 0.08);
+  overflow: hidden;
+  perspective: 880px;
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.psBoardWrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(560px 84px at 50% 4%, rgba(255, 255, 255, 0.38), transparent 76%),
+    repeating-linear-gradient(18deg, rgba(255, 255, 255, 0.12) 0 2px, transparent 2px 20px);
+  pointer-events: none;
+}
+
+.psBoardWrap::after {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 28px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(63, 38, 18, 0.24);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.psBoard {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--psCols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--psRows), minmax(0, 1fr));
+  gap: 5px;
+  aspect-ratio: 7 / 5;
+  min-height: clamp(168px, 24vh, 222px);
+  width: min(100%, 540px);
+  margin: 0 auto;
+  padding: 4px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)),
+    rgba(255, 255, 255, 0.16);
+  transform: rotateX(18deg) translateY(6px) scaleY(1.04);
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 38px 24px rgba(16, 16, 30, 0.16),
+    0 -10px 22px rgba(255, 255, 255, 0.18);
+}
+
+.psAttackLayer {
+  position: absolute;
+  inset: 4px;
+  z-index: 8;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.psAttackFx {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.psAttackProjectile,
+.psAttackImpact {
+  position: absolute;
+  left: var(--psFromX);
+  top: var(--psFromY);
+  pointer-events: none;
+}
+
+.psAttackProjectile {
+  width: 28px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #fff9b8 26%, #ffffff 58%, rgba(255, 255, 255, 0));
+  box-shadow:
+    0 0 10px rgba(255, 247, 139, 0.82),
+    0 0 20px rgba(255, 96, 54, 0.36);
+  transform: translate(-50%, -50%) rotate(var(--psAttackAngle)) scaleX(0.35);
+  transform-origin: center;
+  animation: psAttackProjectile 620ms cubic-bezier(0.16, 0.78, 0.22, 1) both;
+}
+
+.psAttackImpact {
+  left: var(--psToX);
+  top: var(--psToY);
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 247, 142, 0.9);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 12%, rgba(255, 231, 92, 0.75) 13% 32%, rgba(255, 87, 54, 0) 64%);
+  box-shadow: 0 0 18px rgba(255, 84, 56, 0.58);
+  transform: translate(-50%, -50%) scale(0.2);
+  opacity: 0;
+  animation: psAttackImpact 620ms ease-out both;
+}
+
+.psAttackFx-player .psAttackProjectile {
+  background: linear-gradient(90deg, transparent, #bff4ff 24%, #ffffff 58%, rgba(255, 255, 255, 0));
+  box-shadow:
+    0 0 12px rgba(111, 230, 255, 0.85),
+    0 0 22px rgba(18, 96, 214, 0.36);
+}
+
+.psAttackFx-enemy .psAttackProjectile {
+  background: linear-gradient(90deg, transparent, #ffd18f 24%, #fff9d8 58%, rgba(255, 255, 255, 0));
+  box-shadow:
+    0 0 12px rgba(255, 177, 93, 0.82),
+    0 0 22px rgba(201, 39, 70, 0.36);
+}
+
+.psAttackFx-ranged .psAttackProjectile {
+  width: 18px;
+  height: 18px;
+  clip-path: polygon(100% 50%, 0 0, 28% 50%, 0 100%);
+}
+
+.psAttackFx-spell .psAttackProjectile {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #fff, #ffe15b 35%, #ff4f60 72%);
+  clip-path: none;
+}
+
+.psCell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 38% 16%, rgba(255, 255, 255, 0.46), transparent 48%),
+    rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48), inset 0 -8px 18px rgba(16, 16, 30, 0.05);
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.psCell.playerZone {
+  background:
+    radial-gradient(circle at 35% 15%, rgba(255, 255, 255, 0.46), transparent 42%),
+    rgba(79, 183, 255, 0.26);
+}
+
+.psCell.enemyZone {
+  background:
+    radial-gradient(circle at 35% 15%, rgba(255, 255, 255, 0.46), transparent 42%),
+    rgba(255, 113, 79, 0.26);
+}
+
+.psCell.hasCastle {
+  cursor: pointer;
+}
+
+.psCell:hover {
+  transform: translateY(-1px);
+}
+
+.psCell.is-summon {
+  border-color: rgba(72, 216, 159, 0.95);
+  box-shadow: 0 0 0 3px rgba(72, 216, 159, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.psCell.is-move {
+  border-color: rgba(79, 183, 255, 0.96);
+  box-shadow: 0 0 0 3px rgba(79, 183, 255, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.psCell.is-attack,
+.psCell.is-spell {
+  border-color: rgba(255, 113, 79, 0.98);
+  box-shadow:
+    0 0 0 3px rgba(255, 113, 79, 0.26),
+    0 0 18px rgba(255, 113, 79, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.psUnit {
+  position: absolute;
+  inset: 4px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 950;
+  box-shadow: 0 12px 22px rgba(32, 45, 20, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  transition: filter 140ms ease, opacity 140ms ease;
+  transform: rotateX(-18deg) translateY(-8px) scale(1.05);
+  transform-origin: center bottom;
+}
+
+.psUnit-player {
+  --psAttackLean: 8px;
+  background: linear-gradient(145deg, #6ee6ff, #188cff 62%, #1260d6);
+}
+
+.psUnit-enemy {
+  --psAttackLean: -8px;
+  background: linear-gradient(145deg, #ffb15d, #ff4f60 62%, #c92746);
+}
+
+.psUnit.isSelected {
+  outline: 3px solid rgba(255, 248, 139, 0.96);
+  animation: psPulse 720ms ease-in-out infinite alternate;
+}
+
+.psUnit.isExhausted {
+  opacity: 0.68;
+}
+
+.psUnit.hasActed {
+  filter: saturate(0.55) brightness(0.85);
+}
+
+.psUnit.isAttacking {
+  animation: psUnitAttackLunge 520ms cubic-bezier(0.2, 0.82, 0.18, 1) both;
+}
+
+.psUnit.isHit,
+.psBoardCastle.isHit {
+  animation: psHitShake 520ms cubic-bezier(0.28, 0.84, 0.26, 1) both;
+}
+
+.psBoardCastle {
+  position: absolute;
+  inset: 4px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  color: #fff;
+  box-shadow: 0 12px 22px rgba(32, 45, 20, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  transform: rotateX(-18deg) translateY(-8px) scale(1.06);
+  transform-origin: center bottom;
+}
+
+.psBoardCastle-player {
+  background: linear-gradient(145deg, #6ee6ff, #188cff 62%, #1260d6);
+}
+
+.psBoardCastle-enemy {
+  background: linear-gradient(145deg, #ffb15d, #ff4f60 62%, #c92746);
+}
+
+.psBoardCastle.isTarget {
+  outline: 3px solid rgba(255, 248, 139, 0.96);
+  animation: psPulse 720ms ease-in-out infinite alternate;
+}
+
+.psBoardCastle.isHit {
+  animation: psHitShake 520ms cubic-bezier(0.28, 0.84, 0.26, 1) both;
+}
+
+.psBoardCastleRoof {
+  width: 32px;
+  height: 16px;
+  clip-path: polygon(0 100%, 16% 38%, 30% 72%, 50% 18%, 70% 72%, 84% 38%, 100% 100%);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.psBoardCastleBody {
+  width: 38px;
+  height: 30px;
+  border-radius: 12px 12px 8px 8px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding-top: 7px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.psBoardCastleBody span {
+  width: 6px;
+  height: 13px;
+  border-radius: 999px 999px 3px 3px;
+  background: rgba(20, 32, 51, 0.3);
+}
+
+.psBoardCastle strong {
+  min-width: 32px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(17, 25, 42, 0.5);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.psUnitIcon {
+  font-size: clamp(16px, 2.6vw, 24px);
+  line-height: 1;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+}
+
+.psUnitStat {
+  position: absolute;
+  bottom: 4px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(16, 24, 42, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+}
+
+.psAtk {
+  left: 4px;
+}
+
+.psHp {
+  right: 4px;
+}
+
+.psUnitStatus {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #172033;
+  font-size: 10px;
+}
+
+.psBottomDock {
+  margin-top: 3px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "log"
+    "actions"
+    "hand";
+  gap: 4px;
+  align-items: stretch;
+}
+
+.psLog {
+  grid-area: log;
+  margin: 0;
+  min-height: 24px;
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 2px 2px;
+}
+
+.psLog span {
+  flex: 0 0 auto;
+  max-width: 270px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  color: rgba(16, 16, 22, 0.78);
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: var(--psShadowS);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.psHand {
+  grid-area: hand;
+  margin-top: 0;
+  min-width: 0;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 8px;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.88) rgba(255, 255, 255, 0.28);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pinch-zoom;
+}
+
+.psHand::-webkit-scrollbar {
+  display: block;
+  height: 8px;
+}
+
+.psHand::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.psHand::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+}
+
+.psHandTrack {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+}
+
+.psHandCard {
+  position: relative;
+  flex: 0 0 clamp(90px, 10vw, 106px);
+  min-height: clamp(86px, 11.5vh, 104px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 18px;
+  padding: 7px 6px 6px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 4px;
+  text-align: left;
+  color: var(--psInk);
+  cursor: pointer;
+  box-shadow:
+    var(--psShadowM),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    inset 0 -12px 20px rgba(16, 16, 30, 0.08);
+  transition: transform 130ms ease, box-shadow 130ms ease, opacity 130ms ease;
+  overflow: hidden;
+  backdrop-filter: blur(14px) saturate(1.18);
+  -webkit-backdrop-filter: blur(14px) saturate(1.18);
+  scroll-snap-align: start;
+}
+
+.psHandCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(420px 90px at 20% 0%, rgba(255, 255, 255, 0.72), transparent 66%);
+  pointer-events: none;
+}
+
+.psHandCard:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+
+.psHandCard:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.psHandCard.isSelected {
+  transform: translateY(-5px);
+  box-shadow: 0 0 0 4px rgba(255, 213, 74, 0.42), 0 18px 36px rgba(16, 16, 30, 0.18);
+}
+
+.psCard-unit {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(79, 183, 255, 0.58));
+}
+
+.psCard-building {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(72, 216, 159, 0.42));
+}
+
+.psCard-spell {
+  background: linear-gradient(160deg, rgba(255, 247, 207, 0.9), rgba(255, 113, 79, 0.54));
+}
+
+.psCardCost {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #fff7cf, #ffe38f);
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  font-size: 13px;
+  font-weight: 950;
+  box-shadow: 0 8px 14px rgba(43, 52, 24, 0.18);
+  z-index: 1;
+}
+
+.psCardArt {
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 27px;
+  line-height: 1;
+  font-weight: 950;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.24);
+  position: relative;
+  z-index: 1;
+}
+
+.psCardName {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+
+.psCardType {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+
+.psCardText {
+  min-height: 22px;
+  font-size: 9px;
+  line-height: 1.25;
+  color: rgba(20, 32, 51, 0.74);
+  font-weight: 750;
+  position: relative;
+  z-index: 1;
+}
+
+.psActionBar {
+  grid-area: actions;
+  position: relative;
+  left: auto;
+  bottom: auto;
+  width: 100%;
+  transform: none;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(118px, 150px);
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--psBorder);
+  border-radius: 24px;
+  background:
+    radial-gradient(760px 120px at 20% 0%, rgba(255, 255, 255, 0.72), transparent 60%),
+    linear-gradient(180deg, var(--psGlassA), var(--psGlassB));
+  box-shadow:
+    var(--psShadowM),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.psSelectedInfo {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-height: 32px;
+  border-radius: 17px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+}
+
+.psSelectedInfo strong,
+.psSelectedInfo span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.psSelectedInfo strong {
+  font-size: 12px;
+  color: var(--psInk);
+}
+
+.psSelectedInfo span {
+  color: var(--psMuted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.psEndTurnBtn {
+  min-width: 0;
+  min-height: 38px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.05;
+}
+
+.psPhaseBtn {
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.2) 36%, transparent 52%),
+    linear-gradient(180deg, #7fe0ff, #399fff 64%, #1a5db6);
+  color: #fff;
+  text-shadow: 0 2px 2px rgba(24, 65, 130, 0.46);
+}
+
+.psOverlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 14;
+  width: min(430px, calc(100% - 18px));
+  display: block;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.psModal {
+  position: relative;
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  padding: 18px 18px 16px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--psBorder);
+  background:
+    radial-gradient(620px 120px at 20% 0%, rgba(255, 255, 255, 0.82), transparent 64%),
+    radial-gradient(circle at 88% 20%, rgba(255, 213, 74, 0.36), transparent 30%),
+    linear-gradient(180deg, var(--psGlassA), var(--psGlassB));
+  box-shadow:
+    var(--psShadowL),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  text-align: center;
+  pointer-events: auto;
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  animation: psModalDrop 420ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+.psModal::before,
+.psModal::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.psModal::before {
+  inset: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 22px;
+}
+
+.psModal::after {
+  right: -24px;
+  bottom: -26px;
+  width: 118px;
+  height: 118px;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.18);
+  transform: rotate(22deg);
+}
+
+.psModalKicker {
+  position: relative;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--psMuted);
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.psModal h1 {
+  position: relative;
+  margin: 0;
+  color: var(--psInk);
+  font-size: clamp(27px, 4vw, 38px);
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.36);
+}
+
+.psModal p {
+  position: relative;
+  margin: 0 0 4px;
+  max-width: 310px;
+  color: var(--psMuted);
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 800;
+}
+
+.psModalRules {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin: 1px 0 4px;
+}
+
+.psModalRules span {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  color: rgba(16, 16, 22, 0.74);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.psModal .psActionBtn {
+  position: relative;
+  min-width: 128px;
+}
+
+@keyframes psPulse {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes psModalDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes psAttackProjectile {
+  0% {
+    left: var(--psFromX);
+    top: var(--psFromY);
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--psAttackAngle)) scale(0.35);
+  }
+  12% {
+    opacity: 1;
+  }
+  72% {
+    left: var(--psToX);
+    top: var(--psToY);
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--psAttackAngle)) scale(1.08);
+  }
+  100% {
+    left: var(--psToX);
+    top: var(--psToY);
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--psAttackAngle)) scale(0.25);
+  }
+}
+
+@keyframes psAttackImpact {
+  0%,
+  54% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.55);
+  }
+}
+
+@keyframes psUnitAttackLunge {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: rotateX(-18deg) translateY(-8px) translateX(0) scale(1.05);
+  }
+  36% {
+    filter: brightness(1.28) saturate(1.22);
+    transform: rotateX(-18deg) translateY(-12px) translateX(var(--psAttackLean)) scale(1.14);
+  }
+}
+
+@keyframes psHitShake {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: rotateX(-18deg) translateY(-8px) translateX(0) scale(1.06);
+  }
+  18% {
+    filter: brightness(1.55) saturate(1.35);
+    transform: rotateX(-18deg) translateY(-8px) translateX(-4px) scale(1.1);
+  }
+  38% {
+    transform: rotateX(-18deg) translateY(-8px) translateX(4px) scale(1.08);
+  }
+  62% {
+    transform: rotateX(-18deg) translateY(-8px) translateX(-2px) scale(1.06);
+  }
+}
+
+@media (max-width: 860px) {
+  .psShell {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .psTopbar {
+    grid-template-columns: 54px 1fr 1fr;
+  }
+
+  .psHudCenter {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  .psArena {
+    grid-template-columns: 1fr;
+  }
+
+  .psBoardWrap {
+    padding: 7px;
+    border-radius: 20px;
+    min-height: 270px;
+    align-items: center;
+  }
+
+  .psBoard {
+    gap: 5px;
+    min-height: 218px;
+    transform: rotateX(14deg) translateY(12px) scaleY(1.02);
+  }
+
+  .psCell {
+    border-radius: 10px;
+  }
+
+  .psUnit {
+    inset: 4px;
+    border-radius: 12px;
+  }
+
+  .psUnitStat {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  .psCastle {
+    min-height: 92px;
+    border-radius: 16px;
+  }
+
+  .psCastleRoof {
+    width: 44px;
+    height: 24px;
+  }
+
+  .psCastleBody {
+    width: 52px;
+    height: 44px;
+    gap: 4px;
+    padding-top: 10px;
+  }
+
+  .psCastleBody span {
+    width: 9px;
+    height: 20px;
+  }
+
+  .psCastle strong {
+    min-width: 46px;
+    font-size: 18px;
+  }
+
+  .psHudPips {
+    width: 72px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .psHandCard {
+    flex-basis: 112px;
+  }
+
+  .psBottomDock {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "log"
+      "hand"
+      "actions";
+    margin-top: 6px;
+  }
+
+  .psActionBar {
+    position: sticky;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .psEndTurnBtn {
+    min-width: 0;
+    min-height: 46px;
+    border-radius: 999px;
+  }
+
+  .psSelectedInfo {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .psArena {
+    grid-template-columns: 1fr;
+  }
+
+  .psBoardWrap {
+    order: 1;
+  }
+
+  .psBoard {
+    min-height: 212px;
+    transform: none;
+  }
+
+  .psCastle {
+    min-height: 82px;
+  }
+
+  .psCastleBody,
+  .psCastleRoof {
+    transform: scale(0.82);
+  }
+}
