@@ -21,6 +21,7 @@ const APPS = [
   { id: "pet", name: "電子寵物", subtitle: "Pet Buddy", icon: "pet", color: "linear-gradient(145deg, #ffd86d, #ff9871)", route: "/pet" },
   { id: "office-td", name: "職場塔防", subtitle: "Office Tower Defense", icon: "waveBanner", color: "linear-gradient(145deg, #58c0ff, #ffd54a)", route: "/office-td" },
   { id: "pocket-siege", name: "城堡戰棋", subtitle: "Pocket Siege", icon: "castle", color: "linear-gradient(145deg, #4fb7ff, #ff714f)", route: "/pocket-siege" },
+  { id: "kevin-life", name: "遊戲人生", subtitle: "Quest Tracker", icon: "adventurer", color: "linear-gradient(145deg, #7da4ff, #57d0b7)", route: "/kevin-life" },
 ];
 
 const DOCK_ITEMS = [
