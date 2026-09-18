@@ -5328,6 +5328,63 @@
   font-size: 11px;
 }
 
+/* Taiwan stock quote */
+.stockShell { max-width: 640px; }
+.stockTop { padding-bottom: 8px; }
+.stockTitleRow, .stockPriceRow, .stockChartHeader, .stockSearchRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stockTitleRow .title { margin: 0; }
+.stockDateBadge, .stockPreset { border: 1px solid rgba(255,255,255,.78); background: rgba(255,255,255,.58); color: rgba(16,16,22,.76); border-radius: 999px; font-size: 11px; font-weight: 800; padding: 7px 10px; box-shadow: 0 8px 16px rgba(16,16,30,.08); white-space: nowrap; }
+.stockSearchCard { padding: 14px; }
+.stockSearchForm { position: relative; z-index: 1; }
+.stockSearchForm label { display: block; color: rgba(16,16,22,.78); font-size: 12px; font-weight: 900; }
+.stockSearchRow { align-items: stretch; margin-top: 7px; }
+.stockSearchInput { margin-top: 0; font-size: 16px; font-weight: 800; }
+.stockSearchButton { min-width: 76px; border: 0; border-radius: 16px; background: rgba(16,16,22,.92); color: #fff; font-weight: 900; cursor: pointer; padding: 0 12px; }
+.stockSearchButton:disabled { opacity: .55; cursor: wait; }
+.stockPresetRow { display: flex; flex-wrap: wrap; gap: 7px; position: relative; z-index: 1; margin-top: 10px; }
+.stockPreset { cursor: pointer; }
+.stockHero { background: radial-gradient(460px 220px at 6% -20%, rgba(92,166,255,.42), transparent 67%), radial-gradient(380px 210px at 100% 120%, rgba(90,219,177,.26), transparent 66%), linear-gradient(180deg, var(--cardA), var(--cardB)); }
+.stockIdentity { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; }
+.stockIdentity span { padding: 5px 8px; border-radius: 9px; background: rgba(47,141,255,.14); color: rgba(31,103,205,.95); font-size: 12px; font-weight: 950; }
+.stockIdentity h2 { margin: 0; font-size: 19px; color: rgba(16,16,22,.92); }
+.stockPriceRow { position: relative; z-index: 1; align-items: flex-end; margin-top: 12px; }
+.stockPrice { font-size: 38px; }
+.stockChange { min-width: 96px; border-radius: 17px; padding: 9px 11px; display: grid; gap: 2px; text-align: right; font-size: 13px; font-weight: 900; }
+.stockChange strong { font-size: 17px; }
+.stockChange.up { color: #c43452; background: rgba(255,110,139,.14); }
+.stockChange.down { color: #208159; background: rgba(53,194,133,.15); }
+.stockChange.flat { color: rgba(16,16,22,.65); background: rgba(16,16,22,.08); }
+.stockCloseHint { position: relative; z-index: 1; margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.stockStatGrid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stockStat { min-width: 0; padding: 10px; border: 1px solid rgba(255,255,255,.72); border-radius: 16px; background: rgba(255,255,255,.48); }
+.stockStat span { display: block; color: var(--muted); font-size: 11px; }
+.stockStat strong { display: block; margin-top: 4px; color: rgba(16,16,22,.88); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stockChartHeader { position: relative; z-index: 1; align-items: flex-start; }
+.stockChartHeader .sectionTitle { margin-bottom: 0; }
+.stockChartHeader .hint { margin-bottom: 0; }
+.stockRefresh { border: 0; background: rgba(47,141,255,.12); border-radius: 12px; color: rgba(31,103,205,.95); cursor: pointer; font-size: 12px; font-weight: 900; padding: 8px 10px; }
+.stockChartWrap { position: relative; z-index: 1; margin-top: 11px; border-radius: 18px; padding: 6px 6px 2px; border: 1px solid rgba(255,255,255,.72); background: rgba(255,255,255,.48); }
+.stockChartTooltip { min-width: 136px; border: 1px solid rgba(255,255,255,.88); border-radius: 13px; padding: 9px 10px; background: rgba(255,255,255,.94); box-shadow: var(--shadowM); font-size: 12px; }
+.stockChartTooltip strong { display: block; margin-bottom: 5px; }
+.stockChartTooltip div { display: flex; justify-content: space-between; gap: 10px; margin-top: 3px; color: var(--muted); }
+.stockChartTooltip b { color: var(--text); }
+.stockNoChart { position: relative; z-index: 1; margin-top: 10px; border-radius: 15px; padding: 13px; background: rgba(255,255,255,.48); color: var(--muted); font-size: 13px; }
+.stockDisclaimer { margin: 3px 6px 22px; color: rgba(16,16,22,.52); font-size: 11px; line-height: 1.55; }
+.stockStateCard { position: relative; z-index: 1; min-height: 154px; }
+.stockStateCard > * { position: relative; z-index: 1; }
+.stockRetryButton { margin-top: 12px; width: 100%; }
+.stockSkeleton { height: 28px; margin-top: 12px; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,.35), rgba(255,255,255,.85), rgba(255,255,255,.35)); background-size: 200% 100%; animation: stockShimmer 1.2s infinite; }
+.stockSkeletonWide { width: 72%; height: 46px; margin-top: 0; }
+@keyframes stockShimmer { to { background-position: -200% 0; } }
+.pageErrorCard { margin-top: 24px; text-align: center; }
+.pageErrorButton { margin-top: 14px; width: 100%; }
+
+@media (max-width: 560px) {
+  .stockStatGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stockPrice { font-size: 32px; }
+  .stockDateBadge { display: none; }
+}
+
 @media (max-width: 560px) {
   .dcaMilestoneBlock {
     padding: 8px;

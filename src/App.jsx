@@ -1,6 +1,7 @@
 ﻿import { Suspense } from "react";
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import routes from "./pages/routes";
+import PageErrorBoundary from "./components/PageErrorBoundary";
 import "./App.css";
 
 function RouteFallback() {
@@ -18,13 +19,15 @@ function RouteFallback() {
 export default function App() {
   return (
     <Router>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          {routes.map((route) => (
-            <Route key={route.path} path={route.path} element={route.element} />
-          ))}
-        </Routes>
-      </Suspense>
+      <PageErrorBoundary>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            {routes.map((route) => (
+              <Route key={route.path} path={route.path} element={route.element} />
+            ))}
+          </Routes>
+        </Suspense>
+      </PageErrorBoundary>
     </Router>
   );
 }
