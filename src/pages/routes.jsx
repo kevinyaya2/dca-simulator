@@ -22,7 +22,6 @@ const PocketSiege = lazy(() => import("./PocketSiege"));
 const KevinLifeRPG = lazy(() => import("./KevinLifeRPG"));
 const Stock = lazy(() => import("./Stock"));
 const ChromaOps = lazy(() => import("./ChromaOps"));
-const Multiplayer = lazy(() => import("./Multiplayer"));
 
 const routes = [
   { path: "/", element: <Home />, title: "Home" },
@@ -47,7 +46,6 @@ const routes = [
   { path: "/kevin-life", element: <KevinLifeRPG />, title: "Kevin Life RPG" },
   { path: "/stock", element: <Stock />, title: "Taiwan Stocks" },
   { path: "/chroma-ops", element: <ChromaOps />, title: "CHROMA OPS" },
-  { path: "/multiplayer", element: <Multiplayer />, title: "CHROMA OPS Multiplayer" },
 ];
 
 export default routes;

@@ -1,0 +1,34 @@
+.co-dead{
+  z-index:20;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:radial-gradient(circle at 50% 44%,rgba(59,87,139,.5),rgba(6,12,28,.92) 68%);
+  backdrop-filter:blur(6px);
+  animation:co-death-in .22s ease-out;
+}
+.co-dead[hidden]{display:none}
+.co-dead.is-leaving{opacity:0;transition:opacity .18s ease}
+.co-is-dead .co-mobile,.co-is-dead .co-armory{opacity:0;pointer-events:none;transition:opacity .15s ease}
+.co-feedback{z-index:2!important;background:radial-gradient(ellipse at center,transparent 42%,rgba(255,25,52,var(--damage-flash)) 108%),radial-gradient(ellipse at center,transparent 62%,rgba(165,12,35,var(--low-hp)) 118%)!important}
+.co-feedback:after{content:"";position:absolute;inset:9%;border:solid clamp(18px,3vw,34px) transparent;border-top-color:rgba(255,65,82,var(--damage-opacity));transform:rotate(var(--damage-rotation));filter:drop-shadow(0 0 8px #ff3044)}
+.co-feedback.is-hit{animation:co-hit-pulse .45s ease-out}
+.co-dead-card{
+  width:min(360px,calc(100vw - 48px));
+  box-sizing:border-box;
+  padding:28px 30px 26px;
+  border:1px solid rgba(255,255,255,.28);
+  border-top:3px solid #ff7192;
+  border-radius:20px;
+  text-align:center;
+  color:#fff;
+  background:linear-gradient(145deg,rgba(35,52,86,.97),rgba(12,20,39,.98));
+  box-shadow:0 22px 70px rgba(0,0,0,.48),inset 0 1px rgba(255,255,255,.12);
+}
+.co-dead-card p{margin:0;color:#ff9cb1;font-size:11px;font-weight:900;letter-spacing:.2em;}
+.co-dead-card h2{margin:8px 0 20px;font-size:clamp(28px,7vw,38px);line-height:1;font-weight:1000;letter-spacing:.05em;text-shadow:0 3px 0 #27334c;}
+.co-dead-killer{padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.09);font-size:13px;color:#b8c7e6;}
+.co-dead-killer b{display:block;margin-top:4px;color:#fff;font-size:18px;overflow-wrap:anywhere;}
+.co-dead-card small{display:block;margin-top:20px;color:#83f5c0;font-size:12px;font-weight:800;letter-spacing:.08em;}
+@keyframes co-death-in{from{opacity:0;transform:scale(1.04)}to{opacity:1;transform:scale(1)}}
+@keyframes co-hit-pulse{0%{filter:brightness(1.65)}100%{filter:brightness(1)}}

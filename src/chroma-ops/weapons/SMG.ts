@@ -1,1 +1,1 @@
-import { AssaultRifle } from './AssaultRifle'; export class SMG extends AssaultRifle { readonly spec={id:'smg',label:'VOLT-9',magazine:36,reserve:144,damage:20,fireDelay:.06,reloadTime:.9,spread:.018,recoil:.055}; constructor(){super();this.rounds=36;this.spare=0} }
+import { Weapon } from './Weapon'; import { WEAPON_SPECS } from '../../../shared/weapons'; export class SMG extends Weapon { constructor(){super(WEAPON_SPECS.smg)} }

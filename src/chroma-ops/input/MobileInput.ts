@@ -1,1 +1,35 @@
-import { InputManager } from './InputManager'; export class MobileInput {private joyId:number|null=null;private lookId:number|null=null;private shootId:number|null=null;private ox=0;private oy=0;private lx=0;private ly=0;private down=(e:PointerEvent)=>{const r=this.el.getBoundingClientRect(),btn=e.target instanceof HTMLElement?e.target.closest('[data-fire],[data-jump],[data-reload],[data-weapon]'):null;if(btn?.matches('[data-jump]'))this.input.set({jump:true});else if(btn?.matches('[data-reload]'))this.input.set({reload:true});else if(btn?.matches('[data-weapon]'))this.input.set({switchWeapon:2});else if(btn?.matches('[data-fire]')){this.shootId=e.pointerId;this.input.set({shoot:true})}else if(e.clientX<r.left+r.width*.48&&!this.joyId){this.joyId=e.pointerId;this.ox=e.clientX;this.oy=e.clientY}else if(!this.lookId){this.lookId=e.pointerId;this.lx=e.clientX;this.ly=e.clientY}this.el.setPointerCapture?.(e.pointerId)};private move=(e:PointerEvent)=>{if(e.pointerId===this.joyId){const x=Math.max(-52,Math.min(52,e.clientX-this.ox)),y=Math.max(-52,Math.min(52,e.clientY-this.oy));this.input.set({moveX:x/52,moveY:-y/52});this.el.style.setProperty('--joy-x',`${x}px`);this.el.style.setProperty('--joy-y',`${y}px`)}if(e.pointerId===this.lookId){this.input.addLook(e.clientX-this.lx,e.clientY-this.ly);this.lx=e.clientX;this.ly=e.clientY}};private up=(e:PointerEvent)=>{if(e.pointerId===this.joyId){this.joyId=null;this.input.set({moveX:0,moveY:0});this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px')}if(e.pointerId===this.lookId)this.lookId=null;if(e.pointerId===this.shootId){this.shootId=null;this.input.set({shoot:false})}};constructor(private el:HTMLElement,private input:InputManager){for(const x of['pointerdown','pointermove','pointerup','pointercancel']as const)el.addEventListener(x,x==='pointerdown'?this.down:x==='pointermove'?this.move:this.up)}dispose(){for(const x of['pointerdown','pointermove','pointerup','pointercancel']as const)this.el.removeEventListener(x,x==='pointerdown'?this.down:x==='pointermove'?this.move:this.up)}}
+import { InputManager } from './InputManager';
+
+export class MobileInput {
+  private joyId:number|null=null; private lookId:number|null=null; private shootId:number|null=null;
+  private ox=0; private oy=0; private lx=0; private ly=0;
+  private options={passive:false};
+  private begin=(id:number,x:number,y:number,target:EventTarget|null)=>{
+    const r=this.el.getBoundingClientRect();
+    const button=target instanceof HTMLElement?target.closest('[data-fire],[data-jump],[data-reload],[data-weapon],[data-prev],[data-next]'):null;
+    if(button?.matches('[data-jump]'))this.input.set({jump:true});
+    else if(button?.matches('[data-reload]'))this.input.set({reload:true});
+    else if(button?.matches('[data-weapon]'))this.el.dispatchEvent(new CustomEvent('armory'));
+    else if(button?.matches('[data-prev]'))this.el.dispatchEvent(new CustomEvent('armorymove',{detail:-1}));
+    else if(button?.matches('[data-next]'))this.el.dispatchEvent(new CustomEvent('armorymove',{detail:1}));
+    else if(button?.matches('[data-fire]')){this.shootId=id;this.input.set({shoot:true});}
+    else if(x<r.left+r.width*.48&&!this.joyId){this.joyId=id;this.ox=x;this.oy=y;}
+    else if(!this.lookId){this.lookId=id;this.lx=x;this.ly=y;}
+  };
+  private movePoint=(id:number,x:number,y:number)=>{
+    if(id===this.joyId){const dx=Math.max(-52,Math.min(52,x-this.ox)),dy=Math.max(-52,Math.min(52,y-this.oy));this.input.set({moveX:dx/52,moveY:-dy/52});this.el.style.setProperty('--joy-x',`${dx}px`);this.el.style.setProperty('--joy-y',`${dy}px`);}
+    if(id===this.lookId){this.input.addLook(x-this.lx,y-this.ly);this.lx=x;this.ly=y;}
+  };
+  private end=(id:number)=>{if(id===this.joyId){this.joyId=null;this.input.set({moveX:0,moveY:0});this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');}if(id===this.lookId)this.lookId=null;if(id===this.shootId){this.shootId=null;this.input.set({shoot:false});}};
+  private onPointerDown=(e:PointerEvent)=>{e.preventDefault();this.begin(e.pointerId,e.clientX,e.clientY,e.target);this.el.setPointerCapture?.(e.pointerId);};
+  private onPointerMove=(e:PointerEvent)=>{e.preventDefault();this.movePoint(e.pointerId,e.clientX,e.clientY);};
+  private onPointerUp=(e:PointerEvent)=>{e.preventDefault();this.end(e.pointerId);};
+  private onTouchStart=(e:TouchEvent)=>{e.preventDefault();for(const touch of Array.from(e.changedTouches))this.begin(touch.identifier,touch.clientX,touch.clientY,e.target);};
+  private onTouchMove=(e:TouchEvent)=>{e.preventDefault();for(const touch of Array.from(e.changedTouches))this.movePoint(touch.identifier,touch.clientX,touch.clientY);};
+  private onTouchEnd=(e:TouchEvent)=>{e.preventDefault();for(const touch of Array.from(e.changedTouches))this.end(touch.identifier);};
+  constructor(private el:HTMLElement,private input:InputManager){
+    if(window.PointerEvent){el.addEventListener('pointerdown',this.onPointerDown,this.options);el.addEventListener('pointermove',this.onPointerMove,this.options);el.addEventListener('pointerup',this.onPointerUp,this.options);el.addEventListener('pointercancel',this.onPointerUp,this.options);}
+    else {el.addEventListener('touchstart',this.onTouchStart,this.options);el.addEventListener('touchmove',this.onTouchMove,this.options);el.addEventListener('touchend',this.onTouchEnd,this.options);el.addEventListener('touchcancel',this.onTouchEnd,this.options);}
+  }
+  dispose(){if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}}
+}
