@@ -1,0 +1,1 @@
+export const mobileMarkup=()=>`<div class="co-mobile"><div class="co-joy"><i></i><b></b></div><div class="co-actions"><button data-jump>JUMP</button><button data-reload>RLD</button><button data-weapon>AR</button><button data-fire>FIRE</button></div></div><div class="co-rotate">Rotate your device to play</div>`;

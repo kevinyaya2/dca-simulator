@@ -1,0 +1,3 @@
+import * as THREE from 'three';
+export type Box={minX:number,maxX:number,minZ:number,maxZ:number};
+export class CollisionSystem { constructor(public boxes:Box[],private heightAt:(x:number,z:number)=>number=()=>0){} groundHeight(x:number,z:number){return this.heightAt(x,z);} blocked(x:number,z:number,r=.42){return this.boxes.some(b=>x+r>b.minX&&x-r<b.maxX&&z+r>b.minZ&&z-r<b.maxZ);} rayBlocked(a:THREE.Vector3,b:THREE.Vector3){return !!this.firstWallHit(a,b.clone().sub(a).normalize(),a.distanceTo(b));} firstWallHit(a:THREE.Vector3,d:THREE.Vector3,max=30){for(let t=.3;t<max;t+=.22){const p=a.clone().addScaledVector(d,t);if(this.blocked(p.x,p.z,.04)&&p.y<3)return p;}return null;} }

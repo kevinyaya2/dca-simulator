@@ -1,0 +1,1 @@
+export class RespawnSystem { private timers=new Map<string,number>(); kill(id:string){this.timers.set(id,3);} update(dt:number,onRespawn:(id:string)=>void){for(const [id,t] of this.timers){if(t<=dt){this.timers.delete(id);onRespawn(id);}else this.timers.set(id,t-dt);}} }

@@ -1,0 +1,2 @@
+import * as THREE from 'three';
+export class SpawnSystem { private last=-1; constructor(private points:[number,number][]){} choose(enemies:{position:THREE.Vector3;alive:boolean}[]){let best=0,bestScore=-Infinity;this.points.forEach((p,i)=>{const near=enemies.filter(e=>e.alive).reduce((m,e)=>Math.min(m,Math.hypot(e.position.x-p[0],e.position.z-p[1])),140);const score=near-(i===this.last?45:0)+Math.random()*8;if(score>bestScore){bestScore=score;best=i;}});this.last=best;return this.points[best];} }

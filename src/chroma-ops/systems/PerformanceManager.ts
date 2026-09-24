@@ -1,0 +1,1 @@
+export class PerformanceManager { readonly pixelRatio:number; readonly impactLimit:number; constructor(){const coarse=matchMedia('(pointer:coarse)').matches; const low=(navigator.hardwareConcurrency||4)<=4; this.pixelRatio=Math.min(devicePixelRatio,coarse?(low?1:1.35):1.6);this.impactLimit=low?8:16;} }

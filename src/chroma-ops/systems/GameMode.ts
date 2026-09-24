@@ -1,0 +1,1 @@
+export interface GameMode { onKill():void;onDeath():void; readonly kills:number;readonly deaths:number; } export class FreeForAllMode implements GameMode { kills=0;deaths=0;onKill(){this.kills++}onDeath(){this.deaths++} }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Icon from "../components/icons/Icon";
 
 const APPS = [
+  { id: "chroma-ops", name: "CHROMA OPS", subtitle: "3D FPS", icon: "target", color: "linear-gradient(145deg, #ff4e7a, #526cff)", route: "/chroma-ops" },
   { id: "dca", name: "定期定額", subtitle: "DCA Simulator", icon: "wallet", color: "linear-gradient(145deg, #ff7fb0, #8bb8ff)", route: "/dca" },
   { id: "cards", name: "卡片組牌", subtitle: "Deck Builder", icon: "cards", color: "linear-gradient(145deg, #ffc870, #ff9860)", route: "/cards" },
   { id: "fight", name: "戰鬥遊戲", subtitle: "Fight Game", icon: "sword", color: "linear-gradient(145deg, #b89cff, #886cff)", route: "/fight" },

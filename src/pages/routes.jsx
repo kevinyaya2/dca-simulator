@@ -21,6 +21,7 @@ const OfficeTowerDefense = lazy(() => import("./officeDefense/OfficeTowerDefense
 const PocketSiege = lazy(() => import("./PocketSiege"));
 const KevinLifeRPG = lazy(() => import("./KevinLifeRPG"));
 const Stock = lazy(() => import("./Stock"));
+const ChromaOps = lazy(() => import("./ChromaOps"));
 
 const routes = [
   { path: "/", element: <Home />, title: "Home" },
@@ -44,6 +45,7 @@ const routes = [
   { path: "/pocket-siege", element: <PocketSiege />, title: "Pocket Siege" },
   { path: "/kevin-life", element: <KevinLifeRPG />, title: "Kevin Life RPG" },
   { path: "/stock", element: <Stock />, title: "Taiwan Stocks" },
+  { path: "/chroma-ops", element: <ChromaOps />, title: "CHROMA OPS" },
 ];
 
 export default routes;
