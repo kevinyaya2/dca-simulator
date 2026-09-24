@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Game } from "../chroma-ops/core/Game";
 import "./ChromaOps.css";
+import "./MobileControls.css";
 
 export default function ChromaOps() {
   const ref = useRef(null);
