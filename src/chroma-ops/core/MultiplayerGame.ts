@@ -41,7 +41,7 @@ export class MultiplayerGame{
   private radarCanvas:HTMLCanvasElement;private radarContext:CanvasRenderingContext2D;private radarPlayers=new Map<string,Net>();private radarTimer=0;
 
   constructor(private root:HTMLElement,private socket:Socket,private roomCode:string|undefined,private onFatal:(reason:string)=>void){
-    const performance=new PerformanceManager();this.renderer=new T.WebGLRenderer({antialias:!this.coarse,powerPreference:'high-performance'});this.renderer.setPixelRatio(performance.pixelRatio);this.renderer.setClearColor(0x16b9dc);root.append(this.renderer.domElement);
+    const performance=new PerformanceManager();this.renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(performance.pixelRatio);this.renderer.setClearColor(0x16b9dc);root.append(this.renderer.domElement);
     root.insertAdjacentHTML('beforeend','<div class="co-feedback"></div><div class="co-hud"></div><div class="co-mp-roster"></div><div class="co-minimap"><canvas aria-label="以自己為中心的戰術雷達"></canvas></div>'+mobileMarkup());
     this.radarCanvas=root.querySelector('.co-minimap canvas')!;this.radarContext=this.radarCanvas.getContext('2d')!;
     this.hud=new HUD(root.querySelector('.co-hud')!);this.feedback=new DamageFeedbackSystem(root.querySelector('.co-feedback')!);this.armory=new Armory(root,id=>this.socket.emit('match:weapon',id),()=>this.owned,this.restorePointerLock);

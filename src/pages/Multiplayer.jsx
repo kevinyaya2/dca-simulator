@@ -9,7 +9,18 @@ import './Armory.css';
 import './MobileControls.css';
 import './MultiplayerArena.css';
 
-const serverUrl = import.meta.env.VITE_GAME_SERVER_URL || 'http://127.0.0.1:3001';
+const PRODUCTION_GAME_SERVER_URL = 'https://dca-simulator-uw4r.onrender.com';
+const LOCAL_GAME_SERVER_URL = 'http://127.0.0.1:3001';
+const configuredServerUrl = import.meta.env.VITE_GAME_SERVER_URL?.trim().replace(/\/+$/, '');
+const isLocalServerUrl = (url) => /^https?:\/\/(localhost|127(?:\.\d+){3})(?::|\/|$)/i.test(url);
+
+// Vite injects VITE_* values at build time. Never allow a production bundle to
+// inherit a localhost URL from a developer shell or a missing env file.
+const serverUrl = import.meta.env.PROD
+  ? configuredServerUrl && !isLocalServerUrl(configuredServerUrl)
+    ? configuredServerUrl
+    : PRODUCTION_GAME_SERVER_URL
+  : configuredServerUrl || LOCAL_GAME_SERVER_URL;
 
 export default function Multiplayer({ onBack }) {
   const [screen, setScreen] = useState('join');

@@ -2,9 +2,16 @@
 
 ## CHROMA OPS Multiplayer
 
-Run the client with `npm run dev -- --host 0.0.0.0` and the Socket.IO server with `npm run server:dev`. The default server is `http://localhost:3001`; set `VITE_GAME_SERVER_URL` for another endpoint. For phone LAN testing, run `ipconfig`, use the PC IPv4 address in both the browser URL (`http://PC_IP:5173`) and `VITE_GAME_SERVER_URL=http://PC_IP:3001`.
+Run the client with `npm run dev -- --host 0.0.0.0` and the Socket.IO server with `npm run server:dev`. The default development server is `http://127.0.0.1:3001`; set `VITE_GAME_SERVER_URL` for another endpoint. For phone LAN testing, run `ipconfig`, use the PC IPv4 address in both the browser URL (`http://PC_IP:5173`) and `VITE_GAME_SERVER_URL=http://PC_IP:3001`.
 
-Production client remains GitHub Pages. Deploy the server separately with `npm run server:build` then `npm run server:start`, set `PORT`, `CORS_ORIGIN=https://kevinyaya2.github.io`, and set the Pages build environment `VITE_GAME_SERVER_URL=https://YOUR_SERVER`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
+Production client remains GitHub Pages and uses `VITE_GAME_SERVER_URL=https://dca-simulator-uw4r.onrender.com` from `.env.production`. `npm run deploy` now runs a fresh production build before publishing `dist` to the `gh-pages` branch, so do not deploy a previously generated `dist` directory manually.
+
+```bash
+npm install
+npm run deploy
+```
+
+Deploy the server separately with `npm run server:build` then `npm run server:start`, and configure Render with `PORT` plus `CORS_ORIGIN=https://kevinyaya2.github.io`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
 
 本專案是一個使用 **React + Vite** 建立的前端學習專案，  
 目標是模擬 **手機介面（Samsung One UI 風格）**，  
