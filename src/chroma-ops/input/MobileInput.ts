@@ -4,17 +4,18 @@ export class MobileInput {
   private joyId:number|null=null; private lookId:number|null=null; private shootId:number|null=null;
   private ox=0; private oy=0; private lx=0; private ly=0;
   private options={passive:false};
+  private resetControls=()=>{this.joyId=null;this.lookId=null;this.shootId=null;this.input.set({moveX:0,moveY:0,lookX:0,lookY:0,shoot:false});this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');};
+  private onVisibility=()=>{if(document.hidden)this.resetControls();};
   private begin=(id:number,x:number,y:number,target:EventTarget|null)=>{
     const r=this.el.getBoundingClientRect();
-    const button=target instanceof HTMLElement?target.closest('[data-fire],[data-jump],[data-reload],[data-weapon],[data-prev],[data-next]'):null;
+    if(target instanceof HTMLElement&&target.closest('.co-armory'))return;
+    const button=target instanceof HTMLElement?target.closest('[data-fire],[data-jump],[data-reload],[data-weapon]'):null;
     if(button?.matches('[data-jump]'))this.input.set({jump:true});
     else if(button?.matches('[data-reload]'))this.input.set({reload:true});
-    else if(button?.matches('[data-weapon]'))this.el.dispatchEvent(new CustomEvent('armory'));
-    else if(button?.matches('[data-prev]'))this.el.dispatchEvent(new CustomEvent('armorymove',{detail:-1}));
-    else if(button?.matches('[data-next]'))this.el.dispatchEvent(new CustomEvent('armorymove',{detail:1}));
+    else if(button?.matches('[data-weapon]')){this.resetControls();this.el.dispatchEvent(new CustomEvent('armory'));}
     else if(button?.matches('[data-fire]')){this.shootId=id;this.input.set({shoot:true});}
-    else if(x<r.left+r.width*.48&&!this.joyId){this.joyId=id;this.ox=x;this.oy=y;}
-    else if(!this.lookId){this.lookId=id;this.lx=x;this.ly=y;}
+    else if(x<r.left+r.width*.48&&this.joyId===null){this.joyId=id;this.ox=x;this.oy=y;}
+    else if(this.lookId===null){this.lookId=id;this.lx=x;this.ly=y;}
   };
   private movePoint=(id:number,x:number,y:number)=>{
     if(id===this.joyId){const dx=Math.max(-52,Math.min(52,x-this.ox)),dy=Math.max(-52,Math.min(52,y-this.oy));this.input.set({moveX:dx/52,moveY:-dy/52});this.el.style.setProperty('--joy-x',`${dx}px`);this.el.style.setProperty('--joy-y',`${dy}px`);}
@@ -30,6 +31,7 @@ export class MobileInput {
   constructor(private el:HTMLElement,private input:InputManager){
     if(window.PointerEvent){el.addEventListener('pointerdown',this.onPointerDown,this.options);el.addEventListener('pointermove',this.onPointerMove,this.options);el.addEventListener('pointerup',this.onPointerUp,this.options);el.addEventListener('pointercancel',this.onPointerUp,this.options);}
     else {el.addEventListener('touchstart',this.onTouchStart,this.options);el.addEventListener('touchmove',this.onTouchMove,this.options);el.addEventListener('touchend',this.onTouchEnd,this.options);el.addEventListener('touchcancel',this.onTouchEnd,this.options);}
+    window.addEventListener('blur',this.resetControls);window.addEventListener('orientationchange',this.resetControls);document.addEventListener('visibilitychange',this.onVisibility);
   }
-  dispose(){if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}}
+  dispose(){this.resetControls();if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}window.removeEventListener('blur',this.resetControls);window.removeEventListener('orientationchange',this.resetControls);document.removeEventListener('visibilitychange',this.onVisibility);}
 }

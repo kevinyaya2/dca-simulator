@@ -1,0 +1,1 @@
+export const MULTIPLAYER_PROTOCOL_VERSION = 2;
