@@ -5,6 +5,7 @@ export class MobileInput {
   private ox=0; private oy=0; private lx=0; private ly=0;
   private options={passive:false};
   private resetControls=()=>{this.joyId=null;this.lookId=null;this.shootId=null;this.input.set({moveX:0,moveY:0,lookX:0,lookY:0,shoot:false});this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');};
+  private stopShooting=()=>{this.shootId=null;this.input.set({shoot:false});};
   private onVisibility=()=>{if(document.hidden)this.resetControls();};
   private begin=(id:number,x:number,y:number,target:EventTarget|null)=>{
     const r=this.el.getBoundingClientRect();
@@ -12,7 +13,7 @@ export class MobileInput {
     const button=target instanceof HTMLElement?target.closest('[data-fire],[data-jump],[data-reload],[data-weapon]'):null;
     if(button?.matches('[data-jump]'))this.input.set({jump:true});
     else if(button?.matches('[data-reload]'))this.input.set({reload:true});
-    else if(button?.matches('[data-weapon]')){this.resetControls();this.el.dispatchEvent(new CustomEvent('armory'));}
+    else if(button?.matches('[data-weapon]')){this.stopShooting();this.el.dispatchEvent(new CustomEvent('armory'));}
     else if(button?.matches('[data-fire]')){this.shootId=id;this.input.set({shoot:true});}
     else if(x<r.left+r.width*.48&&this.joyId===null){this.joyId=id;this.ox=x;this.oy=y;}
     else if(this.lookId===null){this.lookId=id;this.lx=x;this.ly=y;}
