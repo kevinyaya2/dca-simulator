@@ -4,6 +4,7 @@ import Multiplayer from './Multiplayer';
 import MouseSensitivityControl from '../chroma-ops/ui/MouseSensitivityControl';
 import './ChromaOps.css';
 import './CombatFeedback.css';
+import '../chroma-ops/ui/BattleFeedback.css';
 import './ChromaMenu.css';
 import './Armory.css';
 import './MobileControls.css';

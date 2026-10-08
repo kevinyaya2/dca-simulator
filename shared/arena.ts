@@ -52,14 +52,28 @@ export function blocked(x: number, z: number, radius = PLAYER_RADIUS, feet = 0, 
 export function pointBlocked(x: number, y: number, z: number, radius = .04, boxes: readonly ArenaBox[] = ARENA_BOXES) {
   return boxes.some(box => y >= box.minY && y <= box.maxY && overlapsBox(x,z,box,radius));
 }
+// Slab intersection works for parallel rays and origins inside a solid.
+export function rayBoxDistance(origin:{x:number;y:number;z:number}, direction:{x:number;y:number;z:number},
+  box:{minX:number;maxX:number;minY:number;maxY:number;minZ:number;maxZ:number}, max:number):number|null {
+  let near=0,far=max;
+  for(const axis of ['X','Y','Z'] as const){
+    const key=axis.toLowerCase() as 'x'|'y'|'z', d=direction[key],o=origin[key];
+    if(Math.abs(d)<1e-9){if(o<box[`min${axis}`]||o>box[`max${axis}`])return null;continue;}
+    const a=(box[`min${axis}`]-o)/d,b=(box[`max${axis}`]-o)/d;
+    near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));
+    if(near>far)return null;
+  }
+  return near<=max?near:null;
+}
 export function rayWallDistance(origin: {x:number;y:number;z:number}, direction: {x:number;y:number;z:number}, max: number,
   world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }) {
-  // Small samples also account for the existing ramp/platform height field.
-  for (let distance=.04; distance<max; distance+=.1) {
-    const x=origin.x+direction.x*distance, y=origin.y+direction.y*distance, z=origin.z+direction.z*distance;
-    if(pointBlocked(x,y,z,.04,world.boxes) || y < world.heightAt(x,z)) return distance;
+  let nearest=max;
+  for(const box of world.boxes){const hit=rayBoxDistance(origin,direction,box,nearest);if(hit!==null)nearest=hit;}
+  // Only the height field is sampled; boxes are intersected once regardless of range.
+  for(let distance=0;distance<=nearest;distance+=.1){
+    if(origin.y+direction.y*distance<world.heightAt(origin.x+direction.x*distance,origin.z+direction.z*distance))return distance;
   }
-  return max;
+  return nearest;
 }
 function supportHeight(x: number, z: number, ceiling: number, world: SimWorld) {
   let height = world.heightAt(x,z);
@@ -69,7 +83,7 @@ function supportHeight(x: number, z: number, ceiling: number, world: SimWorld) {
   return height;
 }
 export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
-  world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }) {
+  world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }, moveScale=1) {
   if(!player.alive)return;
   player.yaw-=input.lookX*.0024;
   player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch-input.lookY*.0021));
@@ -83,7 +97,7 @@ export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
   let moveX=forwardX*input.moveY+Math.cos(player.yaw)*input.moveX;
   let moveZ=forwardZ*input.moveY-Math.sin(player.yaw)*input.moveX;
   const length=Math.hypot(moveX,moveZ);
-  if(length>0) { moveX=moveX/length*PLAYER_MOVE_SPEED; moveZ=moveZ/length*PLAYER_MOVE_SPEED; }
+  if(length>0) { moveX=moveX/length*PLAYER_MOVE_SPEED*moveScale; moveZ=moveZ/length*PLAYER_MOVE_SPEED*moveScale; }
   const duration=Math.max(0,Math.min(.25,dt));
   const steps=Math.max(1,Math.ceil(duration/(1/120))), h=duration/steps;
   for(let n=0;n<steps;n++) {

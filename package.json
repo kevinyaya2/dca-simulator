@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test:chroma": "tsx --test tests/chroma-ops.test.ts",
+    "test:chroma": "tsx --test tests/chroma-ops.test.ts tests/chroma-combat.test.ts",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",

@@ -119,6 +119,7 @@ export default function Multiplayer({ onBack }) {
           <p className="mp-result-eyebrow">比賽結束</p>
           <h1 id="mp-result-title">{isWinner ? '勝利！' : '戰鬥結束'}</h1>
           <p className="mp-result-winner"><b>{room?.winner || '未知玩家'}</b> 率先達成 10 次擊殺</p>
+          {room?.winnerTitle && <p className="mp-result-title">{room.winnerTitle}</p>}
           <div className="mp-result-ranking">
             <header><span>最終排名</span><span>擊殺／死亡</span></header>
             {ranked.map((player, index) => <div className={player.id === socket.id ? 'is-me' : ''} key={player.id}><span><i>{index + 1}</i>{player.name}{player.id === room?.winnerId && <em>勝者</em>}</span><strong>{player.kills}／{player.deaths}</strong></div>)}
