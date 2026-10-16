@@ -1,6 +1,6 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ARENA_BOXES, groundHeight, blocked, pointBlocked, rayWallDistance, stepPlayer, type SimPlayer, type SimInput } from '../shared/arena.ts';
+import { ARENA_BOXES, PLAYER_MOVE_SPEED, groundHeight, blocked, pointBlocked, rayWallDistance, stepPlayer, type SimPlayer, type SimInput } from '../shared/arena.ts';
 import { SAFE_SPAWNS, chooseRespawnPoint, chooseWeaponPoint } from '../shared/spawns.ts';
 import { Player } from '../src/chroma-ops/player/Player.ts';
 import { PlayerController } from '../src/chroma-ops/player/PlayerController.ts';
@@ -34,7 +34,7 @@ for(const [label,startX,z,height,targetX] of [['2m cover',-28,13,2,-22],['centra
     assert(p.x<targetX-(height===3?3:4)-.40,'walking is blocked by the side');
     stepPlayer(p,{...idle,jump:true},1/120);step(p,.475);stepPlayer(p,{...idle,jump:true},1/120);
     for(let n=0;n<90;n++)stepPlayer(p,{...idle,moveX:p.x<targetX?1:0},1/120);
-    step(p,.75);assert(Math.abs(p.x-targetX)<.07);assert.equal(p.y,height+1.65);assert.equal(p.jumpsUsed,0);
+    step(p,.75);assert(Math.abs(p.x-targetX)<PLAYER_MOVE_SPEED/120+1e-8,'stops within one movement frame of the target');assert.equal(p.y,height+1.65);assert.equal(p.jumpsUsed,0);
     stepPlayer(p,{...idle,jump:true},1/120);assert.equal(p.jumpsUsed,1);assert(p.y>height+1.65);
   });
 }
@@ -46,8 +46,8 @@ test('double jump cannot climb a 4m wall; movement cannot tunnel at low frame ra
 });
 
 test('existing ramps remain walkable and raised platform sides do not teleport players',()=>{
-  const p=player(-20,39);step(p,4,{moveY:-1});assert(p.z>52);assert.equal(p.y,13.65);
-  const q=player(-39,104);step(q,9,{moveX:1});assert(q.x>-12);assert.equal(q.y,7.65);
+  const p=player(-20,39);step(p,2,{moveY:-1});assert(p.z>52);assert.equal(p.y,13.65);
+  const q=player(-39,104);step(q,4.5,{moveX:1});assert(q.x>-12);assert.equal(q.y,7.65);
   const r=player(24,60);step(r,1,{moveX:-1});assert(r.x>=22);assert.equal(r.y,1.65);
 });
 

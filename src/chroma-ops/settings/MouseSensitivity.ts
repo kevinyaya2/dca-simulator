@@ -1,6 +1,6 @@
 export const DEFAULT_MOUSE_SENSITIVITY = 2;
 export const MIN_MOUSE_SENSITIVITY = 0.5;
-export const MAX_MOUSE_SENSITIVITY = 4;
+export const MAX_MOUSE_SENSITIVITY = 16;
 export const MOUSE_SENSITIVITY_STEP = 0.1;
 export const MOUSE_SENSITIVITY_KEY = 'chroma-mouse-sensitivity';
 
