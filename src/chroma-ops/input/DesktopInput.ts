@@ -4,7 +4,9 @@ import { getMouseSensitivity } from '../settings/MouseSensitivity';
 export class DesktopInput {
   private keys = new Set<string>();
   private enabled = true;
-  private get canPlay() { return this.enabled && document.pointerLockElement === this.el && !this.el.querySelector('.co-armory:not([hidden])'); }
+  private get canPlay() { return this.enabled && document.pointerLockElement === this.el; }
+  private get armoryOpen(){return !!this.el.querySelector('.co-armory:not([hidden])');}
+  private clearCombat=()=>this.input.clearCombat();
   private reset = () => { this.keys.clear(); this.input.reset(); };
   private onLockChange = () => {
     this.reset();
@@ -13,7 +15,9 @@ export class DesktopInput {
   private onKey = (event: KeyboardEvent) => {
     const key = event.key.toLowerCase();
     if (event.type === 'keyup') { this.keys.delete(key); return; }
-    if (!this.canPlay || (event.target instanceof HTMLElement && event.target.closest('input, button, textarea, select, [contenteditable]'))) return;
+    const movement=['w','a','s','d','shift'].includes(key);
+    if(!this.canPlay||(event.target instanceof HTMLElement&&event.target.closest(movement?'input, textarea, select, [contenteditable]':'input, button, textarea, select, [contenteditable]')))return;
+    if(this.armoryOpen&&!movement)return;
     if (!['w', 'a', 's', 'd', ' ', 'r', 'q', '1', '2', '3', '4', '5', '6', '7', 'shift'].includes(key)) return;
     event.preventDefault();
     const firstPress=!event.repeat&&!this.keys.has(key);
@@ -23,14 +27,14 @@ export class DesktopInput {
     if (/^[1-7]$/.test(key)) this.input.set({ switchWeapon: +key });
   };
   private onMove = (event: MouseEvent) => {
-    if (this.canPlay) {
+    if (this.canPlay&&!this.armoryOpen) {
       const sensitivity = getMouseSensitivity();
       this.input.addLook(event.movementX * sensitivity, event.movementY * sensitivity);
     }
   };
   private onDown = (event: MouseEvent) => {
-    if(event.button===2&&this.canPlay){event.preventDefault();this.input.set({aim:true});}
-    if (event.button === 0 && this.canPlay && !(event.target instanceof HTMLElement && event.target.closest('[data-game-ui], .co-armory, button, input'))) {
+    if(event.button===2&&this.canPlay&&!this.armoryOpen){event.preventDefault();this.input.set({aim:true});}
+    if (event.button === 0 && this.canPlay && !this.armoryOpen && !(event.target instanceof HTMLElement && event.target.closest('[data-game-ui], .co-armory, button, input'))) {
       this.input.set({ shoot: true });
     }
   };
@@ -43,6 +47,7 @@ export class DesktopInput {
     document.addEventListener('mousemove', this.onMove);
     el.addEventListener('contextmenu',this.onContext);
     el.addEventListener('combat:reset',this.reset);
+    el.addEventListener('armory:open',this.clearCombat);
     document.addEventListener('visibilitychange',this.onVisibility);
     el.tabIndex = -1;
     document.addEventListener('pointerlockchange', this.onLockChange);
@@ -68,6 +73,7 @@ export class DesktopInput {
     window.removeEventListener('blur', this.reset);
     this.el.removeEventListener('contextmenu',this.onContext);
     this.el.removeEventListener('combat:reset',this.reset);
+    this.el.removeEventListener('armory:open',this.clearCombat);
     document.removeEventListener('visibilitychange',this.onVisibility);
     this.el.removeEventListener('mousedown', this.onDown);
     window.removeEventListener('mouseup', this.onUp);

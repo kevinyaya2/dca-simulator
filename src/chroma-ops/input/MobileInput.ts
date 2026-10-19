@@ -9,6 +9,7 @@ export class MobileInput {
   private ox=0; private oy=0; private lx=0; private ly=0;
   private options={passive:false};
   reset=()=>{this.joyId=null;this.lookId=null;this.shootId=null;this.input.reset();this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');};
+  private clearCombat=()=>{this.lookId=null;this.shootId=null;this.input.clearCombat();};
   private stopShooting=()=>{this.shootId=null;this.input.set({shoot:false});};
   private onVisibility=()=>{if(document.hidden)this.reset();};
   private begin=(id:number,x:number,y:number,target:EventTarget|null)=>{
@@ -31,16 +32,17 @@ export class MobileInput {
   };
   private end=(id:number)=>{if(id===this.joyId){this.joyId=null;this.input.set({moveX:0,moveY:0});this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');}if(id===this.lookId)this.lookId=null;if(id===this.shootId){this.shootId=null;this.input.set({shoot:false});}};
   private onPointerDown=(e:PointerEvent)=>{if(!this.enabled||!this.isGameTarget(e.target))return;e.preventDefault();this.begin(e.pointerId,e.clientX,e.clientY,e.target);this.el.setPointerCapture?.(e.pointerId);};
-  private onPointerMove=(e:PointerEvent)=>{if(!this.enabled||!this.isGameTarget(e.target))return;e.preventDefault();this.movePoint(e.pointerId,e.clientX,e.clientY);};
+  private onPointerMove=(e:PointerEvent)=>{if(!this.enabled||(e.pointerId!==this.joyId&&!this.isGameTarget(e.target)))return;e.preventDefault();this.movePoint(e.pointerId,e.clientX,e.clientY);};
   private onPointerUp=(e:PointerEvent)=>{if(this.enabled&&this.isGameTarget(e.target))e.preventDefault();this.end(e.pointerId);};
   private onTouchStart=(e:TouchEvent)=>{if(!this.enabled||!this.isGameTarget(e.target))return;e.preventDefault();for(const touch of Array.from(e.changedTouches))this.begin(touch.identifier,touch.clientX,touch.clientY,e.target);};
-  private onTouchMove=(e:TouchEvent)=>{if(!this.enabled||!this.isGameTarget(e.target))return;e.preventDefault();for(const touch of Array.from(e.changedTouches))this.movePoint(touch.identifier,touch.clientX,touch.clientY);};
+  private onTouchMove=(e:TouchEvent)=>{if(!this.enabled)return;for(const touch of Array.from(e.changedTouches)){if(touch.identifier!==this.joyId&&!this.isGameTarget(e.target))continue;e.preventDefault();this.movePoint(touch.identifier,touch.clientX,touch.clientY);}};
   private onTouchEnd=(e:TouchEvent)=>{if(this.enabled&&this.isGameTarget(e.target))e.preventDefault();for(const touch of Array.from(e.changedTouches))this.end(touch.identifier);};
   constructor(private el:HTMLElement,private input:InputManager){
     if(window.PointerEvent){el.addEventListener('pointerdown',this.onPointerDown,this.options);el.addEventListener('pointermove',this.onPointerMove,this.options);el.addEventListener('pointerup',this.onPointerUp,this.options);el.addEventListener('pointercancel',this.onPointerUp,this.options);}
     else {el.addEventListener('touchstart',this.onTouchStart,this.options);el.addEventListener('touchmove',this.onTouchMove,this.options);el.addEventListener('touchend',this.onTouchEnd,this.options);el.addEventListener('touchcancel',this.onTouchEnd,this.options);}
     el.addEventListener('combat:reset',this.reset);
+    el.addEventListener('armory:open',this.clearCombat);
     window.addEventListener('blur',this.reset);window.addEventListener('orientationchange',this.reset);document.addEventListener('visibilitychange',this.onVisibility);
   }
-  dispose(){this.el.removeEventListener('combat:reset',this.reset);this.reset();if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}window.removeEventListener('blur',this.reset);window.removeEventListener('orientationchange',this.reset);document.removeEventListener('visibilitychange',this.onVisibility);}
+  dispose(){this.el.removeEventListener('armory:open',this.clearCombat);this.el.removeEventListener('combat:reset',this.reset);this.reset();if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}window.removeEventListener('blur',this.reset);window.removeEventListener('orientationchange',this.reset);document.removeEventListener('visibilitychange',this.onVisibility);}
 }

@@ -50,7 +50,7 @@ export class Game{
   private update(dt:number){this.elapsed+=dt;this.desktop?.update();this.updateStatuses(dt);const input=this.input.getState();if(input.switchWeapon){const id=WEAPON_IDS[input.switchWeapon-1];if(id&&this.owned.has(id)){this.input.set({aim:false});input.aim=false;this.active=id;}}const weapon=this.weapons.get(this.active)!;if(input.reload)weapon.reload();
     const blocked=this.armory.isOpen||!!this.settings?.isOpen;
     if(this.active!=='sniper'||weapon.reloading||input.sprint||!this.player.alive||blocked){this.input.set({aim:false});input.aim=false;}
-    if(blocked){input.sprint=false;input.shoot=false;this.input.set({sprint:false,aim:false});}
+    if(blocked){input.shoot=false;this.input.clearCombat();}
     this.aiming=this.scope.update(this.active,input,this.player.alive,weapon.reloading,blocked);
     if(this.aiming){input.lookX*=.25;input.lookY*=.25;}
     this.controller.update(this.player,input,dt,this.collision,(this.status.get('player')?.slowUntil??0)>this.elapsed?.65:1,this.elapsed-dt);this.arena.update(this.elapsed);if(!this.armory.isOpen&&weapon.update(dt,input.shoot&&this.player.alive).fired)this.fire();this.pickups.forEach(p=>{p.mesh.rotation.y+=dt*2;if(p.cooldown>0){p.cooldown-=dt;if(p.cooldown<=0)this.respawnPickup(p);}else if(this.player.position.distanceTo(p.position)<2){this.owned.add(p.id);this.active=p.id;this.input.set({aim:false});this.aiming=false;p.cooldown=30;p.mesh.visible=false;this.notice=`取得 ${WEAPON_SPECS[p.id].label}`;this.noticeT=1.5;this.armory.render(this.active);}});

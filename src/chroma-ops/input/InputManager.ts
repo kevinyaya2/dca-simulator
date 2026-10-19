@@ -11,6 +11,9 @@ export class InputManager {
   getState():InputState { const s={...this.state}; this.state.lookX=0; this.state.lookY=0; this.state.jump=false; this.state.reload=false; this.state.switchWeapon=0; return s; }
   get aiming(){return !!this.state.aim;}
   get sprinting(){return !!this.state.sprint;}
+  clearCombat() {
+    this.set({shoot:false,aim:false,lookX:0,lookY:0,jump:false,reload:false,switchWeapon:0});
+  }
   reset() {
     const changed=this.state.moveX||this.state.moveY||this.state.sprint||this.state.aim||this.state.shoot||this.state.jump;
     this.state=emptyInput();

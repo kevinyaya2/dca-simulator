@@ -117,7 +117,7 @@ export class MultiplayerGame{
     const blocked=this.armory.isOpen||!!this.settings?.isOpen||this.paused;
     const reloadingNow=this.weapons[this.active].reloadUntil>this.serverNow();
     if(this.active!=='sniper'||reloadingNow||input.reload||input.switchWeapon||input.sprint||!this.player.alive||blocked||this.awaitingWeapon){this.input.set({aim:false});input.aim=false;}
-    if(blocked){input.sprint=false;input.shoot=false;this.input.set({sprint:false,aim:false});}
+    if(blocked){input.shoot=false;this.input.clearCombat();}
     const aiming=this.scope.update(this.active,input,this.player.alive,reloadingNow,blocked);
     if(aiming){input.lookX*=.25;input.lookY*=.25;}
     const yaw=this.player.yaw-input.lookX*.0024,pitch=clamp(this.player.pitch-input.lookY*.0021,-1.35,1.35),command:Command={roundId:this.roundId,seq:++this.seq,clientTime:this.serverNow(),moveX:input.moveX,moveY:input.moveY,yaw,pitch,jump:input.jump,reload:input.reload,sprint:!!input.sprint,aim:aiming};this.pending.push({...command,dt});while(this.pending.length>180)this.pending.shift();this.predict(command,dt);this.socket.emit('match:input',command);const forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),rightX=Math.cos(yaw),rightZ=-Math.sin(yaw);this.moveIntent.set(forwardX*input.moveY+rightX*input.moveX,0,forwardZ*input.moveY+rightZ*input.moveX);if(this.moveIntent.lengthSq()>.0001)this.moveIntent.normalize();

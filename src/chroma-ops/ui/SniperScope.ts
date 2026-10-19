@@ -33,7 +33,7 @@ export class SniperScope {
     const barrel=new T.Mesh(new T.BoxGeometry(.1,.1,1.6),new T.MeshBasicMaterial({color:0x10141e}));barrel.position.set(.34,-.25,-1.15);
     const optic=new T.Mesh(new T.CylinderGeometry(.09,.09,.34,6),new T.MeshBasicMaterial({color:0x080b10}));optic.rotation.x=Math.PI/2;optic.position.set(.34,-.12,-.7);
     this.gunParts.add(barrel,optic);gun.add(this.gunParts);this.gunParts.visible=false;
-    root.addEventListener('combat:reset',this.reset);
+    root.addEventListener('combat:reset',this.reset);root.addEventListener('armory:open',this.reset);
   }
 
   private reset=()=>{this.scoped=false;this.shell.hidden=true;this.root.classList.remove('co-scoped');};
@@ -41,7 +41,7 @@ export class SniperScope {
   update(id:WeaponId,input:InputState,alive:boolean,reloading:boolean,blocked:boolean) {
     this.scoped=id==='sniper'&&!!input.aim&&!input.sprint&&alive&&!reloading&&!blocked;
     this.shell.hidden=!this.scoped;this.root.classList.toggle('co-scoped',this.scoped);
-    this.root.querySelector('[data-sprint]')?.setAttribute('aria-pressed',String(!!input.sprint&&alive&&!blocked));
+    this.root.querySelector('[data-sprint]')?.setAttribute('aria-pressed',String(!!input.sprint&&alive));
     const aim=this.root.querySelector<HTMLButtonElement>('[data-aim]');
     if(aim){aim.disabled=id!=='sniper';aim.setAttribute('aria-pressed',String(this.scoped));}
     this.gunParts.visible=id==='sniper';
@@ -70,7 +70,7 @@ export class SniperScope {
   }
 
   dispose() {
-    this.root.removeEventListener('combat:reset',this.reset);this.reset();this.shell.remove();
+    this.root.removeEventListener('combat:reset',this.reset);this.root.removeEventListener('armory:open',this.reset);this.reset();this.shell.remove();
     this.target.dispose();this.plane.geometry.dispose();this.material.dispose();
     this.gunParts.traverse(object=>{if(object instanceof T.Mesh){object.geometry.dispose();(object.material as T.Material).dispose();}});
     this.gun.remove(this.gunParts);
