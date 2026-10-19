@@ -1,7 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ARENA_BOXES, PLAYER_MOVE_SPEED, groundHeight, blocked, pointBlocked, rayWallDistance, stepPlayer, type SimPlayer, type SimInput } from '../shared/arena.ts';
-import { SAFE_SPAWNS, chooseRespawnPoint, chooseWeaponPoint } from '../shared/spawns.ts';
+import { SAFE_SPAWNS, WEAPON_POINTS, chooseRespawnPoint, chooseWeaponPoint } from '../shared/spawns.ts';
 import { Player } from '../src/chroma-ops/player/Player.ts';
 import { PlayerController } from '../src/chroma-ops/player/PlayerController.ts';
 import { CollisionSystem } from '../src/chroma-ops/systems/CollisionSystem.ts';
@@ -88,14 +88,14 @@ test('respawns are random within safe candidates and do not repeat each characte
 
 test('weapons avoid players, available pickups and previous point; saturation returns no unsafe point',()=>{
   const occupied=SAFE_SPAWNS.slice(0,9).map(([x,z])=>({x,z,alive:true}));
-  const pickups=SAFE_SPAWNS.slice(9,13).map(([x,z])=>({x,z}));const previous=SAFE_SPAWNS[13];
+  const pickups=SAFE_SPAWNS.slice(9,13).map(([x,z])=>({x,z}));const previous=WEAPON_POINTS[13];
   const seen=new Set();for(let n=0;n<2000;n++){
     const point=chooseWeaponPoint(occupied,pickups,previous,()=>n/2000);assert(point);assert.notDeepEqual(point,previous);
-    for(const other of [...occupied,...pickups])assert(Math.hypot(point[0]-other.x,point[1]-other.z)>=8);
-    assert(SAFE_SPAWNS.some(candidate=>candidate[0]===point[0]&&candidate[1]===point[1]));seen.add(point.join(','));
+    for(const other of [...occupied,...pickups])assert(Math.hypot(point.x-other.x,point.y,point.z-other.z)>=8);
+    assert(WEAPON_POINTS.some(candidate=>candidate.x===point.x&&candidate.y===point.y&&candidate.z===point.z));seen.add(JSON.stringify(point));
   }
   assert(seen.size>=5);
-  assert.equal(chooseWeaponPoint(SAFE_SPAWNS.map(([x,z])=>({x,z})),[]),null);
+  assert.equal(chooseWeaponPoint(WEAPON_POINTS,[]),null);
 });
 
 test('single-player spawn history is stored per character',()=>{

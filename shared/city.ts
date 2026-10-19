@@ -1,6 +1,9 @@
 import type { ArenaBox } from './arena.js';
 
-export const CITY_BUILDINGS=[{x:-65,z:45,color:0x35c955,name:'WEST ARCADE',side:-1},{x:68,z:44,color:0x19aee1,name:'EAST STATION',side:1}];
+export const CITY_BUILDINGS=[{x:-65,z:45,color:0x35c955,name:'WEST ARCADE',side:-1},{x:68,z:44,color:0x19aee1,name:'EAST STATION',side:1},
+  {x:-68,z:-47,color:0xee3c87,name:'PINK GALLERY',side:-1},{x:66,z:-48,color:0xf1a72c,name:'SUN MARKET',side:1},
+  ...[-1,1].flatMap(side=>[-90,-12,92].map((z,i)=>({x:side*112,z,color:[0x9864df,0xf17738,0x26b9ad][i],name:`${side<0?'WEST':'EAST'} ${['STUDIO','SHOPS','GARDEN'][i]}`,side}))),
+];
 export const cityBox=(x:number,z:number,w:number,d:number,top:number,color:number,bottom=0):ArenaBox=>
   ({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2,minY:bottom,maxY:top,color});
 export type CityRamp={x:number;z0:number;z1:number;from:number;to:number;width:number};
@@ -67,14 +70,14 @@ for(const top of [6,12])structures.push(cityBox(68,31,4,2,top,0xe9edf1,top-.3));
 for(const x of [65,71])structures.push(cityBox(x,25,.35,.35,14,0x6678ae));
 export const CITY_BOXES=structures;
 
-export const CITY_GARDENS=[[-42,-65],[40,-65],[-45,18],[46,20],[-112,70],[115,65],[-30,112],[38,112]] as const;
-export const CITY_LAMPS=[[-50,-64],[50,-64],[-38,36],[38,36],[-100,12],[105,-10],[-40,80],[42,80],[-16,-90],[16,-90]] as const;
+export const CITY_GARDENS=[[-42,-65],[40,-65],[-45,18],[46,20],[-112,64],[115,65],[-30,112],[38,112]] as const;
+export const CITY_LAMPS=[[-50,-64],[50,-64],[-38,36],[38,36],[-119,18],[119,18],[-40,80],[42,80],[-16,-90],[16,-90]] as const;
 export const CITY_PROPS:ArenaBox[]=[
   ...CITY_GARDENS.map(([x,z])=>cityBox(x,z,5,5,.8,0xf04b94)),
-  ...[[-40,5],[40,3],[-105,72],[108,68]].flatMap(([x,z])=>[
+  ...[[-40,5],[40,3],[-105,68],[108,68]].flatMap(([x,z])=>[
     cityBox(x,z,4,1,.65,0xffc330),cityBox(x,z+.5,4,.2,1.3,0xffc330,.65),
   ]),
   ...CITY_LAMPS.map(([x,z])=>cityBox(x,z,.25,.25,4.6,0xd7e4f0)),
 ];
-export const CITY_SPAWNS:[number,number][]=[[-132,-106],[-104,-122],[-148,-36],[-130,84],[-78,112],[-26,-116],[28,-122],[84,-106],[138,-82],[142,-18],[126,62],[82,112],[18,126],[-42,112],[-96,58],[-108,-42],[-36,-32],[34,34],[100,12],[-40,8]];
+export const CITY_SPAWNS:[number,number][]=[[-140,-114],[-104,-122],[-148,-36],[-140,75],[-78,112],[-26,-116],[28,-122],[84,-106],[140,-100],[145,-36],[126,62],[82,112],[18,126],[-42,112],[-96,58],[-112,-48],[-36,-54],[30,32],[120,24],[-56,8]];
 export const CITY_WAYPOINTS:[number,number][]=[[-130,-100],[-92,-42],[-45,30],[-65,45],[-65,62],[0,32],[68,44],[68,62],[110,60],[120,-18],[88,-74],[20,-102],[-25,-54],[-112,45],[-12,104],[35,35]];

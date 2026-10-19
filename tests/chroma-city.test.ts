@@ -31,8 +31,8 @@ for(const b of CITY_BUILDINGS){
       travel(p,b.x-3.5,b.z+.9);travel(p,b.x-3.5,b.z-9);near(p.y,base+6+1.65);
       if(base===0)travel(p,b.x-7.5,b.z-9);
     }
-    const first=CITY_RAMPS.find(r=>r.from===0&&Math.abs(r.x-b.x)<20)!;
-    const second=CITY_RAMPS.find(r=>r.from===6&&Math.abs(r.x-b.x)<25)!;
+    const first=CITY_RAMPS.find(r=>r.from===0&&r.z0===b.z+25&&Math.abs(r.x-b.x)<20)!;
+    const second=CITY_RAMPS.find(r=>r.from===6&&r.z0===b.z+1&&Math.abs(r.x-b.x)<25)!;
     const q=player(first.x,first.z0+1);travel(q,first.x,first.z1);near(q.y,7.65);
     travel(q,b.x+b.side*10,b.z+1);near(q.y,7.65);
     travel(q,first.x,first.z1);
@@ -53,7 +53,7 @@ test('the middle skywalk has continuous access from both buildings and a clear s
   const west=CITY_BUILDINGS[0],east=CITY_BUILDINGS[1];
   const p=player(west.x+10,west.z,6);
   travel(p,-44,45);travel(p,-44,36);travel(p,44,36);travel(p,44,44);travel(p,east.x-10,44);near(p.y,7.65);
-  const street=player(0,30);travel(street,0,40);near(street.y,1.65);
+  const street=player(8,30);travel(street,8,40);near(street.y,1.65);
   assert.equal(blocked(0,36),false);
 });
 

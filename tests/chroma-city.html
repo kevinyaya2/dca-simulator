@@ -4,7 +4,7 @@
 <style>body{margin:0}nav{position:fixed;z-index:30;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;max-width:80vw;font:12px Arial}nav button,nav output{padding:8px;border:1px solid #ffffff66;border-radius:6px;background:#172447;color:white}</style></head>
 <body><main class="chroma-ops" id="game"></main><nav data-game-ui>
 <button id="city">City overview</button><button id="building">Building entrance</button><button id="lift">Lift entrance</button><button id="wheel">Wheel</button>
-<button id="day">Day</button><button id="dusk">Dusk</button><button id="night">Night</button><button id="dawn">Dawn</button><button id="scope">Scope</button><button id="mobile">844 x 390</button><button id="pause">Check settings pause</button><output id="status">Starting</output></nav>
+<button id="mall">B1 mall</button><button id="north">B1 ramp</button><button id="shops">Outer buildings</button><button id="day">Day</button><button id="dusk">Dusk</button><button id="night">Night</button><button id="dawn">Dawn</button><button id="scope">Scope</button><button id="mobile">844 x 390</button><button id="pause">Check settings pause</button><output id="status">Starting</output></nav>
 <script type="module">
 // Development fixture using the production game, renderer, HUD and lens. Excluded from builds.
 import '../src/pages/ChromaOps.css';
@@ -18,12 +18,16 @@ import { dayNightAt } from '../shared/dayNight.ts';
 const root=document.querySelector('#game'),status=document.querySelector('#status'),game=new Game(root);
 game.desktop?.dispose();game.desktop=undefined;game.mobile?.dispose();game.mobile=undefined;
 game.bots.forEach(bot=>{bot.alive=false;bot.group.visible=false;});game.owned.add('sniper');
+game.pickups.forEach(p=>{p.cooldown=Infinity;p.mesh.visible=false;});
 game.renderer.info.autoReset=false;
 const draw=()=>{game.renderer.info.reset();game.update(0);const info=game.renderer.info;status.textContent=`${dayNightAt(game.elapsed).phase} | ${info.render.calls} draws | ${info.render.triangles} triangles | ${info.memory.geometries} geometries`;};
 const view=(x,y,z,yaw,pitch)=>{game.input.reset();game.active='sniper';game.player.position.set(x,y,z);game.player.yaw=yaw;game.player.pitch=pitch;game.player.velocityY=0;draw();};
 document.querySelector('#city').onclick=()=>view(0,48,134,0,-.4);
 document.querySelector('#building').onclick=()=>view(-65,1.65,76,0,0);
 document.querySelector('#lift').onclick=()=>view(68,1.65,22,Math.PI,0);
+document.querySelector('#mall').onclick=()=>view(-64,-4.35,18,-1.1,0);
+document.querySelector('#north').onclick=()=>view(0,1.65,-52,Math.PI,-.18);
+document.querySelector('#shops').onclick=()=>view(112,1.65,120,0,.08);
 document.querySelector('#wheel').onclick=()=>view(0,1.65,-54,0,.4);
 for(const [id,time] of [['day',30],['dusk',105],['night',150],['dawn',225]])document.querySelector('#'+id).onclick=()=>{game.elapsed=time;draw();};
 document.querySelector('#scope').onclick=()=>{game.input.set({aim:!game.aiming});draw();};

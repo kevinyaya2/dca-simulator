@@ -1,6 +1,7 @@
+import { MALL_BOXES, undergroundHeight } from './underground.js';
 import { WHEEL_SUPPORTS } from './ferrisWheel.js';
 import { movingBoxes, platformPosition, supportingPlatform } from './movingPlatforms.js';
-import { CITY_BOXES, CITY_PROPS, CITY_SPAWNS, cityRampHeight } from './city.js';
+import { CITY_BOXES, CITY_PROPS, CITY_SPAWNS, CITY_BUILDINGS, cityRampHeight } from './city.js';
 export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number };
 export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean; sprint?: boolean; aim?: boolean };
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
@@ -17,31 +18,22 @@ export const GRAVITY = 14;
 export const MAX_STEP_HEIGHT = 0.35;
 const EPSILON = 0.0001;
 export const ARENA_SPAWNS: [number,number][] = CITY_SPAWNS;
-export const ARENA_BUILDINGS = [
-  { x: -65, z: 45, color: 0x35c955, openSouth: true },
-  { x: 68, z: 44, color: 0x19aee1, openSouth: true },
-  { x: -68, z: -47, color: 0xee3c87, openSouth: false },
-  { x: 66, z: -48, color: 0xf1a72c, openSouth: false },
-];
+export const ARENA_BUILDINGS = CITY_BUILDINGS.map(b=>({...b,openSouth:true}));
 const rect = (x: number, z: number, w: number, d: number, h: number, color: number, minY = 0): ArenaBox =>
   ({ minX: x-w/2, maxX: x+w/2, minZ: z-d/2, maxZ: z+d/2, minY, maxY: minY+h, color });
 export const ARENA_BOXES: ArenaBox[] = [
-  ...WHEEL_SUPPORTS,...CITY_BOXES,...CITY_PROPS,
+  ...WHEEL_SUPPORTS,...CITY_BOXES,...CITY_PROPS,...MALL_BOXES,
   rect(-152,0,4,280,19,0x2d58c8), rect(152,0,4,280,19,0xec3478),
   rect(0,-138,308,4,17,0xf3a72d), rect(0,138,308,4,17,0x35c955),
   rect(0,-3,6,6,3,0xf04b55), rect(-22,13,8,3,2,0xffb738),
   rect(24,-14,8,3,2,0x4b75e8), rect(-3,20,3,8,2,0x7a4bd5), rect(5,-25,3,8,2,0x35c955),
-  ...ARENA_BUILDINGS.filter(b=>!b.openSouth).flatMap(b => [
-    rect(b.x-11,b.z,3,24,11,b.color), rect(b.x+11,b.z,3,24,11,b.color),
-    rect(b.x,b.z+(b.openSouth?-11:11),20,3,11,b.color), rect(b.x,b.z,20,20,.5,b.color,10.75),
-  ]),
   rect(-40,-8,12,2,4,0x8d55d5), rect(-34,-19,2,18,4,0x8d55d5), rect(-49,-19,2,18,4,0x8d55d5),
   rect(42,10,13,2,4,0xef4c7b), rect(36,20,2,18,4,0xef4c7b), rect(49,20,2,18,4,0xef4c7b),
   rect(-43,-34,4,4,2,0xffc330), rect(42,34,4,4,2,0x35c955),
-  rect(-110,24,18,3,3,0x4b75e8), rect(110,-28,18,3,3,0xffb738), rect(-12,92,32,3,3,0x35c955),
+  rect(-12,92,32,3,3,0x35c955),
 ];
 export function arenaWorld(seconds:number):SimWorld {
-  return {boxes:[...ARENA_BOXES,...movingBoxes(seconds)],heightAt:groundHeight};
+  return {boxes:[...ARENA_BOXES,...movingBoxes(seconds)],heightAt:terrainHeight};
 }
 export function groundHeight(x: number, z: number) {
   const ramp=cityRampHeight(x,z);if(ramp!==null)return ramp;
@@ -51,11 +43,23 @@ export function groundHeight(x: number, z: number) {
   if(x>-38&&x<=-12&&z>88&&z<112)return Math.max(0,(x+38)/26*6);
   return 0;
 }
+// Ground surface remains available for ground-only spawns; physics can also support floors below it.
+export function terrainHeight(x:number,z:number){return undergroundHeight(x,z)??groundHeight(x,z);}
+const spatialCells=new Map<string,ArenaBox[]>();
+for(const box of ARENA_BOXES)for(let x=Math.floor(box.minX/16);x<=Math.floor(box.maxX/16);x++)for(let z=Math.floor(box.minZ/16);z<=Math.floor(box.maxZ/16);z++){
+  const key=`${x},${z}`,cell=spatialCells.get(key)||[];cell.push(box);spatialCells.set(key,cell);
+}
+export function arenaBoxesNear(x:number,z:number,radius=1){
+  const found=new Set<ArenaBox>();
+  for(let ix=Math.floor((x-radius)/16);ix<=Math.floor((x+radius)/16);ix++)for(let iz=Math.floor((z-radius)/16);iz<=Math.floor((z+radius)/16);iz++)for(const box of spatialCells.get(`${ix},${iz}`)||[])found.add(box);
+  return [...found];
+}
 export function overlapsBox(x: number, z: number, box: ArenaBox, radius = PLAYER_RADIUS) {
   const dx = Math.max(box.minX-x, 0, x-box.maxX), dz = Math.max(box.minZ-z, 0, z-box.maxZ);
   return dx*dx + dz*dz < radius*radius;
 }
 export function blocked(x: number, z: number, radius = PLAYER_RADIUS, feet = 0, boxes: readonly ArenaBox[] = ARENA_BOXES) {
+  if(boxes===ARENA_BOXES)boxes=arenaBoxesNear(x,z,radius);
   return boxes.some(box => overlapsBox(x,z,box,radius) && feet < box.maxY-EPSILON && feet+PLAYER_BODY_HEIGHT > box.minY+EPSILON);
 }
 export function pointBlocked(x: number, y: number, z: number, radius = .04, boxes: readonly ArenaBox[] = ARENA_BOXES) {
@@ -75,7 +79,7 @@ export function rayBoxDistance(origin:{x:number;y:number;z:number}, direction:{x
   return near<=max?near:null;
 }
 export function rayWallDistance(origin: {x:number;y:number;z:number}, direction: {x:number;y:number;z:number}, max: number,
-  world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }) {
+  world: SimWorld = { boxes: ARENA_BOXES, heightAt: terrainHeight }) {
   let nearest=max;
   for(const box of world.boxes){const hit=rayBoxDistance(origin,direction,box,nearest);if(hit!==null)nearest=hit;}
   // Only the height field is sampled; boxes are intersected once regardless of range.
@@ -84,16 +88,17 @@ export function rayWallDistance(origin: {x:number;y:number;z:number}, direction:
   }
   return nearest;
 }
-function supportHeight(x: number, z: number, ceiling: number, world: SimWorld) {
+export function supportHeight(x: number, z: number, ceiling: number, world: SimWorld={boxes:ARENA_BOXES,heightAt:terrainHeight}) {
   let height = world.heightAt(x,z);
-  for (const box of world.boxes) {
+  for (const box of world.boxes===ARENA_BOXES?arenaBoxesNear(x,z):world.boxes) {
     if(box.maxY <= ceiling+EPSILON && overlapsBox(x,z,box)) height=Math.max(height,box.maxY);
   }
   return height;
 }
 export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
-  world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }, moveScale=1, timeSeconds?:number) {
+  world: SimWorld = { boxes: ARENA_BOXES, heightAt: terrainHeight }, moveScale=1, timeSeconds?:number) {
   if(!player.alive)return;
+  if(world.boxes===ARENA_BOXES)world={...world,boxes:arenaBoxesNear(player.x,player.z,7)};
   const staticWorld=world;
   if(timeSeconds!==undefined)world={...staticWorld,boxes:[...staticWorld.boxes,...movingBoxes(timeSeconds)]};
   player.yaw-=input.lookX*.0024;

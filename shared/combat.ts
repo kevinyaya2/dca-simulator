@@ -1,4 +1,4 @@
-import { ARENA_BOXES, groundHeight, PLAYER_EYE_HEIGHT, rayBoxDistance, rayWallDistance, type SimWorld } from './arena.js';
+import { ARENA_BOXES, terrainHeight, PLAYER_EYE_HEIGHT, rayBoxDistance, rayWallDistance, type SimWorld } from './arena.js';
 import { WEAPON_SPECS, type WeaponId } from './weapons.js';
 export type Vec3=[number,number,number];
 export type Combatant={id:string;x:number;y:number;z:number;yaw:number;alive:boolean};
@@ -9,7 +9,7 @@ export type ShotEvent=ShotResult&{eventId:string;id:string;weapon:WeaponId;origi
 export type ConfirmedHit=PlannedHit&{killed:boolean};
 export type HitConfirmation={eventId:string;weapon:WeaponId;hits:ConfirmedHit[]};
 export type KillEvent={eventId:string;at:number;attackerId:string;attackerName:string;victimId:string;victimName:string;weapon:WeaponId;headshot:boolean;multi:number;streak:number;title?:string};
-const world:SimWorld={boxes:ARENA_BOXES,heightAt:groundHeight};
+const world:SimWorld={boxes:ARENA_BOXES,heightAt:terrainHeight};
 const point=(v:Vec3)=>({x:v[0],y:v[1],z:v[2]});
 const dot=(a:Vec3,b:Vec3)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const sub=(a:Vec3,b:Vec3):Vec3=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];

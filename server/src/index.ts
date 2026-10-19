@@ -5,7 +5,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { groundHeight, arenaWorld, stepPlayer, type SimInput } from '../../shared/arena.js';
-import { chooseRespawnPoint, chooseWeaponPoint, type SpawnPoint } from '../../shared/spawns.js';
+import { chooseRespawnPoint, chooseWeaponPoint, initialWeaponPoints, type SpawnPoint } from '../../shared/spawns.js';
 import { WEAPON_IDS, WEAPON_SPECS, type WeaponId } from '../../shared/weapons.js';
 import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound } from '../../shared/protocol.js';
 
@@ -19,7 +19,7 @@ type Player = {
   activeWeapon:WeaponId; ownedWeapons:WeaponId[]; weapons:WeaponState;
   life:number; lastShot:number; lastReceivedSeq:number; lastProcessedSeq:number; input:Input; slowUntil:number; burn:BurnState;
 };
-type Pickup = { id:WeaponId; x:number; z:number; available:boolean; respawnAt:number };
+type Pickup = { id:WeaponId; x:number; y:number; z:number; available:boolean; respawnAt:number };
 type History = { at:number; simulationTime:number; players:Map<string,{x:number;y:number;z:number;alive:boolean;yaw:number;life:number}> };
 type Room = {
   environmentTime:number; code:string; host:string; roundId:number; state:'LOBBY'|'PLAYING'|'GAME_OVER';
@@ -36,7 +36,7 @@ const previousSpawns=new Map<string,SpawnPoint>();
 const now=()=>Date.now();
 const blankInput=():Input=>({seq:0,clientTime:0,moveX:0,moveY:0,lookX:0,lookY:0,jump:false,reload:false,sprint:false,aim:false,yaw:0,pitch:0});
 const createWeapons=():WeaponState=>Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])) as WeaponState;
-function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];for(const id of WEAPON_IDS.filter(id=>id!=='ar')){const point=chooseWeaponPoint(players,pickups);if(!point)throw new Error('No legal weapon candidates');pickups.push({id,x:point[0],z:point[1],available:true,respawnAt:0});}return pickups;}
+function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];for(const id of WEAPON_IDS.filter(id=>id!=='ar')){const point=chooseWeaponPoint(players.map(p=>({...p,y:p.y-1.65})),pickups,undefined,Math.random,initialWeaponPoints(id));if(!point)throw new Error('No legal weapon candidates');pickups.push({id,...point,available:true,respawnAt:0});}return pickups;}
 
 function roomCode():string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode():value;}
 function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,...safe}=p;return{...safe,burnUntil:burn?.expiresAt??0};}
@@ -100,11 +100,11 @@ export function step(io:Server,room:Room,dt:number){
     p.aiming=!!p.input.aim;
     stepPlayer(p,{...p.input,lookX:0,lookY:0},dt,undefined,p.slowUntil>time ? .65 : 1,(room.lastStep-room.wheelEpoch)/1000-dt);
     p.lastProcessedSeq=p.lastReceivedSeq;
-    for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(groundHeight(pickup.x,pickup.z)+.9),p.z-pickup.z)<2){if(!p.ownedWeapons.includes(pickup.id))p.ownedWeapons.push(pickup.id);p.activeWeapon=pickup.id;p.aiming=false;p.input.aim=false;pickup.available=false;pickup.respawnAt=time+30000;emitRoom(io,room);}
+    for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(pickup.y+.9),p.z-pickup.z)<2){if(!p.ownedWeapons.includes(pickup.id))p.ownedWeapons.push(pickup.id);p.activeWeapon=pickup.id;p.aiming=false;p.input.aim=false;pickup.available=false;pickup.respawnAt=time+30000;emitRoom(io,room);}
     if(p.burn){while(p.burn&&p.burn.nextTick<=time&&p.burn.nextTick<=p.burn.expiresAt){const attacker=room.players.get(p.burn.attackerId);p.burn.nextTick+=250;if(attacker){const hit=applyDamage(io,room,attacker,p,{targetId:p.id,damage:4,headshot:false,position:[p.x,p.y-.4,p.z]},'flame');if(hit)io.to(attacker.id).emit('match:hit',{roundId:room.roundId,eventId:`${room.code}:burn:${++room.shotSequence}`,weapon:'flame',hits:[hit]});if(hit?.killed)emitRoom(io,room);if(room.state!=='PLAYING')return;}}if(p.burn&&time>=p.burn.expiresAt)p.burn=null;}
     p.input={...p.input,lookX:0,lookY:0,jump:false,reload:false};
   }
-  for(const pickup of room.pickups)if(!pickup.available&&pickup.respawnAt<=time){const point=chooseWeaponPoint([...room.players.values()],room.pickups.filter(other=>other!==pickup&&other.available),[pickup.x,pickup.z]);if(!point){pickup.respawnAt=time+100;continue;}pickup.x=point[0];pickup.z=point[1];pickup.available=true;emitRoom(io,room);}
+  for(const pickup of room.pickups)if(!pickup.available&&pickup.respawnAt<=time){const point=chooseWeaponPoint([...room.players.values()].map(p=>({...p,y:p.y-1.65})),room.pickups.filter(other=>other!==pickup&&other.available),pickup);if(!point){pickup.respawnAt=time+100;continue;}Object.assign(pickup,point);pickup.available=true;emitRoom(io,room);}
   room.history.push({at:room.lastStep,simulationTime:(room.lastStep-room.wheelEpoch)/1000,players:new Map([...room.players].map(([id,p])=>[id,{x:p.x,y:p.y,z:p.z,alive:p.alive,yaw:p.yaw,life:p.life}]))});while(room.history[0]?.at<time-300)room.history.shift();
   if(room.tick%3===0)emitSnapshot(io,room);
 }

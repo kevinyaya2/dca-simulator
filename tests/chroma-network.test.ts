@@ -31,6 +31,8 @@ test('two clients agree on wheel time, sprint speed, action resets and the new w
     a.on('match:snapshot',(s:Snapshot)=>fromA.set(s.tick,s));b.on('match:snapshot',(s:Snapshot)=>fromB.set(s.tick,s));
     const started=event<Snapshot>(a,'match:snapshot');a.emit('game:start');const first=await started;
     assert.equal(room.environmentTime,0);
+    assert.equal(first.pickups.find(p=>p.id==='smg').y,-6);assert.equal(first.pickups.find(p=>p.id==='shotgun').y,-6);
+    assert.ok(first.pickups.every(p=>Number.isFinite(p.y)));
     assert.ok(first.pickups.some(p=>p.id==='sniper'&&p.available));assert.ok(first.simulationTime>0);assert.ok(Math.abs(first.environmentTime-first.simulationTime)<1e-5);
     const me=first.players.find(p=>p.id===a.id);
     // Choose an unobstructed direction using the same collision rules, regardless of the random spawn.

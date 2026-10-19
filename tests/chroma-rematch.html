@@ -55,6 +55,11 @@ run.onclick=async()=>{
       const expected=dayNightAt(environmentAtSnapshot(delayed,game.serverNow())).night;
       assert(Math.abs(game.arena.lastNight-expected)<.01,'environment uses local round age instead of server timestamp');
       assert(socket.count===7,'duplicate match socket listeners');
+      const basement={...delayed,tick:5,players:[{...player('self',10),y:-4.35,z:18},{...player('peer',10),z:18}],pickups:[{id:'smg',x:-64,y:-6,z:18,available:true,respawnAt:0}]};
+      socket.push('match:snapshot',basement);await frame();await frame();await frame();
+      assert(Math.abs(game.player.position.y+4.35)<.01,'B1 reconciliation snapped player to surface');
+      assert(Math.abs(game.pickupMeshes.get('smg').position.y+5.1)<.01,'B1 pickup rendered on surface');
+      assert(game.radarCanvas.getAttribute('aria-label')==='Radar B1','radar did not identify current floor');
       const memory={...game.renderer.info.memory};
       if(!baseline)baseline=memory;
       assert(memory.geometries===baseline.geometries&&memory.textures===baseline.textures,'GPU resource count grows between rounds');

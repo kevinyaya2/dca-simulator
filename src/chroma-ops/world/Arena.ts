@@ -1,8 +1,9 @@
 import * as T from 'three';
 import { FerrisWheel } from './FerrisWheel';
 import { SAFE_SPAWNS } from '../../../shared/spawns';
-import { ARENA_BOUNDS, ARENA_BOXES, ARENA_BUILDINGS, groundHeight, type ArenaBox } from '../../../shared/arena';
+import { ARENA_BOUNDS, ARENA_BOXES, terrainHeight, type ArenaBox } from '../../../shared/arena';
 import { CITY_BUILDINGS, CITY_RAMPS, CITY_GARDENS, CITY_LAMPS, CITY_WAYPOINTS, cityBox } from '../../../shared/city';
+import { cutEntrances, MALL_ENTRIES, MALL_SHOPS } from '../../../shared/underground';
 import { liftBoxes } from '../../../shared/movingPlatforms';
 import { dayNightAt } from '../../../shared/dayNight';
 import { disposeResources } from '../systems/DisposeResources';
@@ -25,26 +26,30 @@ export class Arena {
   private nightSky=new T.Color(0x100c35);
   private sky=new T.Color();
   private lastNight=-1;
-  groundHeight(x:number,z:number){return groundHeight(x,z);}
+  groundHeight(x:number,z:number){return terrainHeight(x,z);}
 
   constructor(){
     this.group.add(this.wheel.group,this.pools);
-    this.drawBoxes(ARENA_BOXES);
+    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY>0));
+    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY<=0),undefined,true);
     this.drawBoxes([
-      cityBox(0,0,ARENA_BOUNDS.width,ARENA_BOUNDS.depth,0,0x19b9dc,-.35),
+      cityBox(0,0,ARENA_BOUNDS.width,ARENA_BOUNDS.depth,0,0x19b9dc,-.05),
       cityBox(0,0,78,62,.025,0xd5edf0,-.05),
       cityBox(-65,0,16,180,.03,0xe9edf1,-.04),cityBox(68,0,16,180,.03,0xe9edf1,-.04),
       cityBox(0,-64,184,16,.03,0xe9edf1,-.04),cityBox(0,76,210,12,.03,0xe9edf1,-.04),
       cityBox(0,24,112,12,.03,0xe9edf1,-.04),cityBox(0,102,92,16,.03,0x99d9df,-.04),
       cityBox(0,62,44,20,12,0x188bd0),cityBox(4,100,32,24,6,0x795ad8),
-    ]);
+    ].flatMap(b=>b.maxY<1?cutEntrances(b):[b]));
     for(const ramp of CITY_RAMPS)this.ramp(ramp.x,ramp.z0,ramp.x,ramp.z1,ramp.from,ramp.to,ramp.width);
     this.ramp(-20.5,40,-20.5,52,0,12,9);
     this.ramp(-38,100,-12,100,0,6,24);
-    this.makeWindows();this.makeStreet();
+    for(const e of MALL_ENTRIES){
+      if(e.kind==='ramp')this.ramp(0,e.outer,0,e.inner,0,-6,6);
+      const sign=this.sign(`B1  ${e.name}  MALL`,e.axis==='z'?0:e.outer,2.8,e.axis==='z'?e.outer:e.cross,0x75ffe1);sign.rotation.y=e.name==='NORTH'?Math.PI:e.name==='WEST'?-Math.PI/2:e.name==='EAST'?Math.PI/2:0;
+    }
+    this.makeWindows();this.makeStreet();this.makeMall();
     this.lift=liftBoxes(0).map(b=>{const mesh=new T.Mesh(new T.BoxGeometry(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ),new T.MeshBasicMaterial({color:b.color}));this.group.add(mesh);return mesh;});
-    this.sign('WEST ARCADE',-65,5,57.35,0x35c955);
-    this.sign('EAST STATION',68,5,56.35,0x19aee1);
+    for(const b of CITY_BUILDINGS)this.sign(b.name,b.x,5,b.z+12.35,b.color);
     this.sign('SKY WALK  /  6m',0,7.8,38.15,0xffc330);
     this.sign('FERRIS PLAZA',0,3,-85,0xff4e98);
     this.sign('LIFT  0 / 6 / 12',68,13.6,25.75,0xff4e98);
@@ -57,7 +62,7 @@ export class Arena {
         seen.add(material);
         const color=material.color.getHex(),path=[0xe9edf1,0xd5edf0,0x99d9df,0xffffff].includes(color);
         const glow=material.userData.glow as number|undefined;
-        this.palette.push({material,base:material.color.clone(),night:path?.63:.38,glow:glow===undefined?undefined:new T.Color(glow)});
+        this.palette.push({material,base:material.color.clone(),night:material.userData.fixedLight?1:(path?.63:.38),glow:glow===undefined?undefined:new T.Color(glow)});
       }
     });
     // The wheel stays readable and becomes a pink / violet night landmark.
@@ -65,11 +70,11 @@ export class Arena {
     this.update(0,0);
   }
 
-  private drawBoxes(boxes:readonly ArenaBox[],glow?:number){
+  private drawBoxes(boxes:readonly ArenaBox[],glow?:number,fixedLight=false){
     const batches=new Map<number,ArenaBox[]>();
     for(const box of boxes){const items=batches.get(box.color)||[];items.push(box);batches.set(box.color,items);}
     for(const [color,items] of batches){
-      const material=new T.MeshBasicMaterial({color});if(glow!==undefined)material.userData.glow=glow;
+      const material=new T.MeshBasicMaterial({color});material.userData.fixedLight=fixedLight;if(glow!==undefined)material.userData.glow=glow;
       const mesh=new T.InstancedMesh(this.unitBox,material,items.length);
       items.forEach((b,index)=>{this.matrix.makeScale(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ);this.matrix.setPosition((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);mesh.setMatrixAt(index,this.matrix);});
       mesh.instanceMatrix.needsUpdate=true;this.group.add(mesh);
@@ -90,11 +95,33 @@ export class Arena {
       const add=(offset:number,width:number,y:number,height:number)=>frames.push(axis==='x'?cityBox(b.x+side*12.23,b.z+offset,.05,width,y+height/2,0xd4fff6,y-height/2):cityBox(b.x+offset,b.z+side*12.23,width,.05,y+height/2,0xd4fff6,y-height/2));
       for(const y of [base+1.23,base+3.47])add(u,w,y,.08);
       for(const offset of [u-w/2,u+w/2])add(offset,.08,base+2.35,2.3);
+      if(b.name.includes('STUDIO')||b.name.includes('GALLERY'))add(u,.06,base+2.35,2.3);
+      if(b.name.includes('GARDEN')||b.name.includes('MARKET'))add(u,w,base+2.7,.06);
     }
     this.drawBoxes(frames,0x75ffe1);
-    const windows:ArenaBox[]=[];
-    for(const b of ARENA_BUILDINGS.filter(b=>!b.openSouth))for(const side of [-1,1])for(const z of [-6,0,6])for(const y of [3,6,9])windows.push(cityBox(b.x+side*12.52,b.z+z,.04,2.4,y+.75,0xd9ffec,y-.75));
-    this.drawBoxes(windows,0xe4ff94);
+
+  }
+
+  private makeMall(){
+    this.drawBoxes([
+      cityBox(0,2,32,24,-5.98,0xc3addf,-6),
+      ...[-14,18].map(z=>cityBox(0,z,176,8,-5.98,0x57b8be,-6)),
+      ...[-64,64].map(x=>cityBox(x,2,8,40,-5.98,0x57b8be,-6)),
+    ],undefined,true);
+    const trims:ArenaBox[]=[];
+    for(const s of MALL_SHOPS){
+      this.sign(s.name,s.x,-1.4,8.2,s.color);
+      this.sign(s.name,s.x,-1.4,-4.2,s.color);
+      for(const z of [-4.2,8.2])trims.push(cityBox(s.x,z,8,.08,-.65,s.color,-.8));
+    }
+    for(const z of [-14,18])trims.push(cityBox(0,z,168,.35,-.42,0x75ffe1,-.5));
+    for(const x of [-64,0,64])trims.push(cityBox(x,2,.35,38,-.42,0xffd776,-.5));
+    this.drawBoxes(trims,undefined,true);
+    this.sign('B1  COLOR MALL',0,-1.6,2,0x75ffe1);
+    this.sign('NORTH EXIT',0,-1.5,-20,0x75ffe1);
+    this.sign('SOUTH EXIT',0,-1.5,24,0x75ffe1).rotation.y=Math.PI;
+    this.sign('WEST EXIT',-88,-1.5,9,0x75ffe1).rotation.y=Math.PI/2;
+    this.sign('EAST EXIT',88,-1.5,9,0x75ffe1).rotation.y=-Math.PI/2;
   }
 
   private makeStreet(){
@@ -117,7 +144,7 @@ export class Arena {
     context.strokeStyle='#'+color.toString(16).padStart(6,'0');context.lineWidth=10;context.strokeRect(3,3,506,90);
     context.fillStyle='#ffffff';context.font='bold 32px Arial';context.textAlign='center';context.fillText(text,256,60);
     const material=new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas),side:T.DoubleSide});material.userData.glow=0xffffff;
-    const mesh=new T.Mesh(new T.PlaneGeometry(8,1.5),material);mesh.position.set(x,y,z);this.group.add(mesh);
+    const mesh=new T.Mesh(new T.PlaneGeometry(8,1.5),material);mesh.position.set(x,y,z);this.group.add(mesh);return mesh;
   }
 
   update(seconds:number,environmentSeconds=seconds,renderer?:T.WebGLRenderer){
