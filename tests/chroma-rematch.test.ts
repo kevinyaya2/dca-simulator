@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { beginRound } from '../server/src/index.ts';
+import { beginRound, step as stepRoom } from '../server/src/index.ts';
 import { KillTracker } from '../shared/combat.ts';
 import { isCurrentRound } from '../shared/protocol.ts';
 import { Bot } from '../src/chroma-ops/enemies/Bot.ts';
@@ -14,7 +14,7 @@ function roomFixture(){
     hp:100,alive:true,kills:10-index,deaths:3,life:2,lastShot:10,lastReceivedSeq:25000+index*8000,lastProcessedSeq:24990,
     input:{seq:25000,moveX:1,moveY:0,sprint:true,aim:true},activeWeapon:'sniper',ownedWeapons:['ar','sniper'],weapons:{},slowUntil:100,burn:null,
   }]));
-  return {code:'REMATCH',host:'host',roundId:1,state:'GAME_OVER',players,pickups:[],history:[{at:0}],tick:8000,lastStep:Date.now(),wheelEpoch:0,
+  return {environmentTime:173,code:'REMATCH',host:'host',roundId:1,state:'GAME_OVER',players,pickups:[],history:[{at:0}],tick:8000,lastStep:Date.now(),wheelEpoch:0,
     respawnTimers:new Map(),shotSequence:20,killTracker:new KillTracker('rematch')} as unknown as Parameters<typeof beginRound>[1];
 }
 
@@ -28,7 +28,7 @@ test('a new round accepts freshly numbered client commands after a long first ro
     assert.ok(1>p.lastReceivedSeq);
     assert.equal(p.input.sprint,false);assert.equal(p.input.aim,false);assert.equal(p.activeWeapon,'ar');
   }
-  assert.equal(room.history.length,0);assert.equal(states.length,1);
+  assert.equal(room.history.length,0);assert.equal(states.length,1);assert.equal(room.environmentTime,173);
 });
 
 test('twenty rematches isolate round IDs and reset input acknowledgements, ticks and history',()=>{
@@ -43,6 +43,14 @@ test('twenty rematches isolate round IDs and reset input acknowledgements, ticks
     assert.equal(isCurrentRound({roundId:room.roundId,seq:1},room.roundId),true);
     for(const p of room.players.values()){assert.equal(p.lastReceivedSeq,0);assert.equal(p.lastProcessedSeq,0);assert.equal(p.hp,100);}
   }
+});
+
+test('server environment pauses in results and lobby, then resumes across a round reset',()=>{
+  const room=roomFixture(),io={to:()=>({emit:()=>{}})} as unknown as Parameters<typeof beginRound>[0];
+  stepRoom(io,room,30);assert.equal(room.environmentTime,173);
+  room.state='LOBBY';stepRoom(io,room,30);assert.equal(room.environmentTime,173);
+  beginRound(io,room);assert.equal(room.environmentTime,173);assert.equal(room.lastStep,room.wheelEpoch);
+  stepRoom(io,room,1/60);assert.ok(Math.abs(room.environmentTime-(173+1/60))<1e-8);
 });
 
 test('death fragments release cloned materials on expiry and respawn; avatar disposal releases GPU resources once',()=>{
@@ -75,6 +83,16 @@ test('shared geometry, materials and name textures are disposed once per scene c
   let geometries=0,materials=0,textures=0;
   geometry.addEventListener('dispose',()=>geometries++);material.addEventListener('dispose',()=>materials++);texture.addEventListener('dispose',()=>textures++);
   disposeResources(root);assert.deepEqual([geometries,materials,textures],[1,1,1]);
+});
+
+test('city instancing releases mesh-owned buffers as well as shared resources',()=>{
+  const group=new T.Group(),geometry=new T.BoxGeometry(),material=new T.MeshBasicMaterial();
+  const a=new T.InstancedMesh(geometry,material,4),b=new T.InstancedMesh(geometry,material,3);group.add(a,b);
+  a.setColorAt(0,new T.Color('red'));
+  let buffers=0,geometries=0,materials=0;
+  for(const mesh of [a,b])mesh.addEventListener('dispose',()=>buffers++);
+  geometry.addEventListener('dispose',()=>geometries++);material.addEventListener('dispose',()=>materials++);
+  disposeResources(group,a);assert.deepEqual([buffers,geometries,materials],[2,1,1]);
 });
 
 test('repeated start/resume and stop leave at most one animation loop',()=>{

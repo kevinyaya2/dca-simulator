@@ -12,7 +12,7 @@ function event<T>(socket:Socket,name:string,predicate:(value:T)=>boolean=()=>tru
     socket.on(name,receive);
   });
 }
-type Snapshot={roundId:number;tick:number;simulationTime:number;serverTime:number;players:any[];pickups:any[]};
+type Snapshot={environmentTime:number;roundId:number;tick:number;simulationTime:number;serverTime:number;players:any[];pickups:any[]};
 
 test('two clients agree on wheel time, sprint speed, action resets and the new weapon pickup',async()=>{
   const server=createGameServer();
@@ -30,7 +30,8 @@ test('two clients agree on wheel time, sprint speed, action resets and the new w
     const fromA=new Map<number,Snapshot>(),fromB=new Map<number,Snapshot>();
     a.on('match:snapshot',(s:Snapshot)=>fromA.set(s.tick,s));b.on('match:snapshot',(s:Snapshot)=>fromB.set(s.tick,s));
     const started=event<Snapshot>(a,'match:snapshot');a.emit('game:start');const first=await started;
-    assert.ok(first.pickups.some(p=>p.id==='sniper'&&p.available));assert.ok(first.simulationTime>0);
+    assert.equal(room.environmentTime,0);
+    assert.ok(first.pickups.some(p=>p.id==='sniper'&&p.available));assert.ok(first.simulationTime>0);assert.ok(Math.abs(first.environmentTime-first.simulationTime)<1e-5);
     const me=first.players.find(p=>p.id===a.id);
     // Choose an unobstructed direction using the same collision rules, regardless of the random spawn.
     const choices=[{moveX:1,moveY:0},{moveX:-1,moveY:0},{moveX:0,moveY:1},{moveX:0,moveY:-1}];
@@ -53,7 +54,7 @@ test('two clients agree on wheel time, sprint speed, action resets and the new w
     assert.equal(end.players.find(p=>p.id===a.id).sprinting,false);
     const common=[...fromA.keys()].filter(tick=>fromB.has(tick));assert.ok(common.length>5);
     for(const tick of common){assert.deepEqual(fromA.get(tick),fromB.get(tick));}
-    assert.ok(end.simulationTime>first.simulationTime);
+    assert.ok(end.simulationTime>first.simulationTime);assert.ok(Math.abs((end.environmentTime-first.environmentTime)-(end.serverTime-first.serverTime)/1000)<1e-5);
     assert.ok(Math.abs((end.simulationTime-first.simulationTime)-(end.serverTime-first.serverTime)/1000)<1e-8);
     const ammo=end.players.find(p=>p.id===a.id).weapons.ar.ammo;
     // A late, high-sequence command from a prior round must not poison this round's sequence counter.

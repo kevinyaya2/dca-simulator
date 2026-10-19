@@ -13,7 +13,17 @@ npm run deploy
 
 Deploy the server separately with `npm run server:build` then `npm run server:start`, and configure Render with `PORT` plus `CORS_ORIGIN=https://kevinyaya2.github.io`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
 
-### CHROMA OPS 戰鬥更新（協定 6）
+### CHROMA OPS 立體城市與日夜循環（協定 7）
+
+西南 WEST ARCADE、東南 EAST STATION 現在有地面、6 公尺二樓與 12 公尺屋頂，四面門窗皆有實際開口。每棟可走室內折返樓梯或外部斜坡；二樓折線空橋保留橋下街道，屋頂步道接中央高台。花台、長椅、路燈柱與建築是實體掩體；彩色樹冠、窗框、招牌及地面光圈是裝飾。
+
+東側 `(68, 28)` 的 4×4 公尺升降平台停靠 0／6／12 公尺，南側開口可進出、射擊或跳離。每站停 3 秒、每段移動 4 秒，以 0→6→12→6→0 完成 28 秒循環。玩家可搭乘，地面 AI 不進入平台或斜坡。
+
+日夜以 240 秒循環：白天 90 秒、黃昏 30 秒、黑夜 90 秒、清晨 30 秒。夜景使用材質配色、亮窗框、路燈光圈及霓虹摩天輪，不增加即時陰影或全畫面泛光。角色辨識色、HUD 與戰鬥規則不變，鏡內外共用同一環境。
+
+伺服器的 `environmentTime` 僅在 PLAYING 推進，新房間為 0；同房間重開接續，結算與大廳暫停。單人設定面板會一起暫停日夜與移動平台。日夜時間與每場的 `simulationTime` 分開：升降平台、摩天輪、預測與快照在新場重設，仍由 `roundId` 隔離舊封包。共用地形在 `shared/city.ts`，移動平台在 `shared/movingPlatforms.ts`，日夜計算在 `shared/dayNight.ts`。
+
+開發測試頁 `/dca-simulator/tests/chroma-city.html` 可切換四階段、建築入口、升降平台、夜間開鏡與 844×390 觸控版面，也可檢查單人設定暫停。手機真機效能仍需在目標裝置實測。
 
 單人與多人共用即時命中、兩倍爆頭、步槍／衝鋒槍距離衰減、火焰範圍傷害、燃燒、冰槍減速及火箭遮擋判定。七種武器提供獨立彈道與撞擊特效，射手可看到實際扣血數字。
 
@@ -25,7 +35,7 @@ Deploy the server separately with `npm run server:build` then `npm run server:st
 
 多人重開已加入每場獨立的 `roundId`，開始新場時重設指令編號，並重建客戶端的預測、快照與畫面狀態。舊場的輸入、射擊與傷害封包會被忽略。離場時會釋放角色、死亡碎片材質、姓名貼圖、槍枝、拾取物及 WebGL 資源，並移除事件監聽器與動畫迴圈。
 
-此次多人協定由 5 升為 6，**前端與 Render 伺服器必須一起更新**。`npm run deploy` 只發布前端；Render 仍需部署包含此次修改的版本，建置 `npm run server:build`、啟動 `npm run server:start`。版本不同時沿用既有提示。
+此次多人協定由 6 升為 7，**前端與 Render 伺服器必須一起更新**。`npm run deploy` 只發布前端；Render 仍需部署包含此次修改的版本，建置 `npm run server:build`、啟動 `npm run server:start`。版本不同時沿用既有提示。
 
 執行 `npm run test:chroma` 驗證共用戰鬥、移動、搭乘、觸控／鍵鼠、雙客戶端同步與重開回歸。武器數值集中在 `shared/weapons.ts`，戰鬥判定與連殺計數在 `shared/combat.ts`，車廂位置與碰撞在 `shared/ferrisWheel.ts`。開發伺服器的 `/dca-simulator/tests/chroma-visual.html` 提供摩天輪、開鏡、搭乘、暫停與觸控排版檢查場景；`/dca-simulator/tests/chroma-rematch.html` 可連續重建十場，檢查 GPU 資源、Socket 監聽器、動畫迴圈與 DOM 是否釋放。這些測試頁不會加入正式建置。
 

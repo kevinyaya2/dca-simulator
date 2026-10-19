@@ -11,6 +11,7 @@ import '../src/pages/MobileControls.css';
 import '../src/chroma-ops/ui/SniperScope.css';
 import { MultiplayerGame } from '../src/chroma-ops/core/MultiplayerGame.ts';
 import { WEAPON_IDS, WEAPON_SPECS } from '../shared/weapons.ts';
+import { dayNightAt, environmentAtSnapshot } from '../shared/dayNight.ts';
 import * as T from 'three';
 
 // Test only: controlled snapshots exercise the production renderer and cleanup without a live match.
@@ -40,11 +41,19 @@ run.onclick=async()=>{
       game.start();game.resume();game.resume();
       await frame();await frame();
       assert(socket.inputs.length===0,'must wait for this round snapshot before sending inputs');
-      const snapshot={roundId,tick:3,simulationTime:.05,serverTime:Date.now(),players:[player('self',15),player('peer',25)],pickups:[]};
+      const riders=[player('self',67.5),player('peer',68.5)].map(p=>({...p,y:7.65,z:28,supportId:8}));
+      const snapshot={environmentTime:105,roundId,tick:3,simulationTime:8,serverTime:Date.now(),players:riders,pickups:[]};
       socket.push('match:snapshot',{...snapshot,roundId:roundId-1});await frame();assert(socket.inputs.length===0,'stale round snapshot accepted');
       socket.push('match:snapshot',snapshot);await frame();await frame();
       assert(socket.inputs[0]?.seq===1&&socket.inputs[0]?.roundId===roundId,'new round did not start input sequence at 1');
       assert(Math.abs(game.player.yaw-.4)<1e-8,'initial facing not hydrated from server');
+      assert(game.player.supportId===8&&Math.abs(game.player.position.y-7.65)<.01,'local lift passenger not supported');
+      assert(Math.abs(game.avatars.get('peer').group.position.y-6)<.01,'remote lift passenger is not synchronized');
+      // Simulate a late-loaded client receiving a packet delayed by 200 ms.
+      const delayed={...snapshot,tick:4,environmentTime:104.8,serverTime:Date.now()-200};
+      socket.push('match:snapshot',delayed);await frame();
+      const expected=dayNightAt(environmentAtSnapshot(delayed,game.serverNow())).night;
+      assert(Math.abs(game.arena.lastNight-expected)<.01,'environment uses local round age instead of server timestamp');
       assert(socket.count===7,'duplicate match socket listeners');
       const memory={...game.renderer.info.memory};
       if(!baseline)baseline=memory;
@@ -53,6 +62,7 @@ run.onclick=async()=>{
       const peer=game.avatars.get('peer');peer.damage(100);await frame();
       const resources=new Set();
       game.scene.traverse(object=>{
+        if(object instanceof T.InstancedMesh)resources.add(object);
         if(object instanceof T.Mesh||object instanceof T.Points||object instanceof T.Line)resources.add(object.geometry);
         if(object.material)for(const material of Array.isArray(object.material)?object.material:[object.material]){
           resources.add(material);for(const value of Object.values(material))if(value instanceof T.Texture)resources.add(value);

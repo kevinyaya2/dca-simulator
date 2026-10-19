@@ -1,4 +1,6 @@
-import { cabinPosition, supportingCabin, wheelBoxes, WHEEL_SUPPORTS } from './ferrisWheel.js';
+import { WHEEL_SUPPORTS } from './ferrisWheel.js';
+import { movingBoxes, platformPosition, supportingPlatform } from './movingPlatforms.js';
+import { CITY_BOXES, CITY_PROPS, CITY_SPAWNS, cityRampHeight } from './city.js';
 export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number };
 export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean; sprint?: boolean; aim?: boolean };
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
@@ -14,7 +16,7 @@ export const JUMP_SPEED = 7;
 export const GRAVITY = 14;
 export const MAX_STEP_HEIGHT = 0.35;
 const EPSILON = 0.0001;
-export const ARENA_SPAWNS: [number, number][] = [[-132,-106],[-104,-122],[-148,-36],[-130,84],[-78,112],[-26,-116],[28,-122],[84,-106],[138,-82],[142,-18],[126,62],[82,112],[18,126],[-42,112],[-96,58],[-108,-42],[-36,-32],[34,34],[76,12],[-66,8]];
+export const ARENA_SPAWNS: [number,number][] = CITY_SPAWNS;
 export const ARENA_BUILDINGS = [
   { x: -65, z: 45, color: 0x35c955, openSouth: true },
   { x: 68, z: 44, color: 0x19aee1, openSouth: true },
@@ -24,12 +26,12 @@ export const ARENA_BUILDINGS = [
 const rect = (x: number, z: number, w: number, d: number, h: number, color: number, minY = 0): ArenaBox =>
   ({ minX: x-w/2, maxX: x+w/2, minZ: z-d/2, maxZ: z+d/2, minY, maxY: minY+h, color });
 export const ARENA_BOXES: ArenaBox[] = [
-  ...WHEEL_SUPPORTS,
+  ...WHEEL_SUPPORTS,...CITY_BOXES,...CITY_PROPS,
   rect(-152,0,4,280,19,0x2d58c8), rect(152,0,4,280,19,0xec3478),
   rect(0,-138,308,4,17,0xf3a72d), rect(0,138,308,4,17,0x35c955),
   rect(0,-3,6,6,3,0xf04b55), rect(-22,13,8,3,2,0xffb738),
   rect(24,-14,8,3,2,0x4b75e8), rect(-3,20,3,8,2,0x7a4bd5), rect(5,-25,3,8,2,0x35c955),
-  ...ARENA_BUILDINGS.flatMap(b => [
+  ...ARENA_BUILDINGS.filter(b=>!b.openSouth).flatMap(b => [
     rect(b.x-11,b.z,3,24,11,b.color), rect(b.x+11,b.z,3,24,11,b.color),
     rect(b.x,b.z+(b.openSouth?-11:11),20,3,11,b.color), rect(b.x,b.z,20,20,.5,b.color,10.75),
   ]),
@@ -39,9 +41,10 @@ export const ARENA_BOXES: ArenaBox[] = [
   rect(-110,24,18,3,3,0x4b75e8), rect(110,-28,18,3,3,0xffb738), rect(-12,92,32,3,3,0x35c955),
 ];
 export function arenaWorld(seconds:number):SimWorld {
-  return {boxes:[...ARENA_BOXES,...wheelBoxes(seconds)],heightAt:groundHeight};
+  return {boxes:[...ARENA_BOXES,...movingBoxes(seconds)],heightAt:groundHeight};
 }
 export function groundHeight(x: number, z: number) {
+  const ramp=cityRampHeight(x,z);if(ramp!==null)return ramp;
   if(x>-22&&x<22&&z>52&&z<72)return 12;
   if(x>-25&&x<-16&&z>40&&z<=52)return z-40;
   if(x>-12&&x<20&&z>88&&z<112)return 6;
@@ -92,7 +95,7 @@ export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
   world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }, moveScale=1, timeSeconds?:number) {
   if(!player.alive)return;
   const staticWorld=world;
-  if(timeSeconds!==undefined)world={...staticWorld,boxes:[...staticWorld.boxes,...wheelBoxes(timeSeconds)]};
+  if(timeSeconds!==undefined)world={...staticWorld,boxes:[...staticWorld.boxes,...movingBoxes(timeSeconds)]};
   player.yaw-=input.lookX*.0024;
   player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch-input.lookY*.0021));
   let feet=player.y-PLAYER_EYE_HEIGHT;
@@ -111,12 +114,12 @@ export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
   for(let n=0;n<steps;n++) {
     if(timeSeconds!==undefined) {
       const before=timeSeconds+n*h, after=before+h;
-      const id=grounded?supportingCabin(player.x,player.y-PLAYER_EYE_HEIGHT,player.z,before):null;
+      const id=grounded?supportingPlatform(player.x,player.y-PLAYER_EYE_HEIGHT,player.z,before):null;
       if(id!==null) {
-        const a=cabinPosition(id,before),b=cabinPosition(id,after);
+        const a=platformPosition(id,before),b=platformPosition(id,after);
         player.x+=b.x-a.x;player.y+=b.y-a.y;player.z+=b.z-a.z;
       }
-      world={...staticWorld,boxes:[...staticWorld.boxes,...wheelBoxes(after)]};
+      world={...staticWorld,boxes:[...staticWorld.boxes,...movingBoxes(after)]};
     }
     feet=player.y-PLAYER_EYE_HEIGHT;
     const canMove=(x:number,z:number) => !blocked(x,z,PLAYER_RADIUS,feet+(grounded?MAX_STEP_HEIGHT:0),world.boxes)
@@ -145,5 +148,5 @@ export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
     }
     player.y=nextFeet+PLAYER_EYE_HEIGHT;
   }
-  if(timeSeconds!==undefined)player.supportId=player.velocityY<=0?supportingCabin(player.x,player.y-PLAYER_EYE_HEIGHT,player.z,timeSeconds+duration):null;
+  if(timeSeconds!==undefined)player.supportId=player.velocityY<=0?supportingPlatform(player.x,player.y-PLAYER_EYE_HEIGHT,player.z,timeSeconds+duration):null;
 }
