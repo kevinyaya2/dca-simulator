@@ -4,18 +4,20 @@ import { getMouseSensitivity } from '../settings/MouseSensitivity';
 export class MobileInput {
   private enabled=true;
   setEnabled(enabled:boolean){this.enabled=enabled;this.reset();}
-  private isGameTarget=(target:EventTarget|null)=>!(target instanceof HTMLElement&&target.closest('.co-armory, [data-game-ui]'));
+  private isGameTarget=(target:EventTarget|null)=>!this.el.querySelector('.co-armory:not([hidden])')&&!(target instanceof HTMLElement&&target.closest('.co-armory, [data-game-ui]'));
   private joyId:number|null=null; private lookId:number|null=null; private shootId:number|null=null;
   private ox=0; private oy=0; private lx=0; private ly=0;
   private options={passive:false};
-  reset=()=>{this.joyId=null;this.lookId=null;this.shootId=null;this.input.set({moveX:0,moveY:0,lookX:0,lookY:0,shoot:false,jump:false,reload:false,switchWeapon:0});this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');};
+  reset=()=>{this.joyId=null;this.lookId=null;this.shootId=null;this.input.reset();this.el.style.setProperty('--joy-x','0px');this.el.style.setProperty('--joy-y','0px');};
   private stopShooting=()=>{this.shootId=null;this.input.set({shoot:false});};
   private onVisibility=()=>{if(document.hidden)this.reset();};
   private begin=(id:number,x:number,y:number,target:EventTarget|null)=>{
     const r=this.el.getBoundingClientRect();
     if(!this.enabled||!this.isGameTarget(target))return;
-    const button=target instanceof HTMLElement?target.closest('[data-fire],[data-jump],[data-reload],[data-weapon]'):null;
-    if(button?.matches('[data-jump]'))this.input.set({jump:true});
+    const button=target instanceof HTMLElement?target.closest('[data-fire],[data-jump],[data-reload],[data-weapon],[data-sprint],[data-aim]'):null;
+    if(button?.matches('[data-sprint]'))this.input.set({sprint:!this.input.sprinting});
+    else if(button?.matches('[data-aim]'))this.input.set({aim:!this.input.aiming});
+    else if(button?.matches('[data-jump]'))this.input.set({jump:true});
     else if(button?.matches('[data-reload]'))this.input.set({reload:true});
     else if(button?.matches('[data-weapon]')){this.stopShooting();this.el.dispatchEvent(new CustomEvent('armory'));}
     else if(button?.matches('[data-fire]')){this.shootId=id;this.input.set({shoot:true});}
@@ -37,7 +39,8 @@ export class MobileInput {
   constructor(private el:HTMLElement,private input:InputManager){
     if(window.PointerEvent){el.addEventListener('pointerdown',this.onPointerDown,this.options);el.addEventListener('pointermove',this.onPointerMove,this.options);el.addEventListener('pointerup',this.onPointerUp,this.options);el.addEventListener('pointercancel',this.onPointerUp,this.options);}
     else {el.addEventListener('touchstart',this.onTouchStart,this.options);el.addEventListener('touchmove',this.onTouchMove,this.options);el.addEventListener('touchend',this.onTouchEnd,this.options);el.addEventListener('touchcancel',this.onTouchEnd,this.options);}
+    el.addEventListener('combat:reset',this.reset);
     window.addEventListener('blur',this.reset);window.addEventListener('orientationchange',this.reset);document.addEventListener('visibilitychange',this.onVisibility);
   }
-  dispose(){this.reset();if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}window.removeEventListener('blur',this.reset);window.removeEventListener('orientationchange',this.reset);document.removeEventListener('visibilitychange',this.onVisibility);}
+  dispose(){this.el.removeEventListener('combat:reset',this.reset);this.reset();if(window.PointerEvent){this.el.removeEventListener('pointerdown',this.onPointerDown);this.el.removeEventListener('pointermove',this.onPointerMove);this.el.removeEventListener('pointerup',this.onPointerUp);this.el.removeEventListener('pointercancel',this.onPointerUp);}else{this.el.removeEventListener('touchstart',this.onTouchStart);this.el.removeEventListener('touchmove',this.onTouchMove);this.el.removeEventListener('touchend',this.onTouchEnd);this.el.removeEventListener('touchcancel',this.onTouchEnd);}window.removeEventListener('blur',this.reset);window.removeEventListener('orientationchange',this.reset);document.removeEventListener('visibilitychange',this.onVisibility);}
 }

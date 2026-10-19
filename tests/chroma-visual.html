@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Chroma Ops visual checks</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0}nav{position:fixed;z-index:30;left:12px;top:12px;display:flex;gap:8px;font:14px Arial;flex-wrap:wrap;max-width:80vw}
+  nav button,nav output{padding:9px 12px;border:1px solid #ffffff66;border-radius:8px;background:#172447;color:white}
+</style></head><body><main class="chroma-ops" id="game"></main>
+<nav data-game-ui><button id="wheel">Wheel view</button><button id="scope">Scope view</button><button id="ride">Ride cabin</button><button id="pause">Pause / resume</button><button id="touch">Touch controls</button><output id="status">Starting</output></nav>
+<script type="module">
+  // Development-only fixture. Vite serves it directly; it is not an application entry or included in production builds.
+  import '../src/pages/ChromaOps.css';
+  import '../src/pages/CombatFeedback.css';
+  import '../src/pages/Armory.css';
+  import '../src/pages/MobileControls.css';
+  import '../src/chroma-ops/ui/SniperScope.css';
+  import { Game } from '../src/chroma-ops/core/Game.ts';
+  import { MobileInput } from '../src/chroma-ops/input/MobileInput.ts';
+  import { cabinPosition } from '../shared/ferrisWheel.ts';
+  const root=document.querySelector('#game'),status=document.querySelector('#status'),game=new Game(root);
+  game.desktop?.dispose();game.desktop=undefined;game.mobile?.dispose();game.mobile=undefined;
+  game.bots.forEach(bot=>{bot.alive=false;bot.group.visible=false;});
+  game.owned.add('sniper');
+  const setView=(x,y,z,yaw,pitch)=>{game.input.reset();game.player.position.set(x,y,z);game.player.velocityY=0;game.player.jumpsUsed=0;game.player.yaw=yaw;game.player.pitch=pitch;};
+  const wheelView=()=>{setView(0,1.65,-54,0,.4);game.active='ar';};
+  document.querySelector('#wheel').onclick=wheelView;
+  document.querySelector('#scope').onclick=()=>{setView(0,1.65,-50,0,.22);game.active='sniper';game.input.set({aim:true});};
+  document.querySelector('#ride').onclick=()=>{const p=cabinPosition(0,game.elapsed);setView(p.x,p.y+1.65,p.z,Math.PI,.05);game.active='sniper';};
+  let paused=false;
+  document.querySelector('#pause').onclick=()=>{paused=!paused;if(paused)game.loop.stop();else game.loop.start();};
+  document.querySelector('#touch').onclick=async()=>{
+    // Apply the real coarse-pointer CSS in a desktop browser to inspect the touch layout at a narrow viewport.
+    for(const path of ['../src/pages/ChromaOps.css','../src/pages/MobileControls.css','../src/chroma-ops/ui/SniperScope.css']){
+      const css=await (await fetch(new URL(`${path}?direct`,location.href))).text();
+      const style=document.createElement('style');style.textContent=css.replaceAll(/@media\s*\(pointer:\s*coarse\)/g,'@media (min-width:0px)');document.head.append(style);
+    }
+    game.mobile?.dispose();game.mobile=new MobileInput(root,game.input);
+    game.active='sniper';game.input.reset();
+  };
+  setInterval(()=>{status.textContent=`${paused?'Paused':'Running'} · ${game.player.supportId===null?'Ground / air':`Cabin ${game.player.supportId}`} · ${game.input.sprinting?'Sprint':'Walk'} · ${game.aiming?'Scoped':'Hip'}`;},100);
+  window.addEventListener('error',event=>{status.textContent=`ERROR: ${event.message}`;});
+  wheelView();game.start();
+</script></body></html>

@@ -1,10 +1,12 @@
+import { cabinPosition, supportingCabin, wheelBoxes, WHEEL_SUPPORTS } from './ferrisWheel.js';
 export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number };
-export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean };
-export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean };
+export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean; sprint?: boolean; aim?: boolean };
+export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
 export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number };
 export const ARENA_BOUNDS = { minX: -154, maxX: 154, minZ: -140, maxZ: 140, width: 308, depth: 280 } as const;
 export const ARENA_CAMERA_FAR = 420;
 export const PLAYER_MOVE_SPEED = 13;
+export const SPRINT_MULTIPLIER = 1.5;
 export const PLAYER_EYE_HEIGHT = 1.65;
 export const PLAYER_BODY_HEIGHT = 1.8;
 export const PLAYER_RADIUS = 0.42;
@@ -22,6 +24,7 @@ export const ARENA_BUILDINGS = [
 const rect = (x: number, z: number, w: number, d: number, h: number, color: number, minY = 0): ArenaBox =>
   ({ minX: x-w/2, maxX: x+w/2, minZ: z-d/2, maxZ: z+d/2, minY, maxY: minY+h, color });
 export const ARENA_BOXES: ArenaBox[] = [
+  ...WHEEL_SUPPORTS,
   rect(-152,0,4,280,19,0x2d58c8), rect(152,0,4,280,19,0xec3478),
   rect(0,-138,308,4,17,0xf3a72d), rect(0,138,308,4,17,0x35c955),
   rect(0,-3,6,6,3,0xf04b55), rect(-22,13,8,3,2,0xffb738),
@@ -35,6 +38,9 @@ export const ARENA_BOXES: ArenaBox[] = [
   rect(-43,-34,4,4,2,0xffc330), rect(42,34,4,4,2,0x35c955),
   rect(-110,24,18,3,3,0x4b75e8), rect(110,-28,18,3,3,0xffb738), rect(-12,92,32,3,3,0x35c955),
 ];
+export function arenaWorld(seconds:number):SimWorld {
+  return {boxes:[...ARENA_BOXES,...wheelBoxes(seconds)],heightAt:groundHeight};
+}
 export function groundHeight(x: number, z: number) {
   if(x>-22&&x<22&&z>52&&z<72)return 12;
   if(x>-25&&x<-16&&z>40&&z<=52)return z-40;
@@ -83,8 +89,10 @@ function supportHeight(x: number, z: number, ceiling: number, world: SimWorld) {
   return height;
 }
 export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
-  world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }, moveScale=1) {
+  world: SimWorld = { boxes: ARENA_BOXES, heightAt: groundHeight }, moveScale=1, timeSeconds?:number) {
   if(!player.alive)return;
+  const staticWorld=world;
+  if(timeSeconds!==undefined)world={...staticWorld,boxes:[...staticWorld.boxes,...wheelBoxes(timeSeconds)]};
   player.yaw-=input.lookX*.0024;
   player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch-input.lookY*.0021));
   let feet=player.y-PLAYER_EYE_HEIGHT;
@@ -97,18 +105,27 @@ export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
   let moveX=forwardX*input.moveY+Math.cos(player.yaw)*input.moveX;
   let moveZ=forwardZ*input.moveY-Math.sin(player.yaw)*input.moveX;
   const length=Math.hypot(moveX,moveZ);
-  if(length>0) { moveX=moveX/length*PLAYER_MOVE_SPEED*moveScale; moveZ=moveZ/length*PLAYER_MOVE_SPEED*moveScale; }
+  if(length>0) { moveX=moveX/length*PLAYER_MOVE_SPEED*moveScale*(input.sprint?SPRINT_MULTIPLIER:1.0); moveZ=moveZ/length*PLAYER_MOVE_SPEED*moveScale*(input.sprint?SPRINT_MULTIPLIER:1.0); }
   const duration=Math.max(0,Math.min(.25,dt));
   const steps=Math.max(1,Math.ceil(duration/(1/120))), h=duration/steps;
   for(let n=0;n<steps;n++) {
+    if(timeSeconds!==undefined) {
+      const before=timeSeconds+n*h, after=before+h;
+      const id=grounded?supportingCabin(player.x,player.y-PLAYER_EYE_HEIGHT,player.z,before):null;
+      if(id!==null) {
+        const a=cabinPosition(id,before),b=cabinPosition(id,after);
+        player.x+=b.x-a.x;player.y+=b.y-a.y;player.z+=b.z-a.z;
+      }
+      world={...staticWorld,boxes:[...staticWorld.boxes,...wheelBoxes(after)]};
+    }
     feet=player.y-PLAYER_EYE_HEIGHT;
-    const canMove=(x:number,z:number) => !blocked(x,z,PLAYER_RADIUS,feet,world.boxes)
+    const canMove=(x:number,z:number) => !blocked(x,z,PLAYER_RADIUS,feet+(grounded?MAX_STEP_HEIGHT:0),world.boxes)
       && world.heightAt(x,z) <= feet+(grounded?MAX_STEP_HEIGHT:EPSILON);
     const x=player.x+moveX*h;
     if(canMove(x,player.z))player.x=x;
     const z=player.z+moveZ*h;
     if(canMove(player.x,z))player.z=z;
-    support=supportHeight(player.x,player.z,feet+.02,world);
+    support=supportHeight(player.x,player.z,feet+(grounded?MAX_STEP_HEIGHT:.04),world);
     if(grounded && Math.abs(support-feet)<=MAX_STEP_HEIGHT) {
       player.y=support+PLAYER_EYE_HEIGHT;player.velocityY=0;player.jumpsUsed=0;continue;
     }
@@ -123,9 +140,10 @@ export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
         }
       }
     }
-    if(player.velocityY<=0 && feet>=support-EPSILON && nextFeet<=support) {
+    if(player.velocityY<=0 && feet>=support-(timeSeconds!==undefined?.04:EPSILON) && nextFeet<=support) {
       nextFeet=support;player.velocityY=0;player.jumpsUsed=0;grounded=true;
     }
     player.y=nextFeet+PLAYER_EYE_HEIGHT;
   }
+  if(timeSeconds!==undefined)player.supportId=player.velocityY<=0?supportingCabin(player.x,player.y-PLAYER_EYE_HEIGHT,player.z,timeSeconds+duration):null;
 }

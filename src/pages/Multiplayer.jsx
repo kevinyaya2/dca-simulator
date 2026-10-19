@@ -8,6 +8,7 @@ import './ChromaOps.css';
 import './CombatFeedback.css';
 import './Armory.css';
 import './MobileControls.css';
+import '../chroma-ops/ui/SniperScope.css';
 import './MultiplayerArena.css';
 
 const PRODUCTION_GAME_SERVER_URL = 'https://dca-simulator-uw4r.onrender.com';

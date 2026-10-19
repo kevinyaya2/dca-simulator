@@ -49,8 +49,8 @@ export function traceRay(origin:Vec3,dir:Vec3,range:number,targets:Combatant[],s
   for(const target of targets){if(!target.alive)continue;const hit=intersectCharacter(origin,dir,target,distance);if(hit&&hit.distance<distance){distance=hit.distance;kind=hit.kind;targetId=target.id;}}
   return{dir,end:along(origin,dir,distance),kind,targetId};
 }
-export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[],rng= Math.random,simulationWorld=world):ShotResult{
-  const spec=WEAPON_SPECS[id],rays:ShotRay[]=[],hits=new Map<string,PlannedHit>();
+export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[],rng= Math.random,simulationWorld=world,aiming=false):ShotResult{
+  const spec=WEAPON_SPECS[id],spread=aiming?(spec.scopedSpread??spec.spread):spec.spread,rays:ShotRay[]=[],hits=new Map<string,PlannedHit>();
   const add=(targetId:string,damage:number,headshot:boolean,position:Vec3)=>{
     const old=hits.get(targetId);if(old){old.damage+=damage;old.headshot ||= headshot;}else hits.set(targetId,{targetId,damage,headshot,position});
   };
@@ -69,7 +69,7 @@ export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[
     }
   }else{
     for(let n=0;n<(spec.pellets??1);n++){
-      const dir=offsetDirection(base,(rng()-.5)*spec.spread,(rng()-.5)*spec.spread),ray=traceRay(origin,dir,spec.range,targets,simulationWorld);rays.push(ray);
+      const dir=offsetDirection(base,(rng()-.5)*spread,(rng()-.5)*spread),ray=traceRay(origin,dir,spec.range,targets,simulationWorld);rays.push(ray);
       if(id!=='rocket'&&ray.targetId)add(ray.targetId,damageAtDistance(id,length(sub(ray.end,origin)),ray.kind==='head'),ray.kind==='head',ray.end);
     }
     if(id==='rocket'){

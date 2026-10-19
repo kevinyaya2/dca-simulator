@@ -10,7 +10,7 @@ export class Armory{
   get isOpen(){return this.open;}
   setEnabled(enabled:boolean){this.enabled=enabled;if(!enabled)this.close();}
   close(){if(!this.open)return;this.open=false;this.box.hidden=true;this.signature='';this.afterClose?.();}
-  toggle(){if(!this.enabled)return;if(this.open){this.close();return;}this.open=true;this.box.hidden=false;const index=WEAPON_IDS.indexOf(this.active);if(index>=0)this.selected=index;this.render(this.active);this.scrollSelected(false);}
+  toggle(){if(!this.enabled)return;if(this.open){this.close();return;}this.root.dispatchEvent(new Event('combat:reset'));this.open=true;this.box.hidden=false;const index=WEAPON_IDS.indexOf(this.active);if(index>=0)this.selected=index;this.render(this.active);this.scrollSelected(false);}
   move(delta:number){this.selected=(this.selected+delta+WEAPON_IDS.length)%WEAPON_IDS.length;this.render(this.active);this.scrollSelected();}
   render(active:WeaponId=this.active){this.active=active;this.box.hidden=!this.open;const owned=this.owned(),signature=`${this.open}|${active}|${this.selected}|${WEAPON_IDS.map(id=>owned.has(id)?1:0).join('')}`;if(signature===this.signature)return;this.signature=signature;WEAPON_IDS.forEach((id,index)=>{const card=this.track.children[index] as HTMLButtonElement,has=owned.has(id),spec=WEAPON_SPECS[id];card.classList.toggle('active',id===active);card.classList.toggle('focus',index===this.selected);card.classList.toggle('locked',!has);card.disabled=!has;(card.querySelector('small') as HTMLElement).textContent=has?spec.description:'尚未取得';});}
   private scrollSelected(smooth=true){requestAnimationFrame(()=>{(this.track.children[this.selected] as HTMLElement)?.scrollIntoView({behavior:smooth?'smooth':'auto',block:'nearest',inline:'center'});});}
