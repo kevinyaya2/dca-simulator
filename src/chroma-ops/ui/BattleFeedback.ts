@@ -27,5 +27,5 @@ export class BattleFeedback{
     this.entries=this.entries.filter(e=>{e.life-=dt;if(e.life<=0){e.el.remove();return false;}e.el.style.opacity=String(Math.min(1,e.life/.4));return true;});
     this.numbers=this.numbers.filter(n=>{n.life-=dt;if(n.life<=0){n.el.remove();return false;}const p=n.position.clone().project(camera),visible=p.z>=-1&&p.z<=1&&Math.abs(p.x)<1.1&&Math.abs(p.y)<1.1;n.el.hidden=!visible;n.el.style.left=`${(p.x*.5+.5)*100}%`;n.el.style.top=`calc(${(-p.y*.5+.5)*100}% - ${(1-n.life/.7)*34}px)`;n.el.style.opacity=String(Math.min(1,n.life/.2));return true;});
   }
-  dispose(){this.disposed=true;this.root.removeEventListener('pointerdown',this.unlock);this.root.removeEventListener('keydown',this.unlock);void this.audio?.close().catch(()=>{});this.el.remove();this.entries=[];this.numbers=[];this.seen.clear();}
+  dispose(){this.disposed=true;this.root.removeEventListener('pointerdown',this.unlock);this.root.removeEventListener('keydown',this.unlock);void this.audio?.close().catch(()=>{});this.el.remove();this.entries=[];this.numbers=[];this.seen.clear();this.ids=[];}
 }

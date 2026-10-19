@@ -13,7 +13,7 @@ npm run deploy
 
 Deploy the server separately with `npm run server:build` then `npm run server:start`, and configure Render with `PORT` plus `CORS_ORIGIN=https://kevinyaya2.github.io`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
 
-### CHROMA OPS 戰鬥更新（協定 5）
+### CHROMA OPS 戰鬥更新（協定 6）
 
 單人與多人共用即時命中、兩倍爆頭、步槍／衝鋒槍距離衰減、火焰範圍傷害、燃燒、冰槍減速及火箭遮擋判定。七種武器提供獨立彈道與撞擊特效，射手可看到實際扣血數字。
 
@@ -23,9 +23,11 @@ Deploy the server separately with `npm run server:build` then `npm run server:st
 
 右上擊殺紀錄保留最多 5 筆、6 秒；4 秒內接續擊殺觸發短時間連殺，同一條命的 3／5／7／10 殺觸發稱號。廣播只有畫面，命中確認仍有短音效。
 
-此次多人協定由 4 升為 5，**前端與 Render 伺服器必須一起更新**。`npm run deploy` 只發布前端；Render 仍需部署包含此次修改的版本，建置 `npm run server:build`、啟動 `npm run server:start`。版本不同時沿用既有提示。
+多人重開已加入每場獨立的 `roundId`，開始新場時重設指令編號，並重建客戶端的預測、快照與畫面狀態。舊場的輸入、射擊與傷害封包會被忽略。離場時會釋放角色、死亡碎片材質、姓名貼圖、槍枝、拾取物及 WebGL 資源，並移除事件監聽器與動畫迴圈。
 
-執行 `npm run test:chroma` 驗證共用戰鬥、移動、搭乘、觸控／鍵鼠及雙客戶端同步。武器數值集中在 `shared/weapons.ts`，戰鬥判定與連殺計數在 `shared/combat.ts`，車廂位置與碰撞在 `shared/ferrisWheel.ts`。開發伺服器的 `/dca-simulator/tests/chroma-visual.html` 提供摩天輪、開鏡、搭乘、暫停與觸控排版檢查場景；此頁不會加入正式建置。
+此次多人協定由 5 升為 6，**前端與 Render 伺服器必須一起更新**。`npm run deploy` 只發布前端；Render 仍需部署包含此次修改的版本，建置 `npm run server:build`、啟動 `npm run server:start`。版本不同時沿用既有提示。
+
+執行 `npm run test:chroma` 驗證共用戰鬥、移動、搭乘、觸控／鍵鼠、雙客戶端同步與重開回歸。武器數值集中在 `shared/weapons.ts`，戰鬥判定與連殺計數在 `shared/combat.ts`，車廂位置與碰撞在 `shared/ferrisWheel.ts`。開發伺服器的 `/dca-simulator/tests/chroma-visual.html` 提供摩天輪、開鏡、搭乘、暫停與觸控排版檢查場景；`/dca-simulator/tests/chroma-rematch.html` 可連續重建十場，檢查 GPU 資源、Socket 監聽器、動畫迴圈與 DOM 是否釋放。這些測試頁不會加入正式建置。
 
 本專案是一個使用 **React + Vite** 建立的前端學習專案，  
 目標是模擬 **手機介面（Samsung One UI 風格）**，  

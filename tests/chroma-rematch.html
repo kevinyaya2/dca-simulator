@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Chroma rematch regression</title>
+<style>body{margin:0;font:14px Arial;background:#10162c;color:white}header{padding:12px}button{padding:10px}#game{position:relative;width:844px;height:390px;max-width:100vw}pre{white-space:pre-wrap;padding:12px}</style>
+</head><body><header><button id="run">Run 10 rematches</button> <output id="status">Ready</output></header><div class="chroma-ops" id="game"></div><pre id="results"></pre>
+<script type="module">
+import '../src/pages/ChromaOps.css';
+import '../src/pages/MultiplayerArena.css';
+import '../src/pages/CombatFeedback.css';
+import '../src/pages/Armory.css';
+import '../src/pages/MobileControls.css';
+import '../src/chroma-ops/ui/SniperScope.css';
+import { MultiplayerGame } from '../src/chroma-ops/core/MultiplayerGame.ts';
+import { WEAPON_IDS, WEAPON_SPECS } from '../shared/weapons.ts';
+import * as T from 'three';
+
+// Test only: controlled snapshots exercise the production renderer and cleanup without a live match.
+class TestSocket{
+  id='self';connected=true;handlers=new Map();inputs=[];
+  on(name,handler){if(!this.handlers.has(name))this.handlers.set(name,new Set());this.handlers.get(name).add(handler);return this;}
+  off(name,handler){this.handlers.get(name)?.delete(handler);return this;}
+  emit(name,value){if(name==='net:ping')value(Date.now());if(name==='match:input')this.inputs.push(value);}
+  push(name,value){for(const handler of this.handlers.get(name)||[])handler(value);}
+  get count(){return [...this.handlers.values()].reduce((sum,set)=>sum+set.size,0);}
+}
+const root=document.querySelector('#game'),status=document.querySelector('#status'),results=document.querySelector('#results'),run=document.querySelector('#run');
+const assert=(condition,message)=>{if(!condition)throw new Error(message);};
+const player=(id,x)=>({id,name:id,avatar:'',color:0x55aaff,x,y:1.65,z:0,yaw:.4,pitch:.1,velocityY:0,jumpsUsed:0,hp:100,alive:true,kills:0,deaths:0,
+  activeWeapon:'ar',ownedWeapons:['ar'],weapons:Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])),slowUntil:0,burnUntil:0,ack:0,supportId:null,aiming:false,sprinting:false});
+run.onclick=async()=>{
+  run.disabled=true;results.textContent='';status.textContent='Running';
+  const socket=new TestSocket(),nativeRAF=window.requestAnimationFrame.bind(window),nativeCancel=window.cancelAnimationFrame.bind(window),frames=new Set();
+  window.requestAnimationFrame=callback=>{const id=nativeRAF(time=>{frames.delete(id);callback(time);});frames.add(id);return id;};
+  window.cancelAnimationFrame=id=>{frames.delete(id);nativeCancel(id);};
+  const frame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+  let baseline;let active;
+  try{
+    for(let roundId=1;roundId<=10;roundId++){
+      socket.inputs=[];
+      const game=new MultiplayerGame(root,socket,'QA',roundId,message=>{throw new Error(message);});active=game;
+      game.start();game.resume();game.resume();
+      await frame();await frame();
+      assert(socket.inputs.length===0,'must wait for this round snapshot before sending inputs');
+      const snapshot={roundId,tick:3,simulationTime:.05,serverTime:Date.now(),players:[player('self',15),player('peer',25)],pickups:[]};
+      socket.push('match:snapshot',{...snapshot,roundId:roundId-1});await frame();assert(socket.inputs.length===0,'stale round snapshot accepted');
+      socket.push('match:snapshot',snapshot);await frame();await frame();
+      assert(socket.inputs[0]?.seq===1&&socket.inputs[0]?.roundId===roundId,'new round did not start input sequence at 1');
+      assert(Math.abs(game.player.yaw-.4)<1e-8,'initial facing not hydrated from server');
+      assert(socket.count===7,'duplicate match socket listeners');
+      const memory={...game.renderer.info.memory};
+      if(!baseline)baseline=memory;
+      assert(memory.geometries===baseline.geometries&&memory.textures===baseline.textures,'GPU resource count grows between rounds');
+      socket.push('match:damage',{roundId:roundId-1,hp:1});assert(game.player.hp===100,'stale damage accepted');
+      const peer=game.avatars.get('peer');peer.damage(100);await frame();
+      const resources=new Set();
+      game.scene.traverse(object=>{
+        if(object instanceof T.Mesh||object instanceof T.Points||object instanceof T.Line)resources.add(object.geometry);
+        if(object.material)for(const material of Array.isArray(object.material)?object.material:[object.material]){
+          resources.add(material);for(const value of Object.values(material))if(value instanceof T.Texture)resources.add(value);
+        }
+      });
+      let released=0;for(const resource of resources)resource.addEventListener('dispose',()=>released++);
+      game.pause();game.dispose();game.dispose();active=null;
+      assert(released===resources.size,'scene resources not fully released');
+      assert(socket.count===0,'socket listeners retained after disposal');
+      assert(frames.size===0,'animation callback retained after disposal');
+      assert(root.children.length===0,'old HUD or canvas retained');
+      assert(game.pending.length===0&&game.snaps.length===0&&game.avatars.size===0,'prediction or avatar caches retained');
+      results.textContent+=`Round ${roundId}: PASS | geometries ${memory.geometries}, textures ${memory.textures} | released ${released}/${resources.size} | listeners 0, RAF 0, old DOM 0\n`;
+      await frame();
+    }
+    status.textContent='PASS: 10 rematches; resource counts stable';
+  }catch(error){active?.dispose();status.textContent=`FAIL: ${error.message}`;console.error(error);}
+  finally{window.requestAnimationFrame=nativeRAF;window.cancelAnimationFrame=nativeCancel;run.disabled=false;}
+};
+</script></body></html>

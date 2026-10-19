@@ -12,7 +12,7 @@ function event<T>(socket:Socket,name:string,predicate:(value:T)=>boolean=()=>tru
     socket.on(name,receive);
   });
 }
-type Snapshot={tick:number;simulationTime:number;serverTime:number;players:any[];pickups:any[]};
+type Snapshot={roundId:number;tick:number;simulationTime:number;serverTime:number;players:any[];pickups:any[]};
 
 test('two clients agree on wheel time, sprint speed, action resets and the new weapon pickup',async()=>{
   const server=createGameServer();
@@ -36,7 +36,7 @@ test('two clients agree on wheel time, sprint speed, action resets and the new w
     const choices=[{moveX:1,moveY:0},{moveX:-1,moveY:0},{moveX:0,moveY:1},{moveX:0,moveY:-1}];
     const direction=choices.find(d=>{const p={...me};for(let n=0;n<120;n++)stepPlayer(p,{...d,lookX:0,lookY:0,jump:false,sprint:true},1/120,undefined,1,first.simulationTime+n/120);return Math.hypot(p.x-me.x,p.z-me.z)>19;});
     assert.ok(direction,'spawn has a clear route for speed measurement');
-    const command={seq:1,clientTime:Date.now(),...direction,yaw:0,pitch:0,jump:false,reload:false,sprint:false,aim:true};
+    const command={roundId:first.roundId,seq:1,clientTime:Date.now(),...direction,yaw:0,pitch:0,jump:false,reload:false,sprint:false,aim:true};
     const walkingStart=event<Snapshot>(a,'match:snapshot',s=>s.players.find(p=>p.id===a.id)?.ack===1);a.emit('match:input',command);
     const walkA=await walkingStart;
     const walkB=await event<Snapshot>(a,'match:snapshot',s=>s.tick>=walkA.tick+12);
@@ -55,5 +55,15 @@ test('two clients agree on wheel time, sprint speed, action resets and the new w
     for(const tick of common){assert.deepEqual(fromA.get(tick),fromB.get(tick));}
     assert.ok(end.simulationTime>first.simulationTime);
     assert.ok(Math.abs((end.simulationTime-first.simulationTime)-(end.serverTime-first.serverTime)/1000)<1e-8);
+    const ammo=end.players.find(p=>p.id===a.id).weapons.ar.ammo;
+    // A late, high-sequence command from a prior round must not poison this round's sequence counter.
+    a.emit('match:input',{...command,roundId:first.roundId-1,seq:90000});
+    a.emit('match:fire',{roundId:first.roundId-1,clientTime:Date.now()});
+    const afterStale=await event<Snapshot>(a,'match:snapshot',s=>s.tick>=end.tick+6);
+    const stoppedPlayer=afterStale.players.find(p=>p.id===a.id);
+    assert.equal(stoppedPlayer.ack,3);assert.equal(stoppedPlayer.weapons.ar.ammo,ammo);
+    assert.equal(stoppedPlayer.x,end.players.find(p=>p.id===a.id).x);assert.equal(stoppedPlayer.z,end.players.find(p=>p.id===a.id).z);
+    const accepted=event<Snapshot>(a,'match:snapshot',s=>s.players.find(p=>p.id===a.id)?.ack===4);
+    a.emit('match:input',{...command,seq:4,moveX:0,moveY:0});await accepted;
   }finally{a.disconnect();b.disconnect();server.close();}
 });

@@ -60,7 +60,7 @@ export default function Multiplayer({ onBack }) {
 
   useEffect(() => {
     if (!inMatch || !arenaRef.current || gameRef.current) return undefined;
-    const game = new MultiplayerGame(arenaRef.current, socket, room?.code, (reason) => {
+    const game = new MultiplayerGame(arenaRef.current, socket, room?.code, room?.roundId, (reason) => {
       setError(reason);
       setBusy(false);
       setScreen('lobby');
@@ -71,7 +71,7 @@ export default function Multiplayer({ onBack }) {
       game.dispose();
       if (gameRef.current === game) gameRef.current = null;
     };
-  }, [inMatch, socket, room?.code]);
+  }, [inMatch, socket, room?.code, room?.roundId]);
 
   useEffect(() => {
     if (screen === 'results') gameRef.current?.pause();
@@ -114,7 +114,7 @@ export default function Multiplayer({ onBack }) {
     const isHost = socket.id === room?.host;
     const isWinner = socket.id === room?.winnerId;
     return <main className="chroma-ops co-multiplayer-shell">
-      <div className="co-game-stage" ref={arenaRef} aria-label="CHROMA OPS multiplayer arena" />
+      <div key={room?.roundId} className="co-game-stage" ref={arenaRef} aria-label="CHROMA OPS multiplayer arena" />
       {screen === 'results' && <section className="mp-result" role="dialog" aria-modal="true" aria-labelledby="mp-result-title">
         <div className={`mp-result-card ${isWinner ? 'is-winner' : ''}`}>
           <p className="mp-result-eyebrow">比賽結束</p>

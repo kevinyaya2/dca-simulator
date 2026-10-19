@@ -9,4 +9,9 @@ export class HUD{
     if(!d.dead&&this.wasDead){this.death.classList.add('is-leaving');this.hideTimer=window.setTimeout(()=>{this.death.hidden=true;this.death.classList.remove('is-leaving');},180);}
     this.el.parentElement?.classList.toggle('co-is-dead',d.dead);this.wasDead=d.dead;
   }
+  dispose(){
+    window.clearTimeout(this.hideTimer);this.death.remove();this.el.replaceChildren();
+    this.el.parentElement?.classList.remove('co-is-dead');
+  }
+
 }
