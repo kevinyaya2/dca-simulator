@@ -8,8 +8,8 @@ export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: n
 export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number };
 export const ARENA_BOUNDS = { minX: -154, maxX: 154, minZ: -140, maxZ: 140, width: 308, depth: 280 } as const;
 export const ARENA_CAMERA_FAR = 420;
-export const PLAYER_MOVE_SPEED = 13;
-export const SPRINT_MULTIPLIER = 1.5;
+export const PLAYER_MOVE_SPEED = 8;
+export const SPRINT_MULTIPLIER = 1.2;
 export const PLAYER_EYE_HEIGHT = 1.65;
 export const PLAYER_BODY_HEIGHT = 1.8;
 export const PLAYER_RADIUS = 0.42;
