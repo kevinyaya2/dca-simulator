@@ -21,9 +21,9 @@ export function undergroundHeight(x:number,z:number):number|null{
   return inside(x,z,MALL)?-6:null;
 }
 // Subtract entrance openings from both collision slabs and decorative road tiles.
-export function cutEntrances<T extends Rect>(source:T):T[]{
+export function cutEntrances<T extends Rect>(source:T,holes:readonly Rect[]=ENTRY_HOLES):T[]{
   let pieces=[source];
-  for(const hole of ENTRY_HOLES)pieces=pieces.flatMap(r=>{
+  for(const hole of holes)pieces=pieces.flatMap(r=>{
     const x0=Math.max(r.minX,hole.minX),x1=Math.min(r.maxX,hole.maxX),z0=Math.max(r.minZ,hole.minZ),z1=Math.min(r.maxZ,hole.maxZ);
     if(x0>=x1||z0>=z1)return [r];
     return [

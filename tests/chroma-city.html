@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>body{margin:0}nav{position:fixed;z-index:30;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;max-width:80vw;font:12px Arial}nav button,nav output{padding:8px;border:1px solid #ffffff66;border-radius:6px;background:#172447;color:white}</style></head>
 <body><main class="chroma-ops" id="game"></main><nav data-game-ui>
-<button id="city">City overview</button><button id="building">Building entrance</button><button id="lift">Lift entrance</button><button id="wheel">Wheel</button>
+<button id="city">City overview</button><button id="slab">Slab corner</button><button id="building">Building entrance</button><button id="lift">Lift entrance</button><button id="wheel">Wheel</button>
 <button id="mall">B1 mall</button><button id="north">B1 ramp</button><button id="shops">Outer buildings</button><button id="day">Day</button><button id="dusk">Dusk</button><button id="night">Night</button><button id="dawn">Dawn</button><button id="scope">Scope</button><button id="mobile">844 x 390</button><button id="pause">Check settings pause</button><output id="status">Starting</output></nav>
 <script type="module">
 // Development fixture using the production game, renderer, HUD and lens. Excluded from builds.
@@ -23,6 +23,7 @@ game.renderer.info.autoReset=false;
 const draw=()=>{game.renderer.info.reset();game.update(0);const info=game.renderer.info;status.textContent=`${dayNightAt(game.elapsed).phase} | ${info.render.calls} draws | ${info.render.triangles} triangles | ${info.memory.geometries} geometries`;};
 const view=(x,y,z,yaw,pitch)=>{game.input.reset();game.active='sniper';game.player.position.set(x,y,z);game.player.yaw=yaw;game.player.pitch=pitch;game.player.velocityY=0;draw();};
 document.querySelector('#city').onclick=()=>view(0,48,134,0,-.4);
+document.querySelector('#slab').onclick=()=>view(-102,1.65,40,-.65,0);
 document.querySelector('#building').onclick=()=>view(-65,1.65,76,0,0);
 document.querySelector('#lift').onclick=()=>view(68,1.65,22,Math.PI,0);
 document.querySelector('#mall').onclick=()=>view(-64,-4.35,18,-1.1,0);

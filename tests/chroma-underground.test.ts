@@ -9,6 +9,7 @@ import { CollisionSystem } from '../src/chroma-ops/systems/CollisionSystem.ts';
 import * as T from 'three';
 import { resolveShot } from '../shared/combat.ts';
 import { SAFE_SPAWNS } from '../shared/spawns.ts';
+import { GROUND_SURFACES, groundCoversBoxTop } from '../src/chroma-ops/world/GroundSurfaces.ts';
 const idle={moveX:0,moveY:0,lookX:0,lookY:0,jump:false};
 const player=(x:number,z:number,feet=0):SimPlayer=>({x,y:feet+1.65,z,yaw:0,pitch:0,velocityY:0,jumpsUsed:0,alive:true});
 const near=(a:number,b:number)=>assert.ok(Math.abs(a-b)<.05,`${a} != ${b}`);
@@ -95,4 +96,21 @@ test('spatially filtered simulation matches the full world at floor edges and lo
     stepPlayer(indexed,input,.25,undefined,1,n/3);stepPlayer(full,input,.25,world,1,n/3);
     assert.deepEqual(indexed,full);
   }
+});
+
+test('ground paint has exactly one visible surface at intersections and above B1, with entrances open',()=>{
+  const overlap=(a:{minX:number;maxX:number;minZ:number;maxZ:number},b:typeof a)=>
+    Math.max(0,Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX))*Math.max(0,Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ));
+  let area=0;
+  for(let i=0;i<GROUND_SURFACES.length;i++){
+    const a=GROUND_SURFACES[i];assert.equal(a.maxY,0);
+    area+=(a.maxX-a.minX)*(a.maxZ-a.minZ);
+    for(const b of GROUND_SURFACES.slice(i+1))assert.equal(overlap(a,b),0,'coplanar road / ground faces overlap');
+    for(const h of ENTRY_HOLES)assert.equal(overlap(a,h),0,'paint seals a basement entrance');
+  }
+  near(area,308*280-4*6*24);
+  const roof=ARENA_BOXES.find(b=>b.minX===-90&&b.maxX===90&&b.maxY===0)!;
+  assert.equal(groundCoversBoxTop(roof),true,'B1 roof must not draw a second ground-facing cap');
+  const stair=ARENA_BOXES.find(b=>b.minX===113&&b.maxX===114&&b.maxY===0)!;
+  assert.equal(groundCoversBoxTop(stair),false,'the first basement stair remains visible inside its opening');
 });

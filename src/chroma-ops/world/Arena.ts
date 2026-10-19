@@ -1,9 +1,10 @@
 import * as T from 'three';
 import { FerrisWheel } from './FerrisWheel';
+import { GROUND_SURFACES, groundCoversBoxTop } from './GroundSurfaces';
 import { SAFE_SPAWNS } from '../../../shared/spawns';
-import { ARENA_BOUNDS, ARENA_BOXES, terrainHeight, type ArenaBox } from '../../../shared/arena';
+import { ARENA_BOXES, terrainHeight, type ArenaBox } from '../../../shared/arena';
 import { CITY_BUILDINGS, CITY_RAMPS, CITY_GARDENS, CITY_LAMPS, CITY_WAYPOINTS, cityBox } from '../../../shared/city';
-import { cutEntrances, MALL_ENTRIES, MALL_SHOPS } from '../../../shared/underground';
+import { MALL_ENTRIES, MALL_SHOPS } from '../../../shared/underground';
 import { liftBoxes } from '../../../shared/movingPlatforms';
 import { dayNightAt } from '../../../shared/dayNight';
 import { disposeResources } from '../systems/DisposeResources';
@@ -20,6 +21,8 @@ export class Arena {
   private pools=new T.Group();
   private poolMaterial=new T.MeshBasicMaterial({color:0xffdd92,transparent:true,opacity:0,depthWrite:false});
   private unitBox=new T.BoxGeometry(1,1,1);
+  private openTopBox=this.unitBox.clone();
+  private groundPlane=new T.PlaneGeometry(1,1).rotateX(-Math.PI/2);
   private matrix=new T.Matrix4();
   private daySky=new T.Color(0x16b9dc);
   private sunset=new T.Color(0xc779a4);
@@ -30,16 +33,17 @@ export class Arena {
 
   constructor(){
     this.group.add(this.wheel.group,this.pools);
+    // BoxGeometry's +Y face occupies indices 12..17. Ground paint owns that face;
+    // the B1 ceiling underside and structural side faces remain visible.
+    this.openTopBox.setIndex(Array.from(this.unitBox.index!.array).filter((_,index)=>index<12||index>=18));
+    this.openTopBox.clearGroups();
     this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY>0));
-    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY<=0),undefined,true);
+    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY<=0&&!groundCoversBoxTop(b)),undefined,true);
+    this.drawBoxes(ARENA_BOXES.filter(groundCoversBoxTop),undefined,true,this.openTopBox);
+    this.drawBoxes(GROUND_SURFACES,undefined,false,this.groundPlane,true);
     this.drawBoxes([
-      cityBox(0,0,ARENA_BOUNDS.width,ARENA_BOUNDS.depth,0,0x19b9dc,-.05),
-      cityBox(0,0,78,62,.025,0xd5edf0,-.05),
-      cityBox(-65,0,16,180,.03,0xe9edf1,-.04),cityBox(68,0,16,180,.03,0xe9edf1,-.04),
-      cityBox(0,-64,184,16,.03,0xe9edf1,-.04),cityBox(0,76,210,12,.03,0xe9edf1,-.04),
-      cityBox(0,24,112,12,.03,0xe9edf1,-.04),cityBox(0,102,92,16,.03,0x99d9df,-.04),
       cityBox(0,62,44,20,12,0x188bd0),cityBox(4,100,32,24,6,0x795ad8),
-    ].flatMap(b=>b.maxY<1?cutEntrances(b):[b]));
+    ]);
     for(const ramp of CITY_RAMPS)this.ramp(ramp.x,ramp.z0,ramp.x,ramp.z1,ramp.from,ramp.to,ramp.width);
     this.ramp(-20.5,40,-20.5,52,0,12,9);
     this.ramp(-38,100,-12,100,0,6,24);
@@ -70,13 +74,13 @@ export class Arena {
     this.update(0,0);
   }
 
-  private drawBoxes(boxes:readonly ArenaBox[],glow?:number,fixedLight=false){
+  private drawBoxes(boxes:readonly ArenaBox[],glow?:number,fixedLight=false,geometry:T.BufferGeometry=this.unitBox,flat=false){
     const batches=new Map<number,ArenaBox[]>();
     for(const box of boxes){const items=batches.get(box.color)||[];items.push(box);batches.set(box.color,items);}
     for(const [color,items] of batches){
       const material=new T.MeshBasicMaterial({color});material.userData.fixedLight=fixedLight;if(glow!==undefined)material.userData.glow=glow;
-      const mesh=new T.InstancedMesh(this.unitBox,material,items.length);
-      items.forEach((b,index)=>{this.matrix.makeScale(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ);this.matrix.setPosition((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);mesh.setMatrixAt(index,this.matrix);});
+      const mesh=new T.InstancedMesh(geometry,material,items.length);
+      items.forEach((b,index)=>{this.matrix.makeScale(b.maxX-b.minX,flat?1:b.maxY-b.minY,b.maxZ-b.minZ);this.matrix.setPosition((b.minX+b.maxX)/2,flat?b.maxY:(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);mesh.setMatrixAt(index,this.matrix);});
       mesh.instanceMatrix.needsUpdate=true;this.group.add(mesh);
     }
   }
