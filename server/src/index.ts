@@ -8,7 +8,7 @@ import { Server } from 'socket.io';
 import { groundHeight, arenaWorld, stepPlayer, type SimInput } from '../../shared/arena.js';
 import { chooseRespawnPoint, chooseWeaponPoint, initialWeaponPoints, type SpawnPoint } from '../../shared/spawns.js';
 import { WEAPON_IDS, WEAPON_SPECS, type WeaponId } from '../../shared/weapons.js';
-import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound } from '../../shared/protocol.js';
+import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound, type RoomNotice } from '../../shared/protocol.js';
 
 type Input = SimInput & { roundId?:number; seq:number; clientTime:number; reload?:boolean; yaw:number; pitch:number };
 type WeaponState = Record<WeaponId,{ammo:number;reloadUntil:number}>;
@@ -28,6 +28,7 @@ type Room = {
   players:Map<string,Player>; pickups:Pickup[]; history:History[];
   winner?:string; winnerId?:string; winnerTitle?:string; shotSequence:number; killTracker:KillTracker; returnAt?:number; tick:number; lastStep:number; wheelEpoch:number;
   reconnectTimers:Map<string,NodeJS.Timeout>; lobbyReason?:string;
+  notices?:RoomNotice[];
   respawnTimers:Map<string,NodeJS.Timeout>; gameOverTimer?:NodeJS.Timeout;
 };
 
@@ -42,7 +43,12 @@ function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];f
 
 function roomCode(rooms:Map<string,Room>):string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode(rooms):value;}
 function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,...safe}=p;void resumeToken;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
-function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,players:[...room.players.values()].map(publicPlayer),pickups:room.pickups};}
+function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups};}
+function announceConnection(io:Server,room:Room,player:Player,kind:RoomNotice['kind']){
+  const notice:RoomNotice={id:randomUUID(),code:room.code,playerId:player.id,name:player.name,kind,at:now()};
+  room.notices=[...(room.notices??[]),notice].slice(-20);
+  io.to(room.code).emit('room:notice',notice);
+}
 function emitRoom(io:Server,room:Room){io.to(room.code).emit('room:state',roomState(room));}
 function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups});}
 function clearRespawns(room:Room){for(const timer of room.respawnTimers.values())clearTimeout(timer);room.respawnTimers.clear();}
@@ -167,7 +173,7 @@ export function createGameServer(options:{reconnectGraceMs?:number}={}){
       const timer=target.reconnectTimers.get(p.id);if(timer)clearTimeout(timer);target.reconnectTimers.delete(p.id);
       room=target;playerId=p.id;p.input={...blankInput(),yaw:p.yaw,pitch:p.pitch};p.aiming=false;p.sprinting=false;
       if(previousSocket){previousSocket.emit('room:replaced');previousSocket.disconnect(true);}
-      socket.join(target.code);selectHost(target);emitRoom(io,target);reply(cb,credentials(p));
+      socket.join(target.code);selectHost(target);announceConnection(io,target,p,'reconnected');emitRoom(io,target);reply(cb,credentials(p));
     });
     socket.on('room:leave',(cb:unknown)=>{
       const p=currentPlayer();if(room&&p){socket.leave(room.code);removePlayer(room,p.id);}room=undefined;playerId=undefined;reply(cb,{ok:true});
@@ -193,7 +199,7 @@ export function createGameServer(options:{reconnectGraceMs?:number}={}){
       const target=room;p.socketId=undefined;p.disconnectedUntil=now()+graceMs;
       p.input={...blankInput(),yaw:p.yaw,pitch:p.pitch};p.aiming=false;p.sprinting=false;
       target.reconnectTimers.set(p.id,setTimeout(()=>removePlayer(target,p.id),graceMs));
-      selectHost(target);emitRoom(io,target);
+      selectHost(target);announceConnection(io,target,p,'disconnected');emitRoom(io,target);
     });
   });
   const fixedStep=1/60;let lastLoop=now(),accumulator=0;

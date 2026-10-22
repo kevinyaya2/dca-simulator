@@ -4,6 +4,8 @@ import MouseSensitivityControl from '../chroma-ops/ui/MouseSensitivityControl';
 import { MultiplayerGame } from '../chroma-ops/core/MultiplayerGame';
 import { MULTIPLAYER_PROTOCOL_VERSION } from '../../shared/protocol';
 import { readMultiplayerSession, saveMultiplayerSession } from '../chroma-ops/settings/MultiplayerSession';
+import ResumeCard from '../chroma-ops/ui/ResumeCard';
+import RoomBroadcast from '../chroma-ops/ui/RoomBroadcast';
 import './Multiplayer.css';
 import './ChromaOps.css';
 import './CombatFeedback.css';
@@ -43,6 +45,7 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [resultSeconds, setResultSeconds] = useState(10);
+  const [broadcasts, setBroadcasts] = useState([]);
   const arenaRef = useRef(null);
   const gameRef = useRef(null);
   const sessionRef = useRef(readMultiplayerSession());
@@ -67,6 +70,7 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
   };
   const clearSession = () => {
     sessionRef.current = null;
+    setBroadcasts([]);
     saveMultiplayerSession(null);
   };
   const applyRoom = (nextRoom) => {
@@ -134,16 +138,23 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
       setRoom(null);setScreen('join');setBusy(false);
       setError('此席位已在另一個連線恢復，這個連線已結束');
     };
+    const onNotice = (notice) => {
+      if (!resumeRef.current || notice?.code !== sessionRef.current?.code) return;
+      if (!['disconnected', 'reconnected'].includes(notice.kind) || !Number.isFinite(notice.at)) return;
+      setBroadcasts(current => [...current.filter(item => item.id !== notice.id), { ...notice, expiresAt: Date.now() + 8000 }].slice(-3));
+    };
     socket.on('connect', restore);
     socket.on('room:state', onRoomState);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onError);
     socket.on('room:replaced', onReplaced);
+    socket.on('room:notice', onNotice);
     if (resumeRef.current && sessionRef.current) socket.connect();
     return () => {
       activeRef.current = false;
       socket.off('connect', restore);socket.off('room:state', onRoomState);
       socket.off('disconnect', onDisconnect);socket.off('connect_error', onError);socket.off('room:replaced', onReplaced);
+      socket.off('room:notice', onNotice);
       socket.disconnect();
     };
     // Connection handlers read the current session from refs throughout this mount.
@@ -228,14 +239,24 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
   const returnLobby = () => { void hostAction('game:lobby'); };
   const loadingLabel = busy ? <><i className="mp-spinner" aria-hidden="true" />連線中…</> : null;
 
-  if (screen === 'reconnecting') return <main className="mp"><h1>正在返回上一場…</h1><p>斷線席位保留 60 秒，其他玩家仍在對戰。</p><p role="status">{error || '網路恢復後會自動重新連線'}</p><button disabled={busy} onClick={resume}>重試連線</button><button onClick={leave}>離開房間</button></main>;
+  const copyInvite = () => {
+    const url = new URL(location.href);url.searchParams.set('room', room.code);
+    navigator.clipboard?.writeText(url.toString()).catch(() => setError('無法複製，請分享房間碼'));
+  };
+
+  if (screen === 'reconnecting') return <main className="mp"><section className="mp-panel mp-join-panel mp-reconnect-panel">
+    <span className="mp-reconnect-orbit" aria-hidden="true"><i className="mp-spinner" /></span>
+    <p className="mp-eyebrow">BACK TO THE ARENA</p><h1>正在返回上一場</h1><p className="mp-subtitle">隊友還在戰場，正在為你恢復連線。</p>
+    <p className="mp-reconnect-hint">斷線席位保留 <b>60 秒</b></p><p className="mp-status" role="status">{error || '網路恢復後會自動重新連線'}</p>
+    <button className="mp-primary" disabled={busy} onClick={resume}>重試連線</button><button className="mp-secondary" onClick={leave}>離開房間</button>
+  </section></main>;
 
   if (inMatch) {
     const ranked = [...(room?.players || [])].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
     const isWinner = playerId === room?.winnerId;
     return <main className="chroma-ops co-multiplayer-shell">
       <div key={room?.roundId} className="co-game-stage" ref={arenaRef} aria-label="CHROMA OPS multiplayer arena" />
-      {error && <p className="mp-match-error" role="alert">{error}</p>}
+      <RoomBroadcast notices={broadcasts} floating />
       {error && <p className="mp-match-error" role="alert">{error}</p>}
       {screen === 'results' && <section className="mp-result" role="dialog" aria-modal="true" aria-labelledby="mp-result-title">
         <div className={`mp-result-card ${isWinner ? 'is-winner' : ''}`}>
@@ -255,17 +276,31 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
     </main>;
   }
 
-  if (screen === 'lobby' && room) return <main className="mp">
-    <button className="mp-back" disabled={busy} onClick={leave}>← 返回模式選擇</button><h1>多人連線</h1><MouseSensitivityControl />
-    <h2>房間 {room.code}</h2>{room.lobbyReason && <p role="status">{room.lobbyReason}</p>}
-    <p>{room.players.filter(player => player.connected).length} 位在線／{room.players.length} 個席位（上限 8）</p>
-    {room.players.map((player) => <p className="mp-player" key={player.id}>{player.name}{player.id === room.host ? '　房主' : ''}{!player.connected ? '　斷線，保留席位中' : ''}</p>)}
-    <button onClick={() => navigator.clipboard?.writeText(room.code).catch(()=>setError('無法複製，請手動複製房間碼'))}>複製房間碼</button>
-    <button onClick={() => navigator.clipboard?.writeText((()=>{const url=new URL(location.href);url.searchParams.set('room',room.code);return url.toString();})()).catch(()=>setError('無法複製，請分享房間碼'))}>複製邀請連結</button>
-    {isHost && room.state === 'LOBBY' && <button className="mp-primary" disabled={busy || room.players.filter(player => player.connected).length < 2} onClick={start}>{busy ? loadingLabel : '開始遊戲'}</button>}
-    {error && <p role="alert">{error}</p>}
-  </main>;
-  return <main className="mp"><button className="mp-back" disabled={busy} onClick={leave}>← 返回模式選擇</button><h1>多人連線</h1>
-    {sessionRef.current && <button disabled={busy} onClick={resume}>返回上一場（{sessionRef.current.code}）</button>}
-    <MouseSensitivityControl /><label>暱稱<input disabled={busy} value={name} maxLength="16" onChange={(event) => setName(event.target.value)} /></label><button className="mp-primary" disabled={busy} onClick={create}>{busy ? loadingLabel : '建立房間'}</button><label>房間碼<input disabled={busy} value={code} maxLength="6" onChange={(event) => setCode(event.target.value.toUpperCase())} /></label><button disabled={busy} onClick={join}>{busy ? loadingLabel : '加入房間'}</button>{error && <p role="alert">{error}</p>}</main>;
+  if (screen === 'lobby' && room) return <main className="mp"><section className="mp-panel mp-lobby-panel">
+    <button className="mp-back" disabled={busy} onClick={leave}>← 離開房間</button>
+    <header className="mp-lobby-header"><div><p className="mp-eyebrow">CHROMA OPS / LOBBY</p><h1>集結，準備開戰。</h1><p className="mp-subtitle">分享房號，邀請朋友加入你的戰場。</p></div><div className="mp-room-code"><small>房間代碼</small><strong>{room.code}</strong><span><i />{room.players.filter(player => player.connected).length} 位在線 · {room.players.length} / 8 席位</span></div></header>
+    {room.lobbyReason && <p className="mp-status" role="status">{room.lobbyReason}</p>}
+    <div className="mp-lobby-columns"><section className="mp-roster-panel" aria-label="房間玩家">
+      <h2>玩家名單 <span>{room.players.length.toString().padStart(2, '0')} / 08</span></h2>
+      <div className="mp-player-list">{room.players.map((player) => <div className={`mp-player-row ${!player.connected ? 'is-offline' : ''}`} key={player.id}>
+        <span className="mp-avatar" style={{ '--player-color': `#${player.color.toString(16).padStart(6, '0')}` }}>{player.avatar}</span>
+        <span className="mp-player-info"><b>{player.name}{player.id === playerId && <small>你</small>}</b><span><i />{player.connected ? '已連線，準備就緒' : '斷線中 · 席位保留 60 秒'}</span></span>
+        {player.id === room.host && <span className="mp-host-badge">房主</span>}
+      </div>)}</div>
+      <div className="mp-share-actions"><button className="mp-secondary" onClick={() => navigator.clipboard?.writeText(room.code).catch(() => setError('無法複製，請手動複製房間碼'))}>複製房間碼</button><button className="mp-secondary" onClick={copyInvite}>複製邀請連結 ↗</button></div>
+    </section><RoomBroadcast notices={room.notices} /></div>
+    <footer className="mp-lobby-footer"><p>{isHost ? '至少 2 位玩家在線即可開始，朋友也能中途加入。' : '等待房主開始遊戲，先調整好你的手感吧。'}</p>{isHost && <button className="mp-primary" disabled={busy || room.players.filter(player => player.connected).length < 2} onClick={start}>{busy ? loadingLabel : '開始遊戲 →'}</button>}</footer>
+    <details className="mp-preferences"><summary>視角與操作設定</summary><MouseSensitivityControl /></details>
+    {error && <p className="mp-error" role="alert">{error}</p>}
+  </section></main>;
+  return <main className="mp"><section className="mp-panel mp-join-panel">
+    <button className="mp-back" disabled={busy} onClick={leave}>← 選擇模式</button><p className="mp-eyebrow">CHROMA OPS / MULTIPLAYER</p><h1>你的隊友在等你。</h1><p className="mp-subtitle">建立專屬房間，或用房號直達戰場。</p>
+    {sessionRef.current && <ResumeCard code={sessionRef.current.code} disabled={busy} onResume={resume} />}
+    <label className="mp-field">玩家暱稱<input placeholder="大家怎麼稱呼你？" autoComplete="nickname" disabled={busy} value={name} maxLength="16" onChange={(event) => setName(event.target.value)} /></label>
+    <button className="mp-primary" disabled={busy} onClick={create}>{busy ? loadingLabel : '建立新房間 →'}</button>
+    <div className="mp-divider"><span>或加入朋友的房間</span></div>
+    <label className="mp-field">房間碼<input className="mp-code-input" placeholder="輸入 6 碼房號" autoCapitalize="characters" disabled={busy} value={code} maxLength="6" onChange={(event) => setCode(event.target.value.toUpperCase())} /></label><button className="mp-secondary" disabled={busy} onClick={join}>{busy ? loadingLabel : '加入房間 ↗'}</button>
+    <details className="mp-preferences"><summary>視角與操作設定</summary><MouseSensitivityControl /></details>
+    {error && <p className="mp-error" role="alert">{error}</p>}
+  </section></main>;
 }

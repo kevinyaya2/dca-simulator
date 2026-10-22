@@ -25,6 +25,35 @@ async function setup(graceMs=60_000){
 }
 function input(roundId:number,seq:number){return{roundId,seq,clientTime:Date.now(),moveX:0,moveY:0,yaw:0,pitch:0,jump:false,reload:false,sprint:false,aim:false};}
 
+test('connection announcements reach room peers, survive resume, and stay bounded and private',async()=>{
+  const env=await setup();
+  try{
+    const host=await env.connect(),guest=await env.connect(),outsider=await env.connect();
+    const owner:Credentials=await host.emitWithAck('room:create','Host');
+    const seat:Credentials=await guest.emitWithAck('room:join',{code:owner.code,name:'Guest'});
+    await outsider.emitWithAck('room:create','Outside');
+    const external:any[]=[],received:any[]=[];
+    outsider.on('room:notice',notice=>external.push(notice));host.on('room:notice',notice=>received.push(notice));
+    const offline=event(host,'room:notice');guest.disconnect();const lost=await offline;
+    assert.equal(lost.kind,'disconnected');assert.equal(lost.playerId,seat.playerId);assert.equal(lost.name,'Guest');assert.equal(lost.code,owner.code);assert.ok(Number.isFinite(lost.at));
+    let connection=await env.connect();const online=event(host,'room:notice');
+    const restored:Credentials=await connection.emitWithAck('room:resume',seat);const back=await online;
+    assert.equal(back.kind,'reconnected');assert.notEqual(back.id,lost.id);
+    assert.deepEqual(restored.room.notices,[lost,back]);assert.equal(external.length,0);
+    assert.ok(!JSON.stringify(restored.room.notices).includes(seat.resumeToken));
+    // Transport takeover must produce one recovery notice, not a false disconnect/reconnect pair.
+    for(let n=0;n<21;n++){
+      const next=await env.connect();const replaced=event(connection,'disconnect');
+      const result:Credentials=await next.emitWithAck('room:resume',seat);await replaced;connection=next;
+      assert.ok(result.room.notices.length<=20);
+      if(n===20){assert.equal(result.room.notices.length,20);assert.ok(result.room.notices.every((notice:any)=>notice.kind==='reconnected'));}
+    }
+    assert.equal(received.filter(notice=>notice.kind==='disconnected').length,1);assert.equal(external.length,0);
+    const count=received.length;await connection.emitWithAck('room:leave');
+    const last=await host.emitWithAck('game:start');assert.equal(last.error,'NOT_READY');assert.equal(received.length,count,'intentional leave is not reported as a network outage');
+  }finally{env.close();}
+});
+
 test('fixed identity resumes across sockets, transfers host, and preserves state without exposing credentials',async()=>{
   assert.equal(RECONNECT_GRACE_MS,60_000);
   const env=await setup();
