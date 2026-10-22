@@ -1,3 +1,4 @@
+import { rankScores, BASE_BOUNTY, HIGH_BOUNTY, SCORE_TARGET } from '../../../shared/bounty';
 import { arenaWorld } from '../../../shared/arena';
 import { queryAim, aimFromPlayer } from '../../../shared/aim';
 import { AimFeedback } from '../ui/AimFeedback';
@@ -20,16 +21,16 @@ import { GameLoop } from './GameLoop';
 import { Bot } from '../enemies/Bot';
 import { WeaponEffects } from '../systems/WeaponEffects';
 import { BattleFeedback } from '../ui/BattleFeedback';
-import { isCurrentRound, type RoundEvent, type ShotEvent, type HitConfirmation, type KillEvent } from '../../../shared/protocol';
+import { isCurrentRound, type RoundEvent, type ShotEvent, type HitConfirmation, type MultiplayerKillEvent } from '../../../shared/protocol';
 import { DamageFeedbackSystem } from '../systems/DamageFeedbackSystem';
 import { PerformanceManager, CAMERA_NEAR } from '../systems/PerformanceManager';
 import { ARENA_CAMERA_FAR, stepPlayer, type SimPlayer } from '../../../shared/arena';
 import { WEAPON_IDS, WEAPON_SPECS, type WeaponId } from '../../../shared/weapons';
 
 type WeaponState=Record<WeaponId,{ammo:number;reloadUntil:number}>;
-type Net={id:string;name:string;avatar:string;color:number;x:number;y:number;z:number;yaw:number;pitch:number;velocityY:number;jumpsUsed:number;hp:number;alive:boolean;kills:number;deaths:number;activeWeapon:WeaponId;ownedWeapons:WeaponId[];weapons:WeaponState;slowUntil:number;burnUntil:number;ack:number;supportId:number|null;aiming:boolean;sprinting:boolean};
+type Net={id:string;name:string;avatar:string;color:number;x:number;y:number;z:number;yaw:number;pitch:number;velocityY:number;jumpsUsed:number;hp:number;alive:boolean;score:number;bounty:number;kills:number;deaths:number;activeWeapon:WeaponId;ownedWeapons:WeaponId[];weapons:WeaponState;slowUntil:number;burnUntil:number;ack:number;supportId:number|null;aiming:boolean;sprinting:boolean};
 type Pickup={id:WeaponId;x:number;y:number;z:number;available:boolean;respawnAt:number};
-type Snapshot={environmentTime:number;roundId:number;simulationTime:number;serverTime:number;tick:number;players:Net[];pickups:Pickup[];byId?:Map<string,Net>};
+type Snapshot={scoreTarget:number;endsAt:number;environmentTime:number;roundId:number;simulationTime:number;serverTime:number;tick:number;players:Net[];pickups:Pickup[];byId?:Map<string,Net>};
 type Command={roundId:number;seq:number;clientTime:number;moveX:number;moveY:number;yaw:number;pitch:number;jump:boolean;reload:boolean;sprint:boolean;aim:boolean};
 type PendingCommand=Command&{dt:number};
 
@@ -43,7 +44,7 @@ export class MultiplayerGame{
   private pending:PendingCommand[]=[];private snaps:Snapshot[]=[];private seq=0;private hud:HUD;private aimFeedback:AimFeedback;private armory:Armory;private feedback:DamageFeedbackSystem;
   private effects:WeaponEffects;private battle:BattleFeedback;private seenShots=new Set<string>();private statusTimer=0;private loop:GameLoop;private settings?:GameSettings;private desktop?:DesktopInput;private mobile?:MobileInput;
   private resize=()=>{};private owned=new Set<WeaponId>(['ar']);private active:WeaponId='ar';private weapons:WeaponState=Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])) as WeaponState;
-  private kills=0;private deaths=0;private dead=false;private killer='';private ping=0;private pingTimer=0;private serverClockOffset=0;private hasClockOffset=false;private notice='';private noticeT=0;private rosterHTML='';private slowUntil=0;
+  private score=0;private bounty=BASE_BOUNTY;private scoreTarget=SCORE_TARGET;private endsAt=0;private kills=0;private deaths=0;private dead=false;private killer='';private ping=0;private pingTimer=0;private serverClockOffset=0;private hasClockOffset=false;private notice='';private noticeT=0;private rosterHTML='';private slowUntil=0;
   private disposed=false;private ready=false;private paused=false;private wasShooting=false;private lastLocalShot=0;private recoilPitch=0;private recoilYaw=0;private gun=new T.Group();private gunFlash:T.Mesh;private gunMaterial=new T.MeshBasicMaterial({color:0x202634});private handMaterial=new T.MeshBasicMaterial({color:0xffffff});private coarse=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0;
   private cameraOffset=new T.Vector3();private visualPosition=new T.Vector3();private remoteTarget=new T.Vector3();private moveIntent=new T.Vector3();
   private scope:SniperScope;private physicsTime=0;private awaitingWeapon=false;
@@ -88,11 +89,27 @@ export class MultiplayerGame{
     const reconciled:SimPlayer={x:me.x,y:me.y,z:me.z,yaw:me.yaw,pitch:me.pitch,velocityY:me.velocityY,supportId:me.supportId,jumpsUsed:me.jumpsUsed,alive:me.alive};this.physicsTime=snapshot.simulationTime;for(const command of this.pending){this.simulate(reconciled,command,command.dt,this.physicsTime);this.physicsTime+=command.dt;}
     const correction=Math.hypot(reconciled.x-this.player.position.x,reconciled.y-this.player.position.y,reconciled.z-this.player.position.z),hardCorrection=firstSnapshot||respawned||correction>4;
     this.player.position.set(reconciled.x,reconciled.y,reconciled.z);this.player.velocityY=reconciled.velocityY;this.player.jumpsUsed=reconciled.jumpsUsed;this.player.supportId=reconciled.supportId??null;if(firstSnapshot||respawned){this.player.yaw=me.yaw;this.player.pitch=me.pitch;}if(hardCorrection)this.cameraOffset.set(0,0,0);else{this.cameraOffset.copy(this.visualPosition).sub(this.player.position);if(Math.hypot(this.cameraOffset.x,this.cameraOffset.z)>4)this.cameraOffset.set(0,0,0);}
-    this.player.hp=me.hp;this.player.alive=me.alive;this.handMaterial.color.setHex(me.color);if(this.active!==me.activeWeapon){this.input.set({aim:false});this.awaitingWeapon=false;}this.active=me.activeWeapon;this.owned=new Set(me.ownedWeapons);this.weapons=me.weapons;this.kills=me.kills;this.deaths=me.deaths;this.dead=!me.alive;
+    this.player.hp=me.hp;this.player.alive=me.alive;this.handMaterial.color.setHex(me.color);if(this.active!==me.activeWeapon){this.input.set({aim:false});this.awaitingWeapon=false;}this.active=me.activeWeapon;this.owned=new Set(me.ownedWeapons);this.weapons=me.weapons;this.score=me.score;this.bounty=me.bounty;this.scoreTarget=snapshot.scoreTarget;this.endsAt=snapshot.endsAt;this.kills=me.kills;this.deaths=me.deaths;this.dead=!me.alive;
     this.syncAvatars(snapshot.players);this.syncPickups(snapshot.pickups);this.armory.render(this.active);this.updatePanels(snapshot);
   };
 
-  private updatePanels(snapshot:Snapshot){const roster=`<b>${this.roomCode||'房間'} · ${Math.round(this.ping)}ms</b>${[...snapshot.players].sort((a,b)=>b.kills-a.kills).map(player=>`<div><span>${player.name}</span><strong>${player.kills}/${player.deaths}</strong></div>`).join('')}`;if(roster!==this.rosterHTML){this.rosterHTML=roster;this.root.querySelector('.co-mp-roster')!.innerHTML=roster;}this.root.style.setProperty('--co-roster-bottom',`${this.root.querySelector('.co-mp-roster')!.getBoundingClientRect().bottom-this.root.getBoundingClientRect().top}px`);this.radarPlayers=snapshot.byId??new Map(snapshot.players.map(player=>[player.id,player]));}
+  private updatePanels(snapshot:Snapshot){
+    const rows=rankScores(snapshot.players);
+    const signature=JSON.stringify([this.roomCode,Math.round(this.ping),rows.map(p=>[p.id,p.name,p.rank,p.score,p.bounty,p.kills,p.deaths])]);
+    const roster=this.root.querySelector('.co-mp-roster')!;
+    if(signature!==this.rosterHTML){
+      this.rosterHTML=signature;const header=document.createElement('b');header.textContent=`${this.roomCode||'房間'} · ${Math.round(this.ping)}ms`;
+      const legend=document.createElement('small');legend.textContent='名次 · 玩家 ／ 積分 · 賞金 · K/D';roster.replaceChildren(header,legend);
+      for(const player of rows){
+        const row=document.createElement('div'),name=document.createElement('span'),stats=document.createElement('strong');
+        name.textContent=`${player.rank}. ${player.name}`;stats.textContent=`${player.score}分 · 賞${player.bounty} · ${player.kills}/${player.deaths}`;
+        row.classList.toggle('is-high-bounty',player.bounty>=HIGH_BOUNTY);row.append(name,stats);roster.append(row);
+      }
+    }
+    this.root.style.setProperty('--co-roster-bottom',`${roster.getBoundingClientRect().bottom-this.root.getBoundingClientRect().top}px`);
+    this.radarPlayers=snapshot.byId??new Map(snapshot.players.map(player=>[player.id,player]));
+  }
+
   private syncAvatars(players:Net[]){const ids=new Set(players.map(player=>player.id));for(const[id,avatar]of this.avatars)if(!ids.has(id)){avatar.dispose();this.avatars.delete(id);}for(const player of players){if(player.id===this.playerId)continue;let avatar=this.avatars.get(player.id);if(!avatar){avatar=new Bot(player.id,player.name,player.color,player.avatar);avatar.respawn(player.x,player.z);avatar.position.y=player.y-1.65;avatar.group.position.copy(avatar.position);this.avatars.set(player.id,avatar);this.scene.add(avatar.group,avatar.deathGroup);}if(player.alive&&!avatar.alive)avatar.respawn(player.x,player.z);if(!player.alive&&avatar.alive)avatar.damage(100);}}
   private syncPickups(pickups:Pickup[]){for(const pickup of pickups){const mesh=this.pickupMeshes.get(pickup.id);if(!mesh)continue;mesh.position.set(pickup.x,pickup.y+.9,pickup.z);mesh.visible=pickup.available;}}
 
@@ -107,7 +124,7 @@ export class MultiplayerGame{
     this.effects.play(shot,muzzle,!mine);for(const hit of shot.hits)this.avatars.get(hit.targetId)?.hit();
   };
   private onHit=(event:RoundEvent<HitConfirmation>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.hit(event);};
-  private onKill=(event:RoundEvent<KillEvent>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.kill(event);};
+  private onKill=(event:RoundEvent<MultiplayerKillEvent>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.kill(event);};
   private onDamage=(damage:{roundId:number;from:{x:number;z:number};hp:number;damage:number;name:string;weapon:WeaponId})=>{if(this.disposed||this.paused||!this.ready||!isCurrentRound(damage,this.roundId))return;this.player.hp=damage.hp;this.killer=damage.name;this.notice=`遭 ${damage.name} 使用 ${WEAPON_SPECS[damage.weapon]?.label??'武器'} 擊中`;this.noticeT=.8;this.feedback.damage(damage.damage,new T.Vector3(damage.from.x,0,damage.from.z),this.player.position,new T.Vector3(-Math.sin(this.player.yaw),0,-Math.cos(this.player.yaw)));};
   private onDisconnect=()=>{this.pause();this.socket.sendBuffer.length=0;this.onFatal('連線已中斷');};private onConnectError=()=>this.onFatal('無法連線至遊戲伺服器');
   private measurePing(dt:number){this.pingTimer-=dt;if(this.pingTimer>0)return;this.pingTimer=1;const started=Date.now();this.socket.emit('net:ping',(serverTime:number)=>{if(this.disposed)return;this.ping=Date.now()-started;const offset=Date.now()-serverTime-this.ping/2;this.serverClockOffset=this.hasClockOffset?this.serverClockOffset*.8+offset*.2:offset;this.hasClockOffset=true;});}
@@ -130,7 +147,7 @@ export class MultiplayerGame{
     const spec=WEAPON_SPECS[this.active],state=this.weapons[this.active],time=this.serverNow();if(this.player.alive&&input.shoot&&!this.armory.isOpen&&(!this.wasShooting||time-this.lastLocalShot>=spec.fireDelay*1000)&&state.ammo>0&&state.reloadUntil<=time){this.cam.updateMatrixWorld(true);this.effects.muzzle(this.gunFlash.getWorldPosition(new T.Vector3()),this.active);this.recoilPitch=Math.min(.04,this.recoilPitch+.009);this.recoilYaw=clamp(this.recoilYaw+(this.seq%2?.0025:-.0025),-.012,.012);navigator.vibrate?.(8);this.socket.emit('match:fire',{roundId:this.roundId,clientTime:command.clientTime});this.lastLocalShot=time;}this.wasShooting=input.shoot;
     this.updateRemotePlayers(dt);for(const mesh of this.pickupMeshes.values())mesh.rotation.y+=dt*2;this.drawRadar(dt);
     this.noticeT=Math.max(0,this.noticeT-dt);this.effects.update(dt);this.feedback.update(dt,this.player.hp);const recoilDecay=Math.exp(-dt*16);this.recoilPitch*=recoilDecay;this.recoilYaw*=recoilDecay;const horizontalDecay=Math.pow(.5,dt/.12),verticalDecay=Math.pow(.5,dt/.08),moving=this.moveIntent.lengthSq()>.01,correctionAlongMove=(-this.cameraOffset.x)*this.moveIntent.x+(-this.cameraOffset.z)*this.moveIntent.z;if(!moving||correctionAlongMove>=0){this.cameraOffset.x*=horizontalDecay;this.cameraOffset.z*=horizontalDecay;}this.cameraOffset.y*=verticalDecay;if(this.cameraOffset.lengthSq()<1e-6)this.cameraOffset.set(0,0,0);this.visualPosition.copy(this.player.position);if(!aiming)this.visualPosition.add(this.cameraOffset);this.cam.position.copy(this.visualPosition);this.cam.rotation.set(this.player.pitch,this.player.yaw,0,'YXZ');this.gun.rotation.set(this.recoilPitch,this.recoilYaw,0);this.gun.position.z=this.recoilPitch*2;
-    const reloading=state.reloadUntil>this.serverNow();this.hud.render({hp:this.player.hp,ammo:state.ammo,reserve:Infinity,label:spec.label,notice:this.noticeT?this.notice:'',kills:this.kills,deaths:this.deaths,dead:this.dead,killer:this.killer,hit:false,kill:false,reloading});this.cam.updateMatrixWorld(true);this.battle.update(dt,this.cam);
+    const reloading=state.reloadUntil>this.serverNow();this.hud.render({hp:this.player.hp,ammo:state.ammo,reserve:Infinity,label:spec.label,notice:this.noticeT?this.notice:'',kills:this.kills,deaths:this.deaths,dead:this.dead,killer:this.killer,hit:false,kill:false,reloading,score:this.score,bounty:this.bounty,scoreTarget:this.scoreTarget,remainingSeconds:Math.max(0,Math.ceil((this.endsAt-this.serverNow())/1000))});this.cam.updateMatrixWorld(true);this.battle.update(dt,this.cam);
     this.statusTimer+=dt;if(this.statusTimer>=.08){this.statusTimer=0;const time=this.serverNow();for(const p of this.radarPlayers.values())if(p.alive&&(p.burnUntil>time||p.slowUntil>time)){const avatar=this.avatars.get(p.id);if(avatar)this.effects.status(avatar.position.clone().add(new T.Vector3(0,1.22,0)),p.burnUntil>time?'flame':'ice');}}
     this.arena.update(this.physicsTime,environmentAtSnapshot(this.snaps[this.snaps.length-1],this.serverNow()),this.renderer);const aim=aimFromPlayer({x:this.player.position.x,y:this.player.position.y,z:this.player.position.z,yaw:this.player.yaw,pitch:this.player.pitch});const targets=[...this.avatars].map(([id,avatar])=>({id,x:avatar.position.x,y:avatar.position.y+1.65,z:avatar.position.z,yaw:avatar.group.rotation.y,alive:avatar.alive}));this.aimFeedback.update(blocked||!this.player.alive?'neutral':queryAim(this.active,aim.origin,aim.direction,targets,arenaWorld(this.physicsTime)),this.player.alive&&!blocked);this.scope.render(this.renderer,this.scene,this.cam);
   }

@@ -25,7 +25,7 @@ class TestSocket{
 }
 const root=document.querySelector('#game'),status=document.querySelector('#status'),results=document.querySelector('#results'),run=document.querySelector('#run');
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
-const player=(id,x)=>({id,name:id,avatar:'',color:0x55aaff,x,y:1.65,z:0,yaw:.4,pitch:.1,velocityY:0,jumpsUsed:0,hp:100,alive:true,kills:0,deaths:0,
+const player=(id,x)=>({id,name:id,avatar:'',color:0x55aaff,x,y:1.65,z:0,yaw:.4,pitch:.1,velocityY:0,jumpsUsed:0,hp:100,alive:true,kills:0,deaths:0,score:0,bounty:100,
   activeWeapon:'ar',ownedWeapons:['ar'],weapons:Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])),slowUntil:0,burnUntil:0,ack:0,supportId:null,aiming:false,sprinting:false});
 run.onclick=async()=>{
   run.disabled=true;results.textContent='';status.textContent='Running';
@@ -42,7 +42,7 @@ run.onclick=async()=>{
       await frame();await frame();
       assert(socket.inputs.length===0,'must wait for this round snapshot before sending inputs');
       const riders=[player('self',67.5),player('peer',68.5)].map(p=>({...p,y:7.65,z:28,supportId:8}));
-      const snapshot={environmentTime:105,roundId,tick:3,simulationTime:8,serverTime:Date.now(),players:riders,pickups:[]};
+      const snapshot={scoreTarget:1500,endsAt:Date.now()+480000,environmentTime:105,roundId,tick:3,simulationTime:8,serverTime:Date.now(),players:riders,pickups:[]};
       socket.push('match:snapshot',{...snapshot,roundId:roundId-1});await frame();assert(socket.inputs.length===0,'stale round snapshot accepted');
       socket.push('match:snapshot',snapshot);await frame();await frame();
       assert(socket.inputs[0]?.seq===1&&socket.inputs[0]?.roundId===roundId,'new round did not start input sequence at 1');

@@ -149,10 +149,13 @@ test('an offline victim can die, award a kill, and respawn with score preserved'
   const room={environmentTime:0,code:'OFFLINE',host:'attacker',roundId:0,state:'LOBBY',players,pickups:[],history:[],tick:0,lastStep:Date.now(),wheelEpoch:0,respawnTimers:new Map(),reconnectTimers:new Map(),shotSequence:0,killTracker:new KillTracker('offline')} as unknown as Parameters<typeof beginRound>[1];
   const emissions:any[]=[];const server={to:(id:string)=>({emit:(name:string,data:any)=>emissions.push({id,name,data})})} as unknown as Parameters<typeof beginRound>[0];
   beginRound(server,room);const victim=room.players.get('victim')!,attacker=room.players.get('attacker')!;
+  victim.score=700;victim.bounty=300;attacker.score=200;attacker.bounty=150;
   victim.socketId=undefined;victim.disconnectedUntil=Date.now()+60_000;victim.hp=4;victim.burn={attackerId:attacker.id,nextTick:Date.now()-1,expiresAt:Date.now()+1000};
   try{
     step(server,room,1/60);assert.equal(victim.alive,false);assert.equal(victim.deaths,1);assert.equal(attacker.kills,1);
+    assert.equal(attacker.score,500);assert.equal(attacker.bounty,200);assert.equal(victim.score,700);assert.equal(victim.bounty,275);assert.equal(victim.consecutiveDeaths,1);
     assert.ok(emissions.some(e=>e.name==='match:kill'&&e.data.victimId===victim.id));
     await new Promise(resolve=>setTimeout(resolve,3100));assert.equal(victim.alive,true);assert.equal(victim.hp,100);assert.equal(victim.deaths,1);assert.equal(victim.socketId,undefined);
+    assert.equal(victim.score,700);assert.equal(victim.bounty,275);assert.equal(victim.consecutiveDeaths,1);
   }finally{for(const timer of room.respawnTimers.values())clearTimeout(timer);}
 });

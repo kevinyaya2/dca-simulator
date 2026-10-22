@@ -1,3 +1,4 @@
+import { SCORE_TARGET, HIGH_BOUNTY } from '../../shared/bounty';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import MouseSensitivityControl from '../chroma-ops/ui/MouseSensitivityControl';
@@ -252,8 +253,9 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
   </section></main>;
 
   if (inMatch) {
-    const ranked = [...(room?.players || [])].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-    const isWinner = playerId === room?.winnerId;
+    const ranked = room?.finalStandings || [];
+    const winners = ranked.filter(player => room?.winnerIds?.includes(player.id));
+    const isWinner = room?.winnerIds?.includes(playerId);
     return <main className="chroma-ops co-multiplayer-shell">
       <div key={room?.roundId} className="co-game-stage" ref={arenaRef} aria-label="CHROMA OPS multiplayer arena" />
       <RoomBroadcast notices={broadcasts} floating />
@@ -261,12 +263,12 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
       {screen === 'results' && <section className="mp-result" role="dialog" aria-modal="true" aria-labelledby="mp-result-title">
         <div className={`mp-result-card ${isWinner ? 'is-winner' : ''}`}>
           <p className="mp-result-eyebrow">比賽結束</p>
-          <h1 id="mp-result-title">{isWinner ? '勝利！' : '戰鬥結束'}</h1>
-          <p className="mp-result-winner"><b>{room?.winner || '未知玩家'}</b> 率先達成 10 次擊殺</p>
+          <h1 id="mp-result-title">{room?.endReason === 'draw' ? '平手' : isWinner ? '勝利！' : '戰鬥結束'}</h1>
+          <p className="mp-result-winner">{room?.endReason === 'draw' ? '本局無人取得積分' : <><b>{winners.map(player => player.name).join('、')}</b> {room?.endReason === 'target' ? `率先達到 ${room.scoreTarget} 分` : winners.length > 1 ? '超時並列獲勝' : '超時積分最高'}</>}</p>
           {room?.winnerTitle && <p className="mp-result-title">{room.winnerTitle}</p>}
           <div className="mp-result-ranking">
-            <header><span>最終排名</span><span>擊殺／死亡</span></header>
-            {ranked.map((player, index) => <div className={player.id === playerId ? 'is-me' : ''} key={player.id}><span><i>{index + 1}</i>{player.name}{player.id === room?.winnerId && <em>勝者</em>}</span><strong>{player.kills}／{player.deaths}</strong></div>)}
+            <header><span>最終排名</span><span>積分 · 賞金 · K/D</span></header>
+            {ranked.map((player) => <div className={player.id === playerId ? 'is-me' : ''} key={player.id}><span><i>{player.rank}</i>{player.name}{room?.winnerIds?.includes(player.id) && <em>勝者</em>}</span><strong className={player.bounty >= HIGH_BOUNTY ? 'is-high-bounty' : ''}>{player.score}分 · 賞{player.bounty} · {player.kills}/{player.deaths}</strong></div>)}
           </div>
           <p className="mp-result-countdown"><b>{resultSeconds}</b> 秒後自動回到房間</p>
           {isHost ? <div className="mp-result-actions"><button className="mp-primary" disabled={busy} onClick={playAgain}>{busy ? loadingLabel : '立即再玩'}</button><button disabled={busy} onClick={returnLobby}>立即回房間</button></div> : <p className="mp-result-waiting">等待房主操作，或倒數結束後自動返回</p>}
@@ -290,6 +292,7 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
       <div className="mp-share-actions"><button className="mp-secondary" onClick={() => navigator.clipboard?.writeText(room.code).catch(() => setError('無法複製，請手動複製房間碼'))}>複製房間碼</button><button className="mp-secondary" onClick={copyInvite}>複製邀請連結 ↗</button></div>
     </section><RoomBroadcast notices={room.notices} /></div>
     <footer className="mp-lobby-footer"><p>{isHost ? '至少 2 位玩家在線即可開始，朋友也能中途加入。' : '等待房主開始遊戲，先調整好你的手感吧。'}</p>{isHost && <button className="mp-primary" disabled={busy || room.players.filter(player => player.connected).length < 2} onClick={start}>{busy ? loadingLabel : '開始遊戲 →'}</button>}</footer>
+    <p className="mp-bounty-rules">賞金競速：先達 {SCORE_TARGET} 分獲勝，限時 8 分鐘。擊殺取得對方當下賞金（50～300），死亡不扣積分。賞金隨擊殺上升、連死逐步下降；超時同分並列獲勝。</p>
     <details className="mp-preferences"><summary>視角與操作設定</summary><MouseSensitivityControl /></details>
     {error && <p className="mp-error" role="alert">{error}</p>}
   </section></main>;
@@ -300,6 +303,7 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
     <button className="mp-primary" disabled={busy} onClick={create}>{busy ? loadingLabel : '建立新房間 →'}</button>
     <div className="mp-divider"><span>或加入朋友的房間</span></div>
     <label className="mp-field">房間碼<input className="mp-code-input" placeholder="輸入 6 碼房號" autoCapitalize="characters" disabled={busy} value={code} maxLength="6" onChange={(event) => setCode(event.target.value.toUpperCase())} /></label><button className="mp-secondary" disabled={busy} onClick={join}>{busy ? loadingLabel : '加入房間 ↗'}</button>
+    <p className="mp-bounty-rules">賞金競速：先達 {SCORE_TARGET} 分獲勝，限時 8 分鐘。擊殺取得對方當下賞金（50～300），死亡不扣積分。賞金隨擊殺上升、連死逐步下降；超時同分並列獲勝。</p>
     <details className="mp-preferences"><summary>視角與操作設定</summary><MouseSensitivityControl /></details>
     {error && <p className="mp-error" role="alert">{error}</p>}
   </section></main>;

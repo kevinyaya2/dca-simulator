@@ -1,4 +1,6 @@
-export const MULTIPLAYER_PROTOCOL_VERSION = 9;
+export const MULTIPLAYER_PROTOCOL_VERSION = 10;
+import type { KillEvent } from './combat.js';
+export type MultiplayerKillEvent = KillEvent & { scoreAwarded:number; attackerBounty:number; victimBounty:number };
 export type RoundEvent<T> = T & { roundId:number };
 export type RoomNotice = { id:string; code:string; playerId:string; name:string; kind:'disconnected'|'reconnected'; at:number };
 export function isCurrentRound(message:unknown,roundId:number):boolean {

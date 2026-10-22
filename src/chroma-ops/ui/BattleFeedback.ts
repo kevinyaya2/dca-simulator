@@ -14,9 +14,9 @@ export class BattleFeedback{
     this.tone(rank);
     for(const hit of event.hits){if(hit.damage<=0)continue;const el=document.createElement('span');el.className=`co-damage-number ${hit.killed?'is-kill':hit.headshot?'is-head':''}`;el.textContent=String(hit.damage);this.el.append(el);this.numbers.push({el,life:.7,position:new T.Vector3(...hit.position)});if(this.numbers.length>24)this.numbers.shift()!.el.remove();}
   }
-  kill(event:KillEvent){if(!this.accept(`kill:${event.eventId}`))return;
+  kill(event:KillEvent & {scoreAwarded?:number}){if(!this.accept(`kill:${event.eventId}`))return;
     const entry=document.createElement('div');entry.className='co-kill-entry';
-    const attacker=document.createElement('b'),weapon=document.createElement('span'),victim=document.createElement('b');attacker.textContent=event.attackerName;weapon.textContent=`${WEAPON_SPECS[event.weapon].icon}${event.headshot?' · 爆頭':''}`;weapon.title=WEAPON_SPECS[event.weapon].label;victim.textContent=event.victimName;entry.append(attacker,weapon,victim);this.feed.prepend(entry);this.entries.push({el:entry,life:6});while(this.entries.length>5)this.entries.shift()!.el.remove();
+    const attacker=document.createElement('b'),weapon=document.createElement('span'),victim=document.createElement('b');attacker.textContent=event.attackerName;weapon.textContent=`${WEAPON_SPECS[event.weapon].icon}${event.headshot?' · 爆頭':''}`;weapon.title=WEAPON_SPECS[event.weapon].label;victim.textContent=event.victimName;entry.append(attacker,weapon,victim);if(event.scoreAwarded!==undefined){const reward=document.createElement('em');reward.className='co-kill-reward';reward.textContent=`+${event.scoreAwarded} \u5206`;entry.append(reward);}this.feed.prepend(entry);this.entries.push({el:entry,life:6});while(this.entries.length>5)this.entries.shift()!.el.remove();
     const multi=event.multi>=2?(['','','雙殺','三連殺','四連殺','五連殺'][event.multi]??`${event.multi} 連殺`):'';
     if(!multi&&!event.title)return;
     // Upgrade the same attacker's banner in place; other announcements replace it.

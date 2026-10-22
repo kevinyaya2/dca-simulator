@@ -13,6 +13,16 @@ npm run deploy
 
 Deploy the server separately with `npm run server:build` then `npm run server:start`, and configure Render with `PORT` plus `CORS_ORIGIN=https://kevinyaya2.github.io`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
 
+### CHROMA OPS 多人賞金競速（協定 10）
+
+多人 FFA 改為先達 1500 分獲勝，每局最多 8 分鐘；超時最高分獲勝，同分並列，全員零分則平手。2～8 人使用同一組規則。積分與擊殺／死亡數分開，尾刀取得對方死亡前全額賞金，不給助攻分，死亡不扣積分。
+
+賞金開局 100、最低 50、最高 300。擊殺後自身賞金增加目標賞金的 25%（四捨五入，單次最多增加 50），並重置連死計數。首次死亡賞金減 25，未取得擊殺前每次再死減 50；重生不清空賞金，連死計數也保留。賞金不因等待或生存時間自動變動，不影響角色戰力。
+
+HUD 顯示積分目標、自身賞金、剩餘時間與 K/D；排行榜依積分排序，同分同名次，賞金達 200 醒目顯示。擊殺紀錄顯示實得積分。最終記分板在結束時保存參賽者、積分、賞金、K/D、名次與勝者快照，賽後玩家離房不會改變結果。賽中離房或保留席位逾期者不參與結算；有效重連保留進度，中途加入從零分／100 賞金開始並沿用剩餘時間。
+
+賞金規則集中在 `shared/bounty.ts`，伺服器負責計分與截止判定，前端不預測或自行增加積分。協定由 9 升為 10，前端與 Render 伺服器需同步更新；此變更不自動部署。`npm run test:chroma` 包含賞金、超時、重連、重生與結果快照測試；開發頁 `/dca-simulator/tests/chroma-bounty.html` 可檢查 8 人排行、同分、安全暱稱、得分事件去重及桌機／手機版面。實際局長與圍攻平衡仍需 3～4 人及 8 人試玩。
+
 ### CHROMA OPS 擴充街區與 B1 商場（協定 8）
 
 城市現有十棟可進入建築，新增六棟位於 `x=±112`、`z=-90/-12/92`，原北側兩棟也開放室內。每棟皆有地面、6 公尺二樓、12 公尺屋頂、室內樓梯及外部斜坡；保留摩天輪廣場、空橋與中央高台。

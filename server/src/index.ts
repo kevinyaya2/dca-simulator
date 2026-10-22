@@ -9,11 +9,12 @@ import { groundHeight, arenaWorld, stepPlayer, type SimInput } from '../../share
 import { chooseRespawnPoint, chooseWeaponPoint, initialWeaponPoints, type SpawnPoint } from '../../shared/spawns.js';
 import { WEAPON_IDS, WEAPON_SPECS, type WeaponId } from '../../shared/weapons.js';
 import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound, type RoomNotice } from '../../shared/protocol.js';
+import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyKill, finalStandings, type BountyState, type FinalStanding, type EndReason } from '../../shared/bounty.js';
 
 type Input = SimInput & { roundId?:number; seq:number; clientTime:number; reload?:boolean; yaw:number; pitch:number };
 type WeaponState = Record<WeaponId,{ammo:number;reloadUntil:number}>;
 type BurnState = { attackerId:string; nextTick:number; expiresAt:number } | null;
-type Player = {
+type Player = BountyState & {
   id:string; name:string; avatar:string; color:number;
   socketId?:string; resumeToken:string; disconnectedUntil?:number;
   x:number; y:number; z:number; yaw:number; pitch:number; velocityY:number; jumpsUsed:number; supportId:number|null; aiming:boolean; sprinting:boolean;
@@ -29,6 +30,7 @@ type Room = {
   winner?:string; winnerId?:string; winnerTitle?:string; shotSequence:number; killTracker:KillTracker; returnAt?:number; tick:number; lastStep:number; wheelEpoch:number;
   reconnectTimers:Map<string,NodeJS.Timeout>; lobbyReason?:string;
   notices?:RoomNotice[];
+  endsAt?:number; winnerIds?:string[]; endReason?:EndReason; finalStandings?:FinalStanding[];
   respawnTimers:Map<string,NodeJS.Timeout>; gameOverTimer?:NodeJS.Timeout;
 };
 
@@ -42,19 +44,40 @@ const createWeapons=():WeaponState=>Object.fromEntries(WEAPON_IDS.map(id=>[id,{a
 function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];for(const id of WEAPON_IDS.filter(id=>id!=='ar')){const point=chooseWeaponPoint(players.map(p=>({...p,y:p.y-1.65})),pickups,undefined,Math.random,initialWeaponPoints(id));if(!point)throw new Error('No legal weapon candidates');pickups.push({id,...point,available:true,respawnAt:0});}return pickups;}
 
 function roomCode(rooms:Map<string,Room>):string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode(rooms):value;}
-function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,...safe}=p;void resumeToken;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
-function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups};}
+function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,consecutiveDeaths,...safe}=p;void resumeToken;void consecutiveDeaths;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
+function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups};}
 function announceConnection(io:Server,room:Room,player:Player,kind:RoomNotice['kind']){
   const notice:RoomNotice={id:randomUUID(),code:room.code,playerId:player.id,name:player.name,kind,at:now()};
   room.notices=[...(room.notices??[]),notice].slice(-20);
   io.to(room.code).emit('room:notice',notice);
 }
 function emitRoom(io:Server,room:Room){io.to(room.code).emit('room:state',roomState(room));}
-function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups});}
+function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups});}
 function clearRespawns(room:Room){for(const timer of room.respawnTimers.values())clearTimeout(timer);room.respawnTimers.clear();}
 function clearGameOverTimer(room:Room){if(room.gameOverTimer)clearTimeout(room.gameOverTimer);room.gameOverTimer=undefined;room.returnAt=undefined;}
-function returnToLobby(io:Server,room:Room,reason?:string){room.lobbyReason=reason;clearGameOverTimer(room);clearRespawns(room);room.state='LOBBY';room.winner=undefined;room.winnerId=undefined;emitRoom(io,room);}
-export function beginRound(io:Server,room:Room){clearGameOverTimer(room);clearRespawns(room);room.state='PLAYING';room.lobbyReason=undefined;room.roundId++;room.tick=0;room.winner=undefined;room.winnerId=undefined;room.history=[];room.killTracker.reset();room.winnerTitle=undefined;room.lastStep=now();room.wheelEpoch=room.lastStep;for(const p of room.players.values())p.alive=false;for(const p of room.players.values())resetPlayer(p,room,true);room.pickups=createPickups([...room.players.values()]);emitRoom(io,room);}
+function returnToLobby(io:Server,room:Room,reason?:string){room.lobbyReason=reason;clearGameOverTimer(room);clearRespawns(room);room.state='LOBBY';clearResult(room);emitRoom(io,room);}
+function clearResult(room:Room){
+  room.winner=undefined;room.winnerId=undefined;room.winnerTitle=undefined;
+  room.winnerIds=undefined;room.endReason=undefined;room.finalStandings=undefined;room.endsAt=undefined;
+}
+export function finishRound(io:Server,room:Room,reason:'target'|'timeout',title?:string){
+  if(room.state!=='PLAYING')return;
+  clearRespawns(room);clearGameOverTimer(room);
+  room.finalStandings=finalStandings([...room.players.values()]);
+  const top=room.finalStandings[0]?.score??0;
+  room.winnerIds=top>0?room.finalStandings.filter(p=>p.rank===1).map(p=>p.id):[];
+  room.endReason=top===0?'draw':reason;
+  const winner=room.winnerIds.length===1?room.finalStandings.find(p=>p.id===room.winnerIds![0]):undefined;
+  room.winner=winner?.name;room.winnerId=winner?.id;room.winnerTitle=reason==='target'?title:undefined;
+  room.state='GAME_OVER';room.returnAt=now()+10000;
+  room.gameOverTimer=setTimeout(()=>returnToLobby(io,room),10000);
+  emitRoom(io,room);
+}
+function expireRound(io:Server,room:Room,at=now()){
+  if(room.endsAt!==undefined&&at>=room.endsAt){finishRound(io,room,'timeout');return true;}
+  return false;
+}
+export function beginRound(io:Server,room:Room){clearGameOverTimer(room);clearRespawns(room);room.state='PLAYING';clearResult(room);room.endsAt=now()+ROUND_DURATION_MS;room.lobbyReason=undefined;room.roundId++;room.tick=0;room.winner=undefined;room.winnerId=undefined;room.history=[];room.killTracker.reset();room.winnerTitle=undefined;room.lastStep=now();room.wheelEpoch=room.lastStep;for(const p of room.players.values())p.alive=false;for(const p of room.players.values())resetPlayer(p,room,true);room.pickups=createPickups([...room.players.values()]);emitRoom(io,room);}
 
 function resetPlayer(p:Player,room:Room,newRound=false){
   const spawn=chooseRespawnPoint([...room.players.values()].filter(other=>other.id!==p.id),previousSpawns.get(p.id));
@@ -62,25 +85,30 @@ function resetPlayer(p:Player,room:Room,newRound=false){
   p.life=(p.life??0)+1;
   Object.assign(p,{x:spawn[0],y:groundHeight(...spawn)+1.65,z:spawn[1],yaw:0,pitch:0,velocityY:0,jumpsUsed:0,hp:100,alive:true,supportId:null,aiming:false,sprinting:false,lastShot:0,slowUntil:0,burn:null,input:blankInput()});
   p.weapons=createWeapons();
-  if(newRound){p.lastReceivedSeq=0;p.lastProcessedSeq=0;p.activeWeapon='ar';p.ownedWeapons=['ar'];p.kills=0;p.deaths=0;}
+  if(newRound){p.lastReceivedSeq=0;p.lastProcessedSeq=0;p.activeWeapon='ar';p.ownedWeapons=['ar'];p.kills=0;p.deaths=0;Object.assign(p,initialBounty());}
 }
 function historicalPlayers(room:Room,clientTime:number){const target=now()-Math.max(0,Math.min(250,now()-clientTime));let frame=room.history[0];for(const sample of room.history)if(sample.at<=target)frame=sample;return frame;}
-function kill(io:Server,room:Room,attacker:Player,victim:Player,weapon:WeaponId,headshot:boolean){
-  if(!victim.alive)return;victim.alive=false;victim.aiming=false;victim.sprinting=false;victim.supportId=null;victim.input=blankInput();victim.hp=0;victim.burn=null;victim.deaths++;attacker.kills++;
-  const event=room.killTracker.record(attacker,victim,weapon,headshot,now());
-  io.to(room.code).emit('match:kill',{...event,roundId:room.roundId}); // Must precede the terminal room state.
-  if(attacker.kills>=10){clearRespawns(room);clearGameOverTimer(room);room.state='GAME_OVER';room.winner=attacker.name;room.winnerId=attacker.id;room.winnerTitle=event.title;room.returnAt=now()+10000;room.gameOverTimer=setTimeout(()=>returnToLobby(io,room),10000);return;}
-  const timer=setTimeout(()=>{room.respawnTimers.delete(victim.id);if(room.state==='PLAYING'&&!victim.alive){resetPlayer(victim,room);emitRoom(io,room);}},3000);
+export function kill(io:Server,room:Room,attacker:Player,victim:Player,weapon:WeaponId,headshot:boolean,at=now()){
+  if(room.state!=='PLAYING'||attacker.id===victim.id||!victim.alive||expireRound(io,room,at))return;
+  const settlement=settleBountyKill(attacker,victim);Object.assign(attacker,settlement.attacker);Object.assign(victim,settlement.victim);
+  victim.alive=false;victim.aiming=false;victim.sprinting=false;victim.supportId=null;victim.input=blankInput();victim.hp=0;victim.burn=null;victim.deaths++;attacker.kills++;
+  const event=room.killTracker.record(attacker,victim,weapon,headshot,at);
+  io.to(room.code).emit('match:kill',{...event,roundId:room.roundId,scoreAwarded:settlement.scoreAwarded,attackerBounty:attacker.bounty,victimBounty:victim.bounty}); // Must precede the terminal room state.
+  if(attacker.score>=SCORE_TARGET){finishRound(io,room,'target',event.title);return;}
+  const previousTimer=room.respawnTimers.get(victim.id);if(previousTimer)clearTimeout(previousTimer);
+  const timer=setTimeout(()=>{room.respawnTimers.delete(victim.id);if(room.state==='PLAYING'&&!victim.alive&&!expireRound(io,room)){resetPlayer(victim,room);emitRoom(io,room);}},3000);
   room.respawnTimers.set(victim.id,timer);
 }
 function applyDamage(io:Server,room:Room,attacker:Player,victim:Player,hit:PlannedHit,weapon:WeaponId):ConfirmedHit|undefined{
-  if(!victim.alive||hit.damage<=0||room.state!=='PLAYING')return;
+  const at=now();
+  if(!victim.alive||hit.damage<=0||room.state!=='PLAYING'||expireRound(io,room,at))return;
   const damage=Math.min(victim.hp,hit.damage);victim.hp-=damage;
   io.to(victim.socketId??`offline:${victim.id}`).emit('match:damage',{roundId:room.roundId,from:{x:attacker.x,z:attacker.z},hp:victim.hp,damage,name:attacker.name,weapon});
-  const killed=victim.hp===0;if(killed)kill(io,room,attacker,victim,weapon,hit.headshot);
+  const killed=victim.hp===0;if(killed)kill(io,room,attacker,victim,weapon,hit.headshot,at);
   return{...hit,damage,killed};
 }
 function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
+  if(expireRound(io,room))return;
   const time=now(),id=shooter.activeWeapon,spec=WEAPON_SPECS[id],state=shooter.weapons[id];
   if(!shooter.alive||state.reloadUntil>time||state.ammo<=0||time-shooter.lastShot<spec.fireDelay*1000)return;
   shooter.lastShot=time;state.ammo--;const base=aimDirection(shooter.input.yaw,shooter.input.pitch),history=historicalPlayers(room,clientTime);
@@ -97,7 +125,7 @@ function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   if(confirmed.some(h=>h.killed))emitRoom(io,room);
 }
 export function step(io:Server,room:Room,dt:number){
-  if(room.state!=='PLAYING')return;const time=now();room.tick++;room.environmentTime=advanceEnvironment(room.environmentTime,dt,true);
+  if(room.state!=='PLAYING'||expireRound(io,room))return;const time=now();room.tick++;room.environmentTime=advanceEnvironment(room.environmentTime,dt,true);
   for(const p of room.players.values()){
     if(!p.alive)continue;const spec=WEAPON_SPECS[p.activeWeapon],state=p.weapons[p.activeWeapon];
     if(state.reloadUntil&&time>=state.reloadUntil){state.ammo=spec.magazine;state.reloadUntil=0;}
@@ -143,7 +171,7 @@ export function createGameServer(options:{reconnectGraceMs?:number}={}){
     const validName=(name:unknown):name is string=>typeof name==='string'&&name.trim().length>=2&&name.trim().length<=16;
     const credentials=(p:Player)=>({code:room!.code,playerId:p.id,resumeToken:p.resumeToken,lastReceivedSeq:p.lastReceivedSeq,room:roomState(room!)});
     const join=(target:Room,name:string)=>{
-      const index=target.players.size,p:Player={id:randomUUID(),socketId:socket.id,resumeToken:randomBytes(32).toString('hex'),name:name.trim(),avatar:avatars[index%avatars.length],color:colors[index%colors.length],x:0,y:1.65,z:0,yaw:0,pitch:0,velocityY:0,jumpsUsed:0,hp:100,alive:true,supportId:null,aiming:false,sprinting:false,kills:0,deaths:0,activeWeapon:'ar',ownedWeapons:['ar'],weapons:createWeapons(),life:0,lastShot:0,lastReceivedSeq:0,lastProcessedSeq:0,input:blankInput(),slowUntil:0,burn:null};
+      const index=target.players.size,p:Player={id:randomUUID(),socketId:socket.id,resumeToken:randomBytes(32).toString('hex'),name:name.trim(),avatar:avatars[index%avatars.length],color:colors[index%colors.length],x:0,y:1.65,z:0,yaw:0,pitch:0,velocityY:0,jumpsUsed:0,hp:100,alive:true,supportId:null,aiming:false,sprinting:false,kills:0,deaths:0,...initialBounty(),activeWeapon:'ar',ownedWeapons:['ar'],weapons:createWeapons(),life:0,lastShot:0,lastReceivedSeq:0,lastProcessedSeq:0,input:blankInput(),slowUntil:0,burn:null};
       room=target;playerId=p.id;resetPlayer(p,target,true);target.players.set(p.id,p);selectHost(target);socket.join(target.code);emitRoom(io,target);return p;
     };
     socket.on('room:create',(name:unknown,cb:unknown)=>{
