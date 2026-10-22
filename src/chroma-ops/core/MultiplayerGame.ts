@@ -1,4 +1,5 @@
-import { rankScores, BASE_BOUNTY, HIGH_BOUNTY, SCORE_TARGET } from '../../../shared/bounty';
+import { TacticalBoard } from '../ui/TacticalBoard';
+import { BASE_BOUNTY, SCORE_TARGET } from '../../../shared/bounty';
 import { arenaWorld } from '../../../shared/arena';
 import { queryAim, aimFromPlayer } from '../../../shared/aim';
 import { AimFeedback } from '../ui/AimFeedback';
@@ -28,7 +29,7 @@ import { ARENA_CAMERA_FAR, stepPlayer, type SimPlayer } from '../../../shared/ar
 import { WEAPON_IDS, WEAPON_SPECS, type WeaponId } from '../../../shared/weapons';
 
 type WeaponState=Record<WeaponId,{ammo:number;reloadUntil:number}>;
-type Net={id:string;name:string;avatar:string;color:number;x:number;y:number;z:number;yaw:number;pitch:number;velocityY:number;jumpsUsed:number;hp:number;alive:boolean;score:number;bounty:number;kills:number;deaths:number;activeWeapon:WeaponId;ownedWeapons:WeaponId[];weapons:WeaponState;slowUntil:number;burnUntil:number;ack:number;supportId:number|null;aiming:boolean;sprinting:boolean};
+type Net={id:string;name:string;color:number;x:number;y:number;z:number;yaw:number;pitch:number;velocityY:number;jumpsUsed:number;hp:number;alive:boolean;score:number;bounty:number;kills:number;deaths:number;activeWeapon:WeaponId;ownedWeapons:WeaponId[];weapons:WeaponState;slowUntil:number;burnUntil:number;ack:number;supportId:number|null;aiming:boolean;sprinting:boolean};
 type Pickup={id:WeaponId;x:number;y:number;z:number;available:boolean;respawnAt:number};
 type Snapshot={scoreTarget:number;endsAt:number;environmentTime:number;roundId:number;simulationTime:number;serverTime:number;tick:number;players:Net[];pickups:Pickup[];byId?:Map<string,Net>};
 type Command={roundId:number;seq:number;clientTime:number;moveX:number;moveY:number;yaw:number;pitch:number;jump:boolean;reload:boolean;sprint:boolean;aim:boolean};
@@ -44,28 +45,29 @@ export class MultiplayerGame{
   private pending:PendingCommand[]=[];private snaps:Snapshot[]=[];private seq=0;private hud:HUD;private aimFeedback:AimFeedback;private armory:Armory;private feedback:DamageFeedbackSystem;
   private effects:WeaponEffects;private battle:BattleFeedback;private seenShots=new Set<string>();private statusTimer=0;private loop:GameLoop;private settings?:GameSettings;private desktop?:DesktopInput;private mobile?:MobileInput;
   private resize=()=>{};private owned=new Set<WeaponId>(['ar']);private active:WeaponId='ar';private weapons:WeaponState=Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])) as WeaponState;
-  private score=0;private bounty=BASE_BOUNTY;private scoreTarget=SCORE_TARGET;private endsAt=0;private kills=0;private deaths=0;private dead=false;private killer='';private ping=0;private pingTimer=0;private serverClockOffset=0;private hasClockOffset=false;private notice='';private noticeT=0;private rosterHTML='';private slowUntil=0;
+  private score=0;private bounty=BASE_BOUNTY;private scoreTarget=SCORE_TARGET;private endsAt=0;private kills=0;private deaths=0;private dead=false;private killer='';private ping=0;private pingTimer=0;private serverClockOffset=0;private hasClockOffset=false;private notice='';private noticeT=0;private slowUntil=0;
   private disposed=false;private ready=false;private paused=false;private wasShooting=false;private lastLocalShot=0;private recoilPitch=0;private recoilYaw=0;private gun=new T.Group();private gunFlash:T.Mesh;private gunMaterial=new T.MeshBasicMaterial({color:0x202634});private handMaterial=new T.MeshBasicMaterial({color:0xffffff});private coarse=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0;
   private cameraOffset=new T.Vector3();private visualPosition=new T.Vector3();private remoteTarget=new T.Vector3();private moveIntent=new T.Vector3();
-  private scope:SniperScope;private physicsTime=0;private awaitingWeapon=false;
+  private tacticalBoard:TacticalBoard;private scope:SniperScope;private physicsTime=0;private awaitingWeapon=false;
   private snapshotInterval=50;private snapshotJitter=0;private lastSnapshotArrival=0;
   private radarCanvas:HTMLCanvasElement;private radarContext:CanvasRenderingContext2D;private radarPlayers=new Map<string,Net>();private radarTimer=0;
 
   constructor(private root:HTMLElement,private socket:Socket,private roomCode:string|undefined,private roundId:number,private onFatal:(reason:string)=>void,private playerId:string,initialSeq=0,roomActions?:{isHost:boolean;onLeave:()=>void;onEnd:()=>void}){
     this.seq=initialSeq;
     const performanceSettings=new PerformanceManager();this.renderer=new T.WebGLRenderer({antialias:performanceSettings.antialias,powerPreference:'high-performance'});this.renderer.setPixelRatio(performanceSettings.pixelRatio);this.renderer.setClearColor(0x16b9dc);root.append(this.renderer.domElement);
-    root.insertAdjacentHTML('beforeend','<div class="co-feedback"></div><div class="co-hud"></div><div class="co-mp-roster"></div><div class="co-minimap"><canvas aria-label="以自己為中心的戰術雷達"></canvas></div>'+mobileMarkup());
+    root.insertAdjacentHTML('beforeend','<div class="co-feedback"></div><div class="co-hud"></div><div class="co-minimap"><canvas aria-label="以自己為中心的戰術雷達"></canvas></div>'+mobileMarkup());
+    this.tacticalBoard=new TacticalBoard(root,this.coarse);
     this.radarCanvas=root.querySelector('.co-minimap canvas')!;this.radarContext=this.radarCanvas.getContext('2d')!;
     this.hud=new HUD(root.querySelector('.co-hud')!);this.aimFeedback=new AimFeedback(root);this.feedback=new DamageFeedbackSystem(root.querySelector('.co-feedback')!);this.armory=new Armory(root,id=>{this.input.set({aim:false});this.socket.emit('match:weapon',{id,roundId:this.roundId});},()=>this.owned,this.restorePointerLock);
     this.scene.add(this.arena.group,new T.HemisphereLight(0xffffff,0x16b9dc,2));this.effects=new WeaponEffects(this.scene,this.coarse);this.battle=new BattleFeedback(root);this.makeGun();this.scope=new SniperScope(root,this.gun,this.coarse);this.makePickups();
     if(this.coarse)this.mobile=new MobileInput(root,this.input);else{this.desktop=new DesktopInput(root,this.input);root.onclick=e=>{if(!(e.target as HTMLElement).closest('.co-armory, [data-game-ui], button, input'))this.restorePointerLock();};}
     this.resize=()=>{this.cam.aspect=root.clientWidth/root.clientHeight;this.cam.updateProjectionMatrix();this.renderer.setSize(root.clientWidth,root.clientHeight,false);this.sizeRadar();};window.addEventListener('resize',this.resize);this.resize();
-    this.socket.on('match:snapshot',this.onSnapshot);this.socket.on('match:shot',this.onShot);this.socket.on('match:hit',this.onHit);this.socket.on('match:kill',this.onKill);this.socket.on('match:damage',this.onDamage);this.socket.on('disconnect',this.onDisconnect);this.socket.on('connect_error',this.onConnectError);this.loop=new GameLoop(dt=>this.update(dt));this.settings=new GameSettings(root,()=>{this.root.dispatchEvent(new Event('combat:reset'));this.socket.emit('match:input',{roundId:this.roundId,seq:++this.seq,clientTime:this.serverNow(),moveX:0,moveY:0,yaw:this.player.yaw,pitch:this.player.pitch,jump:false,reload:false,sprint:false,aim:false});this.desktop?.setEnabled(false);this.mobile?.setEnabled(false);this.armory.setEnabled(false);this.wasShooting=false;},requestLock=>{this.desktop?.setEnabled(true);this.mobile?.setEnabled(true);this.armory.setEnabled(true);if(requestLock)this.restorePointerLock();},true,roomActions?{...roomActions,code:roomCode??''}:undefined);
+    this.socket.on('match:snapshot',this.onSnapshot);this.socket.on('match:shot',this.onShot);this.socket.on('match:hit',this.onHit);this.socket.on('match:kill',this.onKill);this.socket.on('match:damage',this.onDamage);this.socket.on('disconnect',this.onDisconnect);this.socket.on('connect_error',this.onConnectError);this.loop=new GameLoop(dt=>this.update(dt));this.settings=new GameSettings(root,()=>{this.tacticalBoard.close();this.root.dispatchEvent(new Event('combat:reset'));this.socket.emit('match:input',{roundId:this.roundId,seq:++this.seq,clientTime:this.serverNow(),moveX:0,moveY:0,yaw:this.player.yaw,pitch:this.player.pitch,jump:false,reload:false,sprint:false,aim:false});this.desktop?.setEnabled(false);this.mobile?.setEnabled(false);this.armory.setEnabled(false);this.wasShooting=false;},requestLock=>{this.desktop?.setEnabled(true);this.mobile?.setEnabled(true);this.armory.setEnabled(true);if(requestLock)this.restorePointerLock();},true,roomActions?{...roomActions,code:roomCode??''}:undefined);
   }
 
   start(){if(this.disposed)return;this.paused=false;this.loop.start();}
-  pause(){if(this.disposed)return;this.paused=true;this.settings?.setActive(false);this.desktop?.setEnabled(false);this.mobile?.setEnabled(false);this.armory.setEnabled(false);this.wasShooting=false;this.input.reset();this.loop.stop();const locked=document.pointerLockElement;if(locked&&(locked===this.root||this.root.contains(locked)))document.exitPointerLock?.();}
-  resume(){if(this.disposed)return;this.paused=false;this.settings?.setActive(true);this.desktop?.setEnabled(true);this.mobile?.setEnabled(true);this.armory.setEnabled(true);this.loop.start();}
+  pause(){if(this.disposed)return;this.paused=true;this.tacticalBoard.setActive(false);this.settings?.setActive(false);this.desktop?.setEnabled(false);this.mobile?.setEnabled(false);this.armory.setEnabled(false);this.wasShooting=false;this.input.reset();this.loop.stop();const locked=document.pointerLockElement;if(locked&&(locked===this.root||this.root.contains(locked)))document.exitPointerLock?.();}
+  resume(){if(this.disposed)return;this.paused=false;this.tacticalBoard.setActive(true);this.settings?.setActive(true);this.desktop?.setEnabled(true);this.mobile?.setEnabled(true);this.armory.setEnabled(true);this.loop.start();}
   private restorePointerLock=()=>{if(this.disposed||this.paused)return;if(this.coarse||this.settings?.isOpen||document.pointerLockElement===this.root)return;try{this.root.requestPointerLock?.()?.catch(()=>{});}catch{/* The settings hint remains available when pointer lock fails. */}};
   private sendResetInput(){
     if(this.disposed||this.paused||!this.ready||!this.socket?.connected)return;
@@ -94,23 +96,11 @@ export class MultiplayerGame{
   };
 
   private updatePanels(snapshot:Snapshot){
-    const rows=rankScores(snapshot.players);
-    const signature=JSON.stringify([this.roomCode,Math.round(this.ping),rows.map(p=>[p.id,p.name,p.rank,p.score,p.bounty,p.kills,p.deaths])]);
-    const roster=this.root.querySelector('.co-mp-roster')!;
-    if(signature!==this.rosterHTML){
-      this.rosterHTML=signature;const header=document.createElement('b');header.textContent=`${this.roomCode||'房間'} · ${Math.round(this.ping)}ms`;
-      const legend=document.createElement('small');legend.textContent='名次 · 玩家 ／ 積分 · 賞金 · K/D';roster.replaceChildren(header,legend);
-      for(const player of rows){
-        const row=document.createElement('div'),name=document.createElement('span'),stats=document.createElement('strong');
-        name.textContent=`${player.rank}. ${player.name}`;stats.textContent=`${player.score}分 · 賞${player.bounty} · ${player.kills}/${player.deaths}`;
-        row.classList.toggle('is-high-bounty',player.bounty>=HIGH_BOUNTY);row.append(name,stats);roster.append(row);
-      }
-    }
-    this.root.style.setProperty('--co-roster-bottom',`${roster.getBoundingClientRect().bottom-this.root.getBoundingClientRect().top}px`);
+    this.tacticalBoard.update(snapshot.players,this.roomCode,this.ping);
     this.radarPlayers=snapshot.byId??new Map(snapshot.players.map(player=>[player.id,player]));
   }
 
-  private syncAvatars(players:Net[]){const ids=new Set(players.map(player=>player.id));for(const[id,avatar]of this.avatars)if(!ids.has(id)){avatar.dispose();this.avatars.delete(id);}for(const player of players){if(player.id===this.playerId)continue;let avatar=this.avatars.get(player.id);if(!avatar){avatar=new Bot(player.id,player.name,player.color,player.avatar);avatar.respawn(player.x,player.z);avatar.position.y=player.y-1.65;avatar.group.position.copy(avatar.position);this.avatars.set(player.id,avatar);this.scene.add(avatar.group,avatar.deathGroup);}if(player.alive&&!avatar.alive)avatar.respawn(player.x,player.z);if(!player.alive&&avatar.alive)avatar.damage(100);}}
+  private syncAvatars(players:Net[]){const ids=new Set(players.map(player=>player.id));for(const[id,avatar]of this.avatars)if(!ids.has(id)){avatar.dispose();this.avatars.delete(id);}for(const player of players){if(player.id===this.playerId)continue;let avatar=this.avatars.get(player.id);if(!avatar){avatar=new Bot(player.id,player.name,player.color);avatar.respawn(player.x,player.z);avatar.position.y=player.y-1.65;avatar.group.position.copy(avatar.position);this.avatars.set(player.id,avatar);this.scene.add(avatar.group,avatar.deathGroup);}if(player.alive&&!avatar.alive)avatar.respawn(player.x,player.z);if(!player.alive&&avatar.alive)avatar.damage(100);}}
   private syncPickups(pickups:Pickup[]){for(const pickup of pickups){const mesh=this.pickupMeshes.get(pickup.id);if(!mesh)continue;mesh.position.set(pickup.x,pickup.y+.9,pickup.z);mesh.visible=pickup.available;}}
 
   private sizeRadar(){const rect=this.radarCanvas?.getBoundingClientRect();if(!rect?.width||!rect.height)return;const ratio=Math.min(window.devicePixelRatio||1,1.5),width=Math.round(rect.width*ratio),height=Math.round(rect.height*ratio);if(this.radarCanvas.width!==width||this.radarCanvas.height!==height){this.radarCanvas.width=width;this.radarCanvas.height=height;}}
@@ -136,7 +126,7 @@ export class MultiplayerGame{
     this.measurePing(dt);
     if(!this.ready)return;
     this.desktop?.update();const input=this.input.getState();
-    const blocked=this.armory.isOpen||!!this.settings?.isOpen||this.paused;
+    const blocked=this.tacticalBoard.isOpen||this.armory.isOpen||!!this.settings?.isOpen||this.paused;
     const reloadingNow=this.weapons[this.active].reloadUntil>this.serverNow();
     if(this.active!=='sniper'||reloadingNow||input.reload||input.switchWeapon||!this.player.alive||blocked||this.awaitingWeapon){this.input.set({aim:false});input.aim=false;}
     if(blocked){input.shoot=false;this.input.clearCombat();}
@@ -160,7 +150,7 @@ export class MultiplayerGame{
     this.socket.off('match:hit',this.onHit);this.socket.off('match:kill',this.onKill);this.socket.off('match:damage',this.onDamage);
     this.socket.off('disconnect',this.onDisconnect);this.socket.off('connect_error',this.onConnectError);
     window.removeEventListener('resize',this.resize);this.root.onclick=null;
-    this.desktop?.dispose();this.mobile?.dispose();this.settings?.dispose();this.armory.dispose();
+    this.desktop?.dispose();this.mobile?.dispose();this.tacticalBoard.dispose();this.settings?.dispose();this.armory.dispose();
     this.scope.dispose();this.effects.dispose();this.battle.dispose();this.feedback.dispose();this.hud.dispose();this.aimFeedback.dispose();
     for(const avatar of this.avatars.values())avatar.dispose();
     this.avatars.clear();

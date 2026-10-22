@@ -282,10 +282,9 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
     <button className="mp-back" disabled={busy} onClick={leave}>← 離開房間</button>
     <header className="mp-lobby-header"><div><p className="mp-eyebrow">CHROMA OPS / LOBBY</p><h1>集結，準備開戰。</h1><p className="mp-subtitle">分享房號，邀請朋友加入你的戰場。</p></div><div className="mp-room-code"><small>房間代碼</small><strong>{room.code}</strong><span><i />{room.players.filter(player => player.connected).length} 位在線 · {room.players.length} / 8 席位</span></div></header>
     {room.lobbyReason && <p className="mp-status" role="status">{room.lobbyReason}</p>}
-    <div className="mp-lobby-columns"><section className="mp-roster-panel" aria-label="房間玩家">
+    <div className={`mp-lobby-columns ${room.notices?.length ? '' : 'is-roster-only'}`}><section className="mp-roster-panel" aria-label="房間玩家">
       <h2>玩家名單 <span>{room.players.length.toString().padStart(2, '0')} / 08</span></h2>
       <div className="mp-player-list">{room.players.map((player) => <div className={`mp-player-row ${!player.connected ? 'is-offline' : ''}`} key={player.id}>
-        <span className="mp-avatar" style={{ '--player-color': `#${player.color.toString(16).padStart(6, '0')}` }}>{player.avatar}</span>
         <span className="mp-player-info"><b>{player.name}{player.id === playerId && <small>你</small>}</b><span><i />{player.connected ? '已連線，準備就緒' : '斷線中 · 席位保留 60 秒'}</span></span>
         {player.id === room.host && <span className="mp-host-badge">房主</span>}
       </div>)}</div>
@@ -297,7 +296,7 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
     {error && <p className="mp-error" role="alert">{error}</p>}
   </section></main>;
   return <main className="mp"><section className="mp-panel mp-join-panel">
-    <button className="mp-back" disabled={busy} onClick={leave}>← 選擇模式</button><p className="mp-eyebrow">CHROMA OPS / MULTIPLAYER</p><h1>你的隊友在等你。</h1><p className="mp-subtitle">建立專屬房間，或用房號直達戰場。</p>
+    <button className="mp-back" disabled={busy} onClick={leave}>← 選擇模式</button><p className="mp-eyebrow">CHROMA OPS / MULTIPLAYER</p><h1>邀請你的隊友。</h1><p className="mp-subtitle">建立專屬房間，或用房號直達戰場。</p>
     {sessionRef.current && <ResumeCard code={sessionRef.current.code} disabled={busy} onResume={resume} />}
     <label className="mp-field">玩家暱稱<input placeholder="大家怎麼稱呼你？" autoComplete="nickname" disabled={busy} value={name} maxLength="16" onChange={(event) => setName(event.target.value)} /></label>
     <button className="mp-primary" disabled={busy} onClick={create}>{busy ? loadingLabel : '建立新房間 →'}</button>

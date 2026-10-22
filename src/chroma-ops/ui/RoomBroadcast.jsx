@@ -9,23 +9,29 @@ export function RoomNoticeItem({ notice }) {
   </div>;
 }
 
-function NoticeToast({ notice }) {
-  const [visible, setVisible] = useState(() => Date.now() < notice.expiresAt);
+function FloatingBroadcast({ notices }) {
+  const [now, setNow] = useState(() => Date.now());
+  const active = notices.filter(notice => notice.expiresAt > now).slice(-3);
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(false), Math.max(0, notice.expiresAt - Date.now()));
+    const remaining = notices.filter(notice => notice.expiresAt > now);
+    if (!remaining.length) return;
+    const deadline = Math.min(...remaining.map(notice => notice.expiresAt));
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, deadline - Date.now()));
     return () => clearTimeout(timer);
-  }, [notice.id, notice.expiresAt]);
-  return visible ? <RoomNoticeItem notice={notice} /> : null;
+  }, [notices, now]);
+  if (!active.length) return null;
+  return <aside className="mp-broadcast-toasts" aria-label="房間連線通知" role="log" aria-live="polite" aria-relevant="additions">
+    {active.map(notice => <RoomNoticeItem key={notice.id} notice={notice} />)}
+  </aside>;
 }
 
 export default function RoomBroadcast({ notices = [], floating = false }) {
-  if (floating) return <aside className="mp-broadcast-toasts" aria-label="房間連線通知" role="log" aria-live="polite" aria-relevant="additions">
-    {notices.slice(-3).map(notice => <NoticeToast key={notice.id} notice={notice} />)}
-  </aside>;
+  if (!notices.length) return null;
+  if (floating) return <FloatingBroadcast notices={notices} />;
   return <section className="mp-broadcast" aria-label="房間廣播">
     <header><span><i aria-hidden="true" />房間廣播</span><small>連線動態</small></header>
     <div className="mp-broadcast-log" role="log" aria-live="polite" aria-relevant="additions">
-      {notices.length ? notices.slice(-5).map(notice => <RoomNoticeItem key={notice.id} notice={notice} />) : <p className="mp-broadcast-empty">隊友的斷線與恢復連線通知會顯示在這裡</p>}
+      {notices.slice(-5).map(notice => <RoomNoticeItem key={notice.id} notice={notice} />)}
     </div>
   </section>;
 }
