@@ -23,3 +23,5 @@
 .co-has-settings .co-mp-roster{top:max(70px,calc(env(safe-area-inset-top) + 54px))}
 
 @media(pointer:coarse) and (max-height:520px){.co-settings-overlay{padding:12px}.co-settings-card{padding:16px;max-height:calc(100dvh - 24px)}.co-settings-card h2{font-size:23px}.co-settings-card .co-sensitivity{margin-top:12px;padding:14px}.co-settings-card .co-sensitivity input[type=range]{margin:12px 0}.co-settings-card .co-sensitivity p{margin:8px 0}.co-settings-status{margin:12px 0}.co-settings-help{margin-top:10px}}
+
+.co-room-actions{display:grid;gap:10px;margin-bottom:18px}.co-room-actions button{padding:12px;border:1px solid #ffffff55;border-radius:12px;background:#243c70;color:white;cursor:pointer}.co-room-actions [data-end],.co-room-actions [data-leave]{background:#643041}

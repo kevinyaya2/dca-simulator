@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test:chroma": "tsx --test tests/chroma-ops.test.ts tests/chroma-combat.test.ts tests/chroma-features.test.ts tests/chroma-network.test.ts tests/chroma-input.test.ts tests/chroma-rematch.test.ts tests/chroma-city.test.ts tests/chroma-underground.test.ts tests/chroma-glasshouse.test.ts tests/chroma-aim.test.ts tests/chroma-armory.test.ts",
+    "test:chroma": "tsx --test tests/chroma-ops.test.ts tests/chroma-combat.test.ts tests/chroma-features.test.ts tests/chroma-network.test.ts tests/chroma-recovery.test.ts tests/chroma-input.test.ts tests/chroma-rematch.test.ts tests/chroma-city.test.ts tests/chroma-underground.test.ts tests/chroma-glasshouse.test.ts tests/chroma-aim.test.ts tests/chroma-armory.test.ts",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",

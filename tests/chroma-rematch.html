@@ -37,7 +37,7 @@ run.onclick=async()=>{
   try{
     for(let roundId=1;roundId<=10;roundId++){
       socket.inputs=[];
-      const game=new MultiplayerGame(root,socket,'QA',roundId,message=>{throw new Error(message);});active=game;
+      const game=new MultiplayerGame(root,socket,'QA',roundId,message=>{throw new Error(message);},'self');active=game;
       game.start();game.resume();game.resume();
       await frame();await frame();
       assert(socket.inputs.length===0,'must wait for this round snapshot before sending inputs');

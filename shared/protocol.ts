@@ -1,4 +1,4 @@
-export const MULTIPLAYER_PROTOCOL_VERSION = 8;
+export const MULTIPLAYER_PROTOCOL_VERSION = 9;
 export type RoundEvent<T> = T & { roundId:number };
 export function isCurrentRound(message:unknown,roundId:number):boolean {
   return typeof message==='object'&&message!==null&&(message as {roundId?:unknown}).roundId===roundId;
