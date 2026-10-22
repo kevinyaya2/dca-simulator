@@ -1,0 +1,7 @@
+.co-aim-feedback{position:absolute;z-index:5;left:50%;top:calc(50% + 22px);transform:translateX(-50%);pointer-events:none;font:700 11px/1.5 system-ui,sans-serif;letter-spacing:.05em;padding:2px 7px;border-radius:5px;color:var(--co-aim-color);background:#10182bbf;text-shadow:0 1px 2px #000}
+.co-aim-feedback[hidden]{display:none}
+[data-aim-state="in-range"]{--co-aim-color:#68ffc1}
+[data-aim-state="out-of-range"]{--co-aim-color:#ffe16b}
+[data-aim-state="blocked"]{--co-aim-color:#c1c9d3}
+[data-aim-state="in-range"] .co-crosshair:not(.is-kill),[data-aim-state="out-of-range"] .co-crosshair:not(.is-kill),[data-aim-state="blocked"] .co-crosshair:not(.is-kill),[data-aim-state="in-range"] .co-crosshair:not(.is-kill):after,[data-aim-state="out-of-range"] .co-crosshair:not(.is-kill):after,[data-aim-state="blocked"] .co-crosshair:not(.is-kill):after{background:var(--co-aim-color)}
+[data-aim-state="in-range"] .co-scope-reticle span,[data-aim-state="out-of-range"] .co-scope-reticle span,[data-aim-state="blocked"] .co-scope-reticle span{background:var(--co-aim-color)}

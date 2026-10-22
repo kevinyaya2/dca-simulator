@@ -34,8 +34,8 @@ test('desktop Shift, held right click, hotkey 7 and focus loss do not leave stic
   let resets=0;const input=new InputManager(()=>resets++),desktop=new DesktopInput(root as unknown as HTMLElement,input);
   dispatch(win,'keydown',{key:'w'});desktop.update();assert.equal(input.getState().moveY,1);
   dispatch(root,'mousedown',{button:2});assert.equal(input.aiming,true);
-  dispatch(win,'keydown',{key:'Shift'});desktop.update();assert.equal(input.sprinting,true);assert.equal(input.aiming,false);
-  dispatch(win,'keyup',{key:'Shift'});desktop.update();assert.equal(input.sprinting,false);assert.equal(input.aiming,false);
+  dispatch(win,'keydown',{key:'Shift'});desktop.update();assert.equal(input.sprinting,true);assert.equal(input.aiming,true);
+  dispatch(win,'keyup',{key:'Shift'});desktop.update();assert.equal(input.sprinting,false);assert.equal(input.aiming,true);
   dispatch(root,'mouseup',{button:2});dispatch(root,'mousedown',{button:2});assert.equal(input.aiming,true);
   dispatch(win,'keydown',{key:'7'});assert.equal(input.getState().switchWeapon,7);assert.equal(input.aiming,false);
   assert.equal(dispatch(root,'contextmenu').defaultPrevented,true);
@@ -52,7 +52,9 @@ test('touch can move, look and fire together; aim and sprint toggle independentl
   down(2,680,290,aim);dispatch(root,'pointerup',{pointerId:2});assert.equal(input.aiming,true);
   down(3,780,310,fire);down(4,500,100);dispatch(root,'pointermove',{pointerId:4,clientX:520,clientY:110});
   const state=input.getState();assert.ok(state.moveX>0&&state.moveY>0);assert.equal(state.shoot,true);assert.equal(state.lookX,40);assert.equal(state.lookY,20);
-  down(5,630,290,sprint);dispatch(root,'pointerup',{pointerId:5});assert.equal(input.sprinting,true);assert.equal(input.aiming,false);
+  down(5,630,290,sprint);dispatch(root,'pointerup',{pointerId:5});assert.equal(input.sprinting,true);assert.equal(input.aiming,true);
+  down(6,680,290,aim);dispatch(root,'pointerup',{pointerId:6});assert.equal(input.aiming,false);assert.equal(input.sprinting,true);
+  down(7,680,290,aim);dispatch(root,'pointerup',{pointerId:7});assert.equal(input.aiming,true);assert.equal(input.sprinting,true);
   dispatch(root,'pointercancel',{pointerId:3});assert.equal(input.getState().shoot,false);
   dispatch(root,'pointerup',{pointerId:1});assert.equal(input.getState().moveX,0);assert.equal(input.sprinting,true);
   doc.hidden=true;dispatch(doc,'visibilitychange');assert.equal(input.sprinting,false);assert.equal(input.aiming,false);

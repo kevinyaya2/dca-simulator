@@ -13,6 +13,15 @@ const paint=[
 ];
 export const GROUND_SURFACES=paint.flatMap((region,index)=>cutEntrances(region,[...ENTRY_HOLES,...paint.slice(index+1)]));
 
+// Landings, skywalks and floor slabs can overlap at exactly the same height.
+// Keep collision volumes intact, but let only one rectangle paint each top pixel.
+export function uniqueBoxTops(boxes:readonly ArenaBox[]):ArenaBox[]{
+  const levels=new Map<number,ArenaBox[]>();
+  for(const b of boxes){const level=levels.get(b.maxY)||[];level.push(b);levels.set(b.maxY,level);}
+  return [...levels.values()].flatMap(level=>level.flatMap((b,index)=>cutEntrances(b,level.slice(index+1).filter(other=>
+    other.minX<b.maxX&&other.maxX>b.minX&&other.minZ<b.maxZ&&other.maxZ>b.minZ))));
+}
+
 export function groundCoversBoxTop(box:ArenaBox){
   return box.maxY===0&&!ENTRY_HOLES.some(h=>Math.min(box.maxX,h.maxX)>Math.max(box.minX,h.minX)
     &&Math.min(box.maxZ,h.maxZ)>Math.max(box.minZ,h.minZ));

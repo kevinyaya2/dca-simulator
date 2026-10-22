@@ -1,11 +1,12 @@
 import * as T from 'three';
 import type { WeaponId } from '../../../shared/weapons';
 import type { InputState } from '../input/InputManager';
+import { CAMERA_NEAR } from '../systems/PerformanceManager';
 
 // Render the same scene into a circular lens; the main camera always keeps its normal FOV.
 export class SniperScope {
   private shell:HTMLDivElement;
-  private lens=new T.PerspectiveCamera(75,1,.05,420);
+  private lens=new T.PerspectiveCamera(75,1,CAMERA_NEAR,420);
   private target=new T.WebGLRenderTarget(256,256);
   private overlay=new T.Scene();
   private overlayCamera=new T.OrthographicCamera(-1,1,1,-1,0,2);
@@ -39,7 +40,7 @@ export class SniperScope {
   private reset=()=>{this.scoped=false;this.shell.hidden=true;this.root.classList.remove('co-scoped');};
 
   update(id:WeaponId,input:InputState,alive:boolean,reloading:boolean,blocked:boolean) {
-    this.scoped=id==='sniper'&&!!input.aim&&!input.sprint&&alive&&!reloading&&!blocked;
+    this.scoped=id==='sniper'&&!!input.aim&&alive&&!reloading&&!blocked;
     this.shell.hidden=!this.scoped;this.root.classList.toggle('co-scoped',this.scoped);
     this.root.querySelector('[data-sprint]')?.setAttribute('aria-pressed',String(!!input.sprint&&alive));
     const aim=this.root.querySelector<HTMLButtonElement>('[data-aim]');
@@ -53,6 +54,7 @@ export class SniperScope {
     renderer.render(scene,camera);
     this.gun.visible=true;
     if(!this.scoped)return;
+    this.target.samples=Math.min(4,renderer.capabilities.maxSamples);
     const width=this.root.clientWidth,height=this.root.clientHeight;
     const frame=Math.min(height*.58,width*.44),diameter=frame*.6;
     this.root.style.setProperty('--scope-size',`${frame}px`);
@@ -60,7 +62,7 @@ export class SniperScope {
     const pixels=Math.max(64,Math.min(this.coarse?512:768,Math.ceil(diameter*renderer.getPixelRatio())));
     if(this.target.width!==pixels)this.target.setSize(pixels,pixels);
     this.lens.position.copy(camera.position);this.lens.quaternion.copy(camera.quaternion);
-    this.lens.fov=camera.fov;this.lens.zoom=4*height/diameter;this.lens.far=camera.far;this.lens.updateProjectionMatrix();
+    this.lens.fov=camera.fov;this.lens.zoom=4*height/diameter;this.lens.near=camera.near;this.lens.far=camera.far;this.lens.updateProjectionMatrix();
     this.gun.visible=false;
     const savedTarget=renderer.getRenderTarget(),savedAutoClear=renderer.autoClear;
     renderer.setRenderTarget(this.target);renderer.render(scene,this.lens);renderer.setRenderTarget(savedTarget);

@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { FerrisWheel } from './FerrisWheel';
-import { GROUND_SURFACES, groundCoversBoxTop } from './GroundSurfaces';
+import { GROUND_SURFACES, groundCoversBoxTop, uniqueBoxTops } from './GroundSurfaces';
 import { SAFE_SPAWNS } from '../../../shared/spawns';
 import { ARENA_BOXES, terrainHeight, type ArenaBox } from '../../../shared/arena';
 import { CITY_BUILDINGS, CITY_RAMPS, CITY_GARDENS, CITY_LAMPS, CITY_WAYPOINTS, cityBox } from '../../../shared/city';
@@ -39,15 +39,14 @@ export class Arena {
     this.openTopBox.setIndex(Array.from(this.unitBox.index!.array).filter((_,index)=>index<12||index>=18));
     this.openTopBox.clearGroups();
     const glass=new Set(GLASSHOUSE_GLASS);
-    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY>0&&!glass.has(b)));
+    const solids=[...ARENA_BOXES.filter(b=>b.maxY>0&&!glass.has(b)),
+      cityBox(0,62,44,20,12,0x188bd0),cityBox(4,100,32,24,6,0x795ad8)];
+    this.drawSolids(solids);
     this.drawBoxes(GLASSHOUSE_DETAILS);
     this.makeGlasshouseWindows();
     this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY<=0&&!groundCoversBoxTop(b)),undefined,true);
     this.drawBoxes(ARENA_BOXES.filter(groundCoversBoxTop),undefined,true,this.openTopBox);
     this.drawBoxes(GROUND_SURFACES,undefined,false,this.groundPlane,true);
-    this.drawBoxes([
-      cityBox(0,62,44,20,12,0x188bd0),cityBox(4,100,32,24,6,0x795ad8),
-    ]);
     for(const ramp of CITY_RAMPS)this.ramp(ramp.x,ramp.z0,ramp.x,ramp.z1,ramp.from,ramp.to,ramp.width);
     this.ramp(-20.5,40,-20.5,52,0,12,9);
     this.ramp(-38,100,-12,100,0,6,24);
@@ -90,6 +89,27 @@ export class Arena {
     }
   }
 
+  private drawSolids(boxes:readonly ArenaBox[]){
+    // Static structures share one draw per colour, including their clipped tops.
+    // Baking these small boxes avoids doubling draw calls for the top-face pass.
+    const batches=new Map<number,{positions:number[];indices:number[]}>();
+    const batch=(color:number)=>{let data=batches.get(color);if(!data){data={positions:[],indices:[]};batches.set(color,data);}return data;};
+    for(const b of boxes){
+      const data=batch(b.color),offset=data.positions.length/3;
+      for(const y of [b.minY,b.maxY])data.positions.push(b.minX,y,b.minZ,b.maxX,y,b.minZ,b.maxX,y,b.maxZ,b.minX,y,b.maxZ);
+      for(const i of [0,1,2,0,2,3,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0])data.indices.push(offset+i);
+    }
+    for(const b of uniqueBoxTops(boxes)){
+      const data=batch(b.color),offset=data.positions.length/3;
+      data.positions.push(b.minX,b.maxY,b.minZ,b.maxX,b.maxY,b.minZ,b.maxX,b.maxY,b.maxZ,b.minX,b.maxY,b.maxZ);
+      for(const i of [0,2,1,0,3,2])data.indices.push(offset+i);
+    }
+    for(const [color,data] of batches){
+      const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(data.positions,3));geometry.setIndex(data.indices);
+      this.group.add(new T.Mesh(geometry,new T.MeshBasicMaterial({color})));
+    }
+  }
+
   private makeGlasshouseWindows(){
     // Separate panes sort back-to-front individually, sharing geometry and material.
     const material=new T.MeshBasicMaterial({color:0xc9f1ed,transparent:true,opacity:.28,depthWrite:false});
@@ -112,7 +132,7 @@ export class Arena {
   private makeWindows(){
     const frames:ArenaBox[]=[];
     for(const b of CITY_BUILDINGS)for(const base of [0,6])for(const side of [-1,1])for(const axis of ['x','z'])for(const [u,w] of [[-9,5.4],[-4,3.4],[4,3.4],[9,5.4]]){
-      const add=(offset:number,width:number,y:number,height:number)=>frames.push(axis==='x'?cityBox(b.x+side*12.23,b.z+offset,.05,width,y+height/2,0xd4fff6,y-height/2):cityBox(b.x+offset,b.z+side*12.23,width,.05,y+height/2,0xd4fff6,y-height/2));
+      const add=(offset:number,width:number,y:number,height:number)=>frames.push(axis==='x'?cityBox(b.x+side*12.27,b.z+offset,.05,width,y+height/2,0xd4fff6,y-height/2):cityBox(b.x+offset,b.z+side*12.27,width,.05,y+height/2,0xd4fff6,y-height/2));
       for(const y of [base+1.23,base+3.47])add(u,w,y,.08);
       for(const offset of [u-w/2,u+w/2])add(offset,.08,base+2.35,2.3);
       if(b.name.includes('STUDIO')||b.name.includes('GALLERY'))add(u,.06,base+2.35,2.3);

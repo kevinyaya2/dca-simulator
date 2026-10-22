@@ -5,7 +5,7 @@ export class InputManager {
   constructor(private onReset?:()=>void){}
   set(p: Partial<InputState>) {
     Object.assign(this.state, p);
-    if(this.state.sprint || p.reload || p.switchWeapon) this.state.aim=false;
+    if(p.reload || p.switchWeapon) this.state.aim=false;
   }
   addLook(x:number,y:number) { this.state.lookX += x; this.state.lookY += y; }
   getState():InputState { const s={...this.state}; this.state.lookX=0; this.state.lookY=0; this.state.jump=false; this.state.reload=false; this.state.switchWeapon=0; return s; }

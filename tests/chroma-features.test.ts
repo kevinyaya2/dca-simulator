@@ -104,10 +104,11 @@ test('configured sprint speed stacks with slow and preserves jump physics',()=>{
   near(a.x,PLAYER_MOVE_SPEED);near(b.x,sprintSpeed);near(c.x,sprintSpeed*.65);near(a.y,b.y);near(a.velocityY,b.velocityY);
 });
 
-test('sprint and reload cancel aim until another aim press; reset clears held actions',()=>{
+test('sprint preserves aim in either order; reload, switching and reset still clear actions',()=>{
   const input=new InputManager();input.set({aim:true});assert.equal(input.aiming,true);
-  input.set({sprint:true});assert.equal(input.aiming,false);
-  input.set({sprint:false});assert.equal(input.aiming,false);
+  input.set({sprint:true});assert.equal(input.aiming,true);
+  input.set({sprint:false});assert.equal(input.aiming,true);
+  input.set({aim:false});input.set({sprint:true});input.set({aim:true});assert.equal(input.aiming,true);
   input.set({aim:true});input.set({reload:true});assert.equal(input.aiming,false);
   input.getState();input.set({aim:true});input.set({switchWeapon:7});assert.equal(input.aiming,false);
   input.set({sprint:true,shoot:true});input.reset();assert.equal(input.sprinting,false);assert.equal(input.getState().shoot,false);

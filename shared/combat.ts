@@ -16,6 +16,11 @@ const sub=(a:Vec3,b:Vec3):Vec3=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
 const length=(v:Vec3)=>Math.hypot(...v);
 export const normalize=(v:Vec3):Vec3=>{const l=length(v)||1;return v.map(n=>n/l) as Vec3;};
 export const along=(origin:Vec3,dir:Vec3,t:number):Vec3=>[origin[0]+dir[0]*t,origin[1]+dir[1]*t,origin[2]+dir[2]*t];
+export const FLAME_CONE_ANGLE=12*Math.PI/180;
+export function flameTargetPoints(target:Combatant):Vec3[]{
+  const feet=target.y-PLAYER_EYE_HEIGHT;
+  return [[0,1.22,0],[0,1.92,0],[-.28,1.22,0],[.28,1.22,0],[0,.46,0]].map(([x,y,z])=>[target.x+x,feet+y,target.z+z]);
+}
 export const aimDirection=(yaw:number,pitch:number):Vec3=>[-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
 export function offsetDirection(base:Vec3,x:number,y:number):Vec3{
   const right=normalize(Math.abs(base[1])>.999?[1,0,0]:[-base[2],0,base[0]]);
@@ -55,13 +60,13 @@ export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[
     const old=hits.get(targetId);if(old){old.damage+=damage;old.headshot ||= headshot;}else hits.set(targetId,{targetId,damage,headshot,position});
   };
   if(id==='flame'){
-    const angle=12*Math.PI/180;
+    const angle=FLAME_CONE_ANGLE;
     rays.push(traceRay(origin,base,spec.range,targets,simulationWorld));
     for(let n=0;n<24;n++){const radius=Math.sqrt((n+.5)/24)*Math.tan(angle),phase=n*2.399963;const dir=offsetDirection(base,Math.cos(phase)*radius,Math.sin(phase)*radius);rays.push(traceRay(origin,dir,spec.range,targets,simulationWorld));}
-    for(const target of targets){if(!target.alive)continue;const feet=target.y-PLAYER_EYE_HEIGHT;
+    for(const target of targets){if(!target.alive)continue;
       let selected:{position:Vec3;angle:number}|undefined;
-      for(const offset of [[0,1.22,0],[0,1.92,0],[-.28,1.22,0],[.28,1.22,0],[0,.46,0]]){
-        const position:Vec3=[target.x+offset[0],feet+offset[1],target.z+offset[2]],delta=sub(position,origin),distance=length(delta);
+      for(const position of flameTargetPoints(target)){
+        const delta=sub(position,origin),distance=length(delta);
         if(distance>spec.range||distance<.001)continue;const dir=normalize(delta),a=Math.acos(Math.max(-1,Math.min(1,dot(dir,base))));
         if(a<=angle&&rayWallDistance(point(origin),point(dir),distance,simulationWorld)>=distance-.001&&(!selected||a<selected.angle))selected={position,angle:a};
       }
