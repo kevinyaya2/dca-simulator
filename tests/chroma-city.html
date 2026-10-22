@@ -21,7 +21,7 @@ game.bots.forEach(bot=>{bot.alive=false;bot.group.visible=false;});game.owned.ad
 game.pickups.forEach(p=>{p.cooldown=Infinity;p.mesh.visible=false;});
 game.renderer.info.autoReset=false;
 const draw=()=>{game.renderer.info.reset();game.update(0);const info=game.renderer.info;status.textContent=`${dayNightAt(game.elapsed).phase} | ${info.render.calls} draws | ${info.render.triangles} triangles | ${info.memory.geometries} geometries`;};
-const view=(x,y,z,yaw,pitch)=>{game.input.reset();game.active='sniper';game.player.position.set(x,y,z);game.player.yaw=yaw;game.player.pitch=pitch;game.player.velocityY=0;draw();};
+const view=(x,y,z,yaw,pitch,hideGun=false)=>{game.gun.scale.setScalar(hideGun?0:1);game.input.reset();game.active='sniper';game.player.position.set(x,y,z);game.player.yaw=yaw;game.player.pitch=pitch;game.player.velocityY=0;draw();};
 document.querySelector('#city').onclick=()=>view(0,48,134,0,-.4);
 document.querySelector('#slab').onclick=()=>view(-102,1.65,40,-.65,0);
 document.querySelector('#building').onclick=()=>view(-65,1.65,76,0,0);
@@ -29,6 +29,9 @@ document.querySelector('#lift').onclick=()=>view(68,1.65,22,Math.PI,0);
 document.querySelector('#mall').onclick=()=>view(-64,-4.35,18,-1.1,0);
 document.querySelector('#north').onclick=()=>view(0,1.65,-52,Math.PI,-.18);
 document.querySelector('#shops').onclick=()=>view(112,1.65,120,0,.08);
+for(const [label,pose] of [['Chroma Lab',[6,24,133,-1.05,-.2]],['Lab stairs',[14,9,110,-2.35,.1]],['Lab interior',[58,7.65,112,0,0]],['Lab roof',[32,19.65,94,-1.2,0]]]){
+  const button=document.createElement('button');button.textContent=label;button.onclick=()=>view(...pose,true);status.before(button);
+}
 document.querySelector('#wheel').onclick=()=>view(0,1.65,-54,0,.4);
 for(const [id,time] of [['day',30],['dusk',105],['night',150],['dawn',225]])document.querySelector('#'+id).onclick=()=>{game.elapsed=time;draw();};
 document.querySelector('#scope').onclick=()=>{game.input.set({aim:!game.aiming});draw();};

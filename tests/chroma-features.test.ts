@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stepPlayer, arenaWorld, rayWallDistance, type SimPlayer, type SimWorld, ARENA_BOXES, groundHeight } from '../shared/arena.ts';
+import { stepPlayer, arenaWorld, rayWallDistance, type SimPlayer, type SimWorld, ARENA_BOXES, groundHeight, PLAYER_MOVE_SPEED, SPRINT_MULTIPLIER } from '../shared/arena.ts';
 import { cabinPosition, supportingCabin } from '../shared/ferrisWheel.ts';
 import { resolveShot, damageAtDistance } from '../shared/combat.ts';
 import { WEAPON_IDS, WEAPON_SPECS } from '../shared/weapons.ts';
@@ -93,14 +93,15 @@ test('cabin shot occlusion follows the historical wheel time',()=>{
   assert.equal(supportingCabin(0,.2,-90,0),0);
 });
 
-test('sprint is 19.5 units per second, stacks with slow, and preserves jump physics',()=>{
+test('configured sprint speed stacks with slow and preserves jump physics',()=>{
   const a=player(0,1.65,0),b={...a},c={...a};
   for(let n=0;n<120;n++){
     stepPlayer(a,{...idle,moveX:1,jump:n===0},1/120,empty);
     stepPlayer(b,{...idle,moveX:1,sprint:true,jump:n===0},1/120,empty);
     stepPlayer(c,{...idle,moveX:1,sprint:true,jump:n===0},1/120,empty,.65);
   }
-  near(a.x,13);near(b.x,19.5);near(c.x,19.5*.65);near(a.y,b.y);near(a.velocityY,b.velocityY);
+  const sprintSpeed=PLAYER_MOVE_SPEED*SPRINT_MULTIPLIER;
+  near(a.x,PLAYER_MOVE_SPEED);near(b.x,sprintSpeed);near(c.x,sprintSpeed*.65);near(a.y,b.y);near(a.velocityY,b.velocityY);
 });
 
 test('sprint and reload cancel aim until another aim press; reset clears held actions',()=>{

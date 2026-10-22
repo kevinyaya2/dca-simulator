@@ -8,6 +8,7 @@ import { MALL_ENTRIES, MALL_SHOPS } from '../../../shared/underground';
 import { liftBoxes } from '../../../shared/movingPlatforms';
 import { dayNightAt } from '../../../shared/dayNight';
 import { disposeResources } from '../systems/DisposeResources';
+import { GLASSHOUSE, GLASSHOUSE_GLASS, GLASSHOUSE_DETAILS } from '../../../shared/glasshouse';
 
 type Palette={material:T.MeshBasicMaterial;base:T.Color;night:number;glow?:T.Color};
 export class Arena {
@@ -37,7 +38,10 @@ export class Arena {
     // the B1 ceiling underside and structural side faces remain visible.
     this.openTopBox.setIndex(Array.from(this.unitBox.index!.array).filter((_,index)=>index<12||index>=18));
     this.openTopBox.clearGroups();
-    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY>0));
+    const glass=new Set(GLASSHOUSE_GLASS);
+    this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY>0&&!glass.has(b)));
+    this.drawBoxes(GLASSHOUSE_DETAILS);
+    this.makeGlasshouseWindows();
     this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY<=0&&!groundCoversBoxTop(b)),undefined,true);
     this.drawBoxes(ARENA_BOXES.filter(groundCoversBoxTop),undefined,true,this.openTopBox);
     this.drawBoxes(GROUND_SURFACES,undefined,false,this.groundPlane,true);
@@ -57,6 +61,7 @@ export class Arena {
     this.sign('SKY WALK  /  6m',0,7.8,38.15,0xffc330);
     this.sign('FERRIS PLAZA',0,3,-85,0xff4e98);
     this.sign('LIFT  0 / 6 / 12',68,13.6,25.75,0xff4e98);
+    this.sign(GLASSHOUSE.name,58,5.25,116.3,0x99d9df);
     const seen=new Set<T.MeshBasicMaterial>();
     this.group.traverse(object=>{
       if(!(object instanceof T.Mesh))return;
@@ -82,6 +87,17 @@ export class Arena {
       const mesh=new T.InstancedMesh(geometry,material,items.length);
       items.forEach((b,index)=>{this.matrix.makeScale(b.maxX-b.minX,flat?1:b.maxY-b.minY,b.maxZ-b.minZ);this.matrix.setPosition((b.minX+b.maxX)/2,flat?b.maxY:(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);mesh.setMatrixAt(index,this.matrix);});
       mesh.instanceMatrix.needsUpdate=true;this.group.add(mesh);
+    }
+  }
+
+  private makeGlasshouseWindows(){
+    // Separate panes sort back-to-front individually, sharing geometry and material.
+    const material=new T.MeshBasicMaterial({color:0xc9f1ed,transparent:true,opacity:.28,depthWrite:false});
+    for(const b of GLASSHOUSE_GLASS){
+      const pane=new T.Mesh(this.unitBox,material);
+      pane.scale.set(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ);
+      pane.position.set((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);
+      this.group.add(pane);
     }
   }
 

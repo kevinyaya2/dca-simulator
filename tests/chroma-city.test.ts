@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stepPlayer, groundHeight, blocked, rayWallDistance, arenaWorld, type SimPlayer } from '../shared/arena.ts';
+import { stepPlayer, groundHeight, blocked, rayWallDistance, arenaWorld, PLAYER_MOVE_SPEED, SPRINT_MULTIPLIER, type SimPlayer } from '../shared/arena.ts';
 import { CITY_BUILDINGS, CITY_RAMPS } from '../shared/city.ts';
 import { liftHeight, LIFT_ID, platformPosition } from '../shared/movingPlatforms.ts';
 import { dayNightAt, advanceEnvironment, environmentAtSnapshot } from '../shared/dayNight.ts';
@@ -90,7 +90,8 @@ test('external ramp sides cannot teleport a ground player onto upper routes',()=
 
 test('sprinting up stairs at 4 FPS keeps collision and the two-jump budget intact',()=>{
   const b=CITY_BUILDINGS[0],p=player(b.x-7.5,b.z-9);
-  for(let n=0;n<2;n++)stepPlayer(p,{...idle,moveY:-1,sprint:true},.25);
+  const frames=Math.ceil(9/(PLAYER_MOVE_SPEED*SPRINT_MULTIPLIER*.25));
+  for(let n=0;n<frames;n++)stepPlayer(p,{...idle,moveY:-1,sprint:true},.25);
   assert.ok(Math.abs(p.y-1.65-3)<.3);assert.equal(p.jumpsUsed,0);
   p.x=b.x+5;p.z=b.z+5;p.y=7.65;
   stepPlayer(p,{...idle,jump:true},.2);stepPlayer(p,{...idle,jump:true},.2);

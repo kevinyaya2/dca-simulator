@@ -2,6 +2,7 @@ import { MALL_BOXES, undergroundHeight } from './underground.js';
 import { WHEEL_SUPPORTS } from './ferrisWheel.js';
 import { movingBoxes, platformPosition, supportingPlatform } from './movingPlatforms.js';
 import { CITY_BOXES, CITY_PROPS, CITY_SPAWNS, CITY_BUILDINGS, cityRampHeight } from './city.js';
+import { GLASSHOUSE_BOXES } from './glasshouse.js';
 export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number };
 export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean; sprint?: boolean; aim?: boolean };
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
@@ -22,7 +23,7 @@ export const ARENA_BUILDINGS = CITY_BUILDINGS.map(b=>({...b,openSouth:true}));
 const rect = (x: number, z: number, w: number, d: number, h: number, color: number, minY = 0): ArenaBox =>
   ({ minX: x-w/2, maxX: x+w/2, minZ: z-d/2, maxZ: z+d/2, minY, maxY: minY+h, color });
 export const ARENA_BOXES: ArenaBox[] = [
-  ...WHEEL_SUPPORTS,...CITY_BOXES,...CITY_PROPS,...MALL_BOXES,
+  ...WHEEL_SUPPORTS,...CITY_BOXES,...CITY_PROPS,...MALL_BOXES,...GLASSHOUSE_BOXES,
   rect(-152,0,4,280,19,0x2d58c8), rect(152,0,4,280,19,0xec3478),
   rect(0,-138,308,4,17,0xf3a72d), rect(0,138,308,4,17,0x35c955),
   rect(0,-3,6,6,3,0xf04b55), rect(-22,13,8,3,2,0xffb738),
