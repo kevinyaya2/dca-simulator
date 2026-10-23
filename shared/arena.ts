@@ -8,7 +8,7 @@ export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: num
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
 export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number };
 export const ARENA_BOUNDS = { minX: -154, maxX: 154, minZ: -140, maxZ: 140, width: 308, depth: 280 } as const;
-export const ARENA_CAMERA_FAR = 420;
+export const ARENA_CAMERA_FAR = 560;
 export const PLAYER_MOVE_SPEED = 8;
 export const SPRINT_MULTIPLIER = 1.2;
 export const PLAYER_EYE_HEIGHT = 1.65;

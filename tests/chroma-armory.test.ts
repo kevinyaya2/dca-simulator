@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Armory } from '../src/chroma-ops/ui/Armory.ts';
-import { WEAPON_IDS, type WeaponId } from '../shared/weapons.ts';
+import { WEAPON_IDS, type WeaponId, type WeaponLevel } from '../shared/weapons.ts';
 
 class UI extends EventTarget {
   dataset:Record<string,string>={};children:UI[]=[];parent:UI|null=null;hidden=false;textContent='';
@@ -13,23 +13,24 @@ class UI extends EventTarget {
   querySelector(selector:string):UI|null{return this.children.find(c=>c.kind===selector)??null;}
   setAttribute(key:string,value:string){this.attributes.set(key,value);}
   insertAdjacentHTML(){}
-  set innerHTML(_value:string){if(this.kind!=='.co-armory-track')return;this.children=[];for(const id of WEAPON_IDS){const card=new UI('button');card.dataset.armory=id;card.append(new UI('small'));this.append(card);}}
+  set innerHTML(_value:string){if(this.kind!=='.co-armory-track')return;this.children=[];for(const id of WEAPON_IDS){const card=new UI('button');card.dataset.armory=id;card.append(new UI('small'));card.append(new UI('.co-level'));card.append(new UI('em'));card.append(new UI('.co-weapon-stats'));this.append(card);}}
   scrollIntoView(){}
   remove(){}
 }
 function dispatch(target:EventTarget,type:string,properties:Record<string,unknown>={}){
   const event=new Event(type,{cancelable:true});for(const [key,value] of Object.entries(properties))Object.defineProperty(event,key,{value});target.dispatchEvent(event);return event;
 }
-function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;chosen:WeaponId[]})=>void,touch=false){
-  const names=['window','HTMLElement','matchMedia','navigator','requestAnimationFrame'];
+function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;chosen:WeaponId[];levels:Partial<Record<WeaponId,WeaponLevel>>})=>void,touch=false){
+  const names=['window','HTMLElement','matchMedia','navigator','requestAnimationFrame','document'];
   const previous=names.map(n=>Object.getOwnPropertyDescriptor(globalThis,n));
   const win=Object.assign(new EventTarget(),{PointerEvent:touch?undefined:Event});
-  const values=[win,UI,()=>({matches:touch}),{maxTouchPoints:touch?1:0},(cb:()=>void)=>cb()];
+  const values=[win,UI,()=>({matches:touch}),{maxTouchPoints:touch?1:0},(cb:()=>void)=>cb(),{pointerLockElement:null}];
   names.forEach((n,i)=>Object.defineProperty(globalThis,n,{value:values[i],configurable:true}));
   const root=new UI('root'),box=new UI('.co-armory'),track=new UI('.co-armory-track'),chosen:WeaponId[]=[];
   root.append(box);box.append(track);
-  const armory=new Armory(root as unknown as HTMLElement,id=>chosen.push(id),()=>new Set<WeaponId>(['ar','sniper']));
-  try{armory.toggle();run({armory,root,box,track,win,chosen});}finally{armory.dispose();names.forEach((n,i)=>{if(previous[i])Object.defineProperty(globalThis,n,previous[i]!);else Reflect.deleteProperty(globalThis,n);});}
+  const levels:Partial<Record<WeaponId,WeaponLevel>>={};
+  const armory=new Armory(root as unknown as HTMLElement,id=>chosen.push(id),()=>new Set<WeaponId>(['ar','sniper']),undefined,id=>levels[id]??1);
+  try{armory.toggle();run({armory,root,box,track,win,chosen,levels});}finally{armory.dispose();names.forEach((n,i)=>{if(previous[i])Object.defineProperty(globalThis,n,previous[i]!);else Reflect.deleteProperty(globalThis,n);});}
 }
 function pointer(root:UI,win:EventTarget,target:UI,move=0,cancel=false){
   dispatch(root,'pointerdown',{pointerId:2,button:0,clientX:100,clientY:100,target});
@@ -64,3 +65,27 @@ test('touch fallback preserves panel swipes, ignores an existing joystick finger
   dispatch(win,'touchend',{changedTouches:[{identifier:3,clientX:100,clientY:100}]});
   dispatch(root,'click',{target:card});assert.equal(armory.isOpen,false);assert.deepEqual(chosen,['ar']);
 },true));
+
+test('armory updates level and actual magazine capacity without changing equipped weapon',()=>fixture(({armory,track,levels,chosen})=>{
+  const card=track.children[0],locked=track.children[1];
+  assert.equal(card.dataset.level,'1');assert.equal(locked.dataset.level,'0');
+  assert.equal(card.querySelector('.co-level')?.textContent,'Lv.1');
+  levels.ar=2;armory.render('ar');assert.equal(card.querySelector('em')?.textContent,'38 \u767c\u5f48\u5323');assert.equal(card.dataset.level,'2');
+  levels.ar=3;armory.render('ar');assert.equal(card.querySelector('em')?.textContent,'45 \u767c\u5f48\u5323');assert.match(card.querySelector('.co-level')!.textContent,/Lv.3/);
+  assert.deepEqual(chosen,[]);
+}));
+
+test('pointer locked desktop: wheel selection equips with a left click anywhere, without shooting',()=>fixture(({armory,root,win,chosen})=>{
+  Object.defineProperty(document,'pointerLockElement',{value:root,configurable:true});
+  dispatch(root,'wheel',{deltaY:-100});
+  let leaked=0;root.addEventListener('click',()=>leaked++);
+  pointer(root,win,root,40);
+  assert.deepEqual(chosen,['sniper']);assert.equal(armory.isOpen,false);assert.equal(leaked,0);
+}));
+test('pointer locked desktop: clicking locked selection leaves armory open and allows another selection',()=>fixture(({armory,root,win,chosen})=>{
+  Object.defineProperty(document,'pointerLockElement',{value:root,configurable:true});
+  dispatch(root,'wheel',{deltaY:100});pointer(root,win,root);
+  assert.equal(armory.isOpen,true);assert.deepEqual(chosen,[]);
+  dispatch(root,'wheel',{deltaY:-100});pointer(root,win,root);
+  assert.deepEqual(chosen,['ar']);assert.equal(armory.isOpen,false);
+}));

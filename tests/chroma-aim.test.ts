@@ -29,7 +29,7 @@ test('flame preview follows the cone; shotgun and rocket preview only the centre
   assert.equal(queryAim('flame',origin,dir,[side],empty),'in-range');
   assert.equal(queryAim('shotgun',origin,dir,[side],empty),'neutral');
   assert.equal(queryAim('rocket',origin,dir,[side],empty),'neutral');
-  assert.equal(queryAim('flame',origin,dir,[target(-20,2)],empty),'out-of-range');
+  assert.equal(queryAim('flame',origin,dir,[target(-27,2)],empty),'out-of-range');
   assert.equal(queryAim('flame',origin,dir,[target(-10,4)],empty),'neutral');
 });
 

@@ -72,10 +72,10 @@ test('server initializes B1 loot with height and prevents pickup through the gro
   const room=roomFixture(),io={to:()=>({emit:()=>{}})} as unknown as Parameters<typeof beginRound>[0];
   beginRound(io,room);
   const smg=room.pickups.find(p=>p.id==='smg')!,shotgun=room.pickups.find(p=>p.id==='shotgun')!;
-  assert.equal(smg.y,-6);assert.equal(shotgun.y,-6);assert.equal(room.pickups.length,6);
+  assert.equal(smg.y,-6);assert.equal(shotgun.y,-6);assert.equal(room.pickups.length,7);
   const p=room.players.get('host')!;Object.assign(p,{x:smg.x,z:smg.z,y:1.65});
   stepRoom(io,room,1/60);assert.equal(smg.available,true);assert.equal(p.activeWeapon,'ar');
-  p.y=-4.35;stepRoom(io,room,1/60);assert.equal(smg.available,false);assert.equal(p.activeWeapon,'smg');
+  p.y=-4.35;stepRoom(io,room,1/60);assert.equal(smg.available,false);assert.equal(p.activeWeapon,'ar');assert.ok(p.ownedWeapons.includes('smg'));
 });
 
 test('death fragments release cloned materials on expiry and respawn; avatar disposal releases GPU resources once',()=>{

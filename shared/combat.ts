@@ -1,5 +1,5 @@
 import { ARENA_BOXES, terrainHeight, PLAYER_EYE_HEIGHT, rayBoxDistance, rayWallDistance, type SimWorld } from './arena.js';
-import { WEAPON_SPECS, type WeaponId } from './weapons.js';
+import { WEAPON_SPECS, weaponRange, weaponDamageMultiplier, type WeaponLevel, type WeaponId } from './weapons.js';
 export type Vec3=[number,number,number];
 export type Combatant={id:string;x:number;y:number;z:number;yaw:number;alive:boolean};
 export type ShotRay={dir:Vec3;end:Vec3;kind:'range'|'wall'|'body'|'head';targetId?:string};
@@ -27,10 +27,10 @@ export function offsetDirection(base:Vec3,x:number,y:number):Vec3{
   const up:Vec3=[right[1]*base[2]-right[2]*base[1],right[2]*base[0]-right[0]*base[2],right[0]*base[1]-right[1]*base[0]];
   return normalize([base[0]+right[0]*x+up[0]*y,base[1]+right[1]*x+up[1]*y,base[2]+right[2]*x+up[2]*y]);
 }
-export function damageAtDistance(id:WeaponId,distance:number,headshot=false){
+export function damageAtDistance(id:WeaponId,distance:number,headshot=false,level:WeaponLevel=1){
   const s=WEAPON_SPECS[id],f=s.falloff;
   const multiplier=f?1-(1-f.minimum)*Math.max(0,Math.min(1,(distance-f.start)/(f.end-f.start))):1;
-  return Math.max(1,Math.round(s.damage*multiplier*(headshot?(s.headshot??1):1)));
+  return Math.max(1,Math.round(s.damage*weaponDamageMultiplier(level)*multiplier*(headshot?(s.headshot??1):1)));
 }
 export function intersectCharacter(origin:Vec3,dir:Vec3,target:Combatant,max:number){
   const c=Math.cos(target.yaw),s=Math.sin(target.yaw),dx=origin[0]-target.x,dz=origin[2]-target.z;
@@ -54,35 +54,35 @@ export function traceRay(origin:Vec3,dir:Vec3,range:number,targets:Combatant[],s
   for(const target of targets){if(!target.alive)continue;const hit=intersectCharacter(origin,dir,target,distance);if(hit&&hit.distance<distance){distance=hit.distance;kind=hit.kind;targetId=target.id;}}
   return{dir,end:along(origin,dir,distance),kind,targetId};
 }
-export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[],rng= Math.random,simulationWorld=world,aiming=false):ShotResult{
-  const spec=WEAPON_SPECS[id],spread=aiming?(spec.scopedSpread??spec.spread):spec.spread,rays:ShotRay[]=[],hits=new Map<string,PlannedHit>();
+export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[],rng= Math.random,simulationWorld=world,aiming=false,level:WeaponLevel=1):ShotResult{
+  const spec=WEAPON_SPECS[id],range=weaponRange(id,level),damage=spec.damage*weaponDamageMultiplier(level),spread=aiming?(spec.scopedSpread??spec.spread):spec.spread,rays:ShotRay[]=[],hits=new Map<string,PlannedHit>();
   const add=(targetId:string,damage:number,headshot:boolean,position:Vec3)=>{
     const old=hits.get(targetId);if(old){old.damage+=damage;old.headshot ||= headshot;}else hits.set(targetId,{targetId,damage,headshot,position});
   };
   if(id==='flame'){
     const angle=FLAME_CONE_ANGLE;
-    rays.push(traceRay(origin,base,spec.range,targets,simulationWorld));
-    for(let n=0;n<24;n++){const radius=Math.sqrt((n+.5)/24)*Math.tan(angle),phase=n*2.399963;const dir=offsetDirection(base,Math.cos(phase)*radius,Math.sin(phase)*radius);rays.push(traceRay(origin,dir,spec.range,targets,simulationWorld));}
+    rays.push(traceRay(origin,base,range,targets,simulationWorld));
+    for(let n=0;n<24;n++){const radius=Math.sqrt((n+.5)/24)*Math.tan(angle),phase=n*2.399963;const dir=offsetDirection(base,Math.cos(phase)*radius,Math.sin(phase)*radius);rays.push(traceRay(origin,dir,range,targets,simulationWorld));}
     for(const target of targets){if(!target.alive)continue;
       let selected:{position:Vec3;angle:number}|undefined;
       for(const position of flameTargetPoints(target)){
         const delta=sub(position,origin),distance=length(delta);
-        if(distance>spec.range||distance<.001)continue;const dir=normalize(delta),a=Math.acos(Math.max(-1,Math.min(1,dot(dir,base))));
+        if(distance>range||distance<.001)continue;const dir=normalize(delta),a=Math.acos(Math.max(-1,Math.min(1,dot(dir,base))));
         if(a<=angle&&rayWallDistance(point(origin),point(dir),distance,simulationWorld)>=distance-.001&&(!selected||a<selected.angle))selected={position,angle:a};
       }
-      if(selected)add(target.id,Math.round(spec.damage*(1-.4*selected.angle/angle)),false,selected.position);
+      if(selected)add(target.id,Math.round(damage*(1-.4*selected.angle/angle)),false,selected.position);
     }
   }else{
     for(let n=0;n<(spec.pellets??1);n++){
-      const dir=offsetDirection(base,(rng()-.5)*spread,(rng()-.5)*spread),ray=traceRay(origin,dir,spec.range,targets,simulationWorld);rays.push(ray);
-      if(id!=='rocket'&&ray.targetId)add(ray.targetId,damageAtDistance(id,length(sub(ray.end,origin)),ray.kind==='head'),ray.kind==='head',ray.end);
+      const dir=offsetDirection(base,(rng()-.5)*spread,(rng()-.5)*spread),ray=traceRay(origin,dir,range,targets,simulationWorld);rays.push(ray);
+      if(id!=='rocket'&&ray.targetId)add(ray.targetId,damageAtDistance(id,length(sub(ray.end,origin)),ray.kind==='head',level),ray.kind==='head',ray.end);
     }
     if(id==='rocket'){
       const ray=rays[0];if(ray.kind!=='range'){
         const explosion=along(ray.end,ray.dir,-.06);
         for(const target of targets){if(!target.alive)continue;const position:Vec3=[target.x,target.y-PLAYER_EYE_HEIGHT+1.22,target.z],delta=sub(position,explosion),distance=length(delta);
-          if(target.id===ray.targetId)add(target.id,spec.damage,false,ray.end);
-          else if(distance<(spec.splash??0)&&rayWallDistance(point(explosion),point(normalize(delta)),distance,simulationWorld)>=distance-.001)add(target.id,Math.max(1,Math.round(spec.damage*(1-distance/spec.splash!))),false,position);
+          if(target.id===ray.targetId)add(target.id,Math.round(damage),false,ray.end);
+          else if(distance<(spec.splash??0)&&rayWallDistance(point(explosion),point(normalize(delta)),distance,simulationWorld)>=distance-.001)add(target.id,Math.max(1,Math.round(damage*(1-distance/spec.splash!))),false,position);
         }
       }
     }

@@ -1,0 +1,20 @@
+.co-weapon-card[data-level="1"],.co-pickup-feedback[data-level="1"]{--level:#b7c8d8}
+.co-weapon-card[data-level="2"],.co-pickup-feedback[data-level="2"]{--level:#52e4e0}
+.co-weapon-card[data-level="3"],.co-pickup-feedback[data-level="3"]{--level:#ffd267}
+.co-weapon-card[data-level="2"],.co-weapon-card[data-level="3"]{border-color:var(--level);box-shadow:inset 0 2px var(--level),0 0 16px color-mix(in srgb,var(--level) 18%,transparent)}
+.co-level{display:inline-block;align-self:center;color:var(--level,#b7c8d8);font-size:11px;letter-spacing:.07em;padding:4px 9px;border:1px solid currentColor;border-radius:20px}
+.co-weapon-stats{margin-top:5px;font-size:10px;color:#bdcee4;line-height:1.5}
+.co-pickup-preview{position:absolute;z-index:5;left:50%;top:calc(50% + 30px);transform:translateX(-50%);max-width:70vw;padding:7px 12px;border:1px solid #9be9e94d;border-radius:8px;background:#101d35d9;color:#d6ffff;font-size:11px;text-align:center;pointer-events:none}
+.co-pickup-preview[hidden]{display:none}
+.co-ammo .co-quick-reload{color:#52e4e0}
+.co-hud-level{font-size:11px;color:#d6e9ff;white-space:nowrap}
+.co-ammo .co-reserve{display:block;font-size:10px;opacity:.65;margin-top:3px}
+.co-pickup-feedback{position:absolute;z-index:8;top:59%;left:50%;transform:translateX(-50%);width:max-content;max-width:min(340px,76vw);display:flex;align-items:center;gap:14px;padding:12px 18px;border:1px solid var(--level);border-left:3px solid var(--weapon);border-radius:12px;background:linear-gradient(110deg,#101d35f2,#101626ed);box-shadow:0 8px 32px #0005;pointer-events:none;color:#fff}
+.co-pickup-feedback[hidden]{display:none}
+.co-pickup-feedback>span{display:grid;place-items:center;width:40px;height:40px;flex-shrink:0;border-radius:9px;background:#ffffff0c;color:var(--weapon);font-size:26px}
+.co-pickup-feedback>div{display:grid;gap:4px}
+.co-pickup-feedback strong{font-size:11px;letter-spacing:.08em;color:var(--level)}
+.co-pickup-feedback b{font-size:15px}
+.co-pickup-feedback small{font-size:11px;color:#bdcee4}
+@media(pointer:coarse){.co-pickup-feedback{top:54%;max-width:52vw;padding:8px 10px;gap:9px}.co-pickup-feedback>span{width:28px;height:28px;font-size:20px}.co-pickup-feedback b{font-size:12px}.co-pickup-feedback small{font-size:10px}}
+@media(prefers-reduced-motion:no-preference){.co-pickup-feedback{animation:co-pickup-enter .18s ease-out}@keyframes co-pickup-enter{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}}

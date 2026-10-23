@@ -6,9 +6,9 @@ const empty:SimWorld={boxes:[],heightAt:()=>0};
 const target=(id='enemy',x=0,z=-10,y=1.65,yaw=0):Combatant=>({id,x,z,y,yaw,alive:true});
 const center=()=>.5;
 const box=(minX:number,maxX:number,minZ:number,maxZ:number,minY=0,maxY=4)=>({minX,maxX,minZ,maxZ,minY,maxY,color:0});
-test('linear falloff boundaries and head multiplier',()=>{
-  assert.equal(damageAtDistance('ar',40),28);assert.equal(damageAtDistance('ar',100),21);assert.equal(damageAtDistance('ar',160),14);assert.equal(damageAtDistance('ar',420,true),28);
-  assert.equal(damageAtDistance('smg',12),22);assert.equal(damageAtDistance('smg',36),14);assert.equal(damageAtDistance('smg',60),7);assert.equal(damageAtDistance('smg',420),7);
+test('AR and SMG retain full damage at every distance; head multipliers remain',()=>{
+  assert.equal(damageAtDistance('ar',40),28);assert.equal(damageAtDistance('ar',100),28);assert.equal(damageAtDistance('ar',160),28);assert.equal(damageAtDistance('ar',420,true),56);
+  assert.equal(damageAtDistance('smg',12),22);assert.equal(damageAtDistance('smg',36),22);assert.equal(damageAtDistance('smg',60),22);assert.equal(damageAtDistance('smg',420),22);
   assert.equal(damageAtDistance('flame',0,true),20);assert.equal(damageAtDistance('rocket',0,true),100);
 });
 test('head and body match model, rotate and follow airborne feet',()=>{
@@ -23,14 +23,14 @@ test('closest target or wall stops hits; distant targets do not get wider',()=>{
   assert.equal(result.hits[0].targetId,'near');assert.equal(result.rays[0].kind,'body');
   const blocked=resolveShot('ar',[0,1.22,0],[0,0,-1],[target()],center,{...empty,boxes:[box(-2,2,-6,-5)]});assert.equal(blocked.hits.length,0);assert.equal(blocked.rays[0].end[2],-5);
   assert.equal(resolveShot('ar',[0,1.22,0],[0,0,-1],[target('far',2,-300)],center,empty).hits.length,0);
-  assert.equal(resolveShot('ar',[0,1.22,0],[0,0,-1],[target('far',0,-300)],center,empty).hits[0].damage,14);
+  assert.equal(resolveShot('ar',[0,1.22,0],[0,0,-1],[target('far',0,-300)],center,empty).hits.length,0);
 });
 test('shotgun head pellets aggregate to a single hit',()=>{
   const result=resolveShot('shotgun',[0,1.92,0],[0,0,-1],[target()],center,empty);
   assert.equal(result.rays.length,10);assert.equal(result.hits.length,1);assert.equal(result.hits[0].damage,200);assert.equal(result.hits[0].headshot,true);
 });
 test('flame cone hits several targets once, fades at edges and respects range/walls',()=>{
-  const result=resolveShot('flame',[0,1.22,0],[0,0,-1],[target('a',0,-8),target('b',1.6,-10),target('outside',5,-8),target('far',0,-13)],center,empty);
+  const result=resolveShot('flame',[0,1.22,0],[0,0,-1],[target('a',0,-8),target('b',1.6,-10),target('outside',5,-8),target('far',0,-27)],center,empty);
   assert.deepEqual(result.hits.map(h=>h.targetId),['a','b']);assert.equal(result.hits[0].damage,20);assert.ok(result.hits[1].damage<20);assert.equal(result.hits[0].headshot,false);
   const blocked=resolveShot('flame',[0,1.22,0],[0,0,-1],[target()],center,{...empty,boxes:[box(-10,10,-6,-5)]});assert.equal(blocked.hits.length,0);assert.ok(blocked.rays.every(r=>r.end[2]>=-5.0001));
 });
@@ -38,7 +38,7 @@ test('rocket direct damage is not doubled; splash is occluded and expires harmle
   const result=resolveShot('rocket',[0,1.22,0],[0,0,-1],[target('direct'),target('near',2,-10)],center,empty);
   assert.equal(result.hits.find(h=>h.targetId==='direct')?.damage,100);assert.ok(result.hits.find(h=>h.targetId==='near'));
   const w={...empty,boxes:[box(.8,1.2,-12,-8)]};assert.equal(resolveShot('rocket',[0,1.22,0],[0,0,-1],[target('direct'),target('near',2,-10)],center,w).hits.length,1);
-  assert.equal(resolveShot('rocket',[0,1.22,0],[0,0,-1],[target('far',0,-54)],center,empty).hits.length,0);
+  assert.equal(resolveShot('rocket',[0,1.22,0],[0,0,-1],[target('far',0,-102)],center,empty).hits.length,0);
 });
 test('analytic walls handle parallel rays, raised cover, origin inside and terrain',()=>{
   const w={...empty,boxes:[box(-1,1,-101,-100)]};assert.equal(rayWallDistance({x:0,y:1,z:0},{x:0,y:0,z:-1},420,w),100);

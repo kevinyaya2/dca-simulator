@@ -1,12 +1,14 @@
 import * as T from 'three';
-import { WEAPON_SPECS, type WeaponId } from '../../../shared/weapons';
-import { along, type ShotEvent } from '../../../shared/combat';
+import { WEAPON_SPECS, weaponRange, type WeaponLevel, type WeaponId } from '../../../shared/weapons';
+import { along, offsetDirection, traceRay, FLAME_CONE_ANGLE, type ShotEvent, type Combatant } from '../../../shared/combat';
+import { rayWallDistance, type SimWorld } from '../../../shared/arena';
 type Particle={position:T.Vector3;velocity:T.Vector3;life:number;duration:number;size:number;color:T.Color;style:number};
-type Beam={mesh:T.Mesh;core:T.Mesh;life:number;duration:number};
+type Beam={mesh:T.Mesh;core:T.Mesh;life:number;duration:number;end?:T.Vector3;localWeapon?:WeaponId};
 type Flame={mesh:T.Mesh;life:number};
 type Ring={mesh:T.Mesh;life:number;duration:number;radius:number};
 // One depth-tested draw call for sparks, embers, frost and smoke. Soft sprites are procedural.
 export class WeaponEffects{
+  private localFlames:Flame[]=[];private localFlameTimer=0;
   private group=new T.Group();private particles:Particle[];private beams:Beam[];private rings:Ring[];private flames:Flame[];private flameCursor=0;private flameGeometry=new T.CylinderGeometry(1,.25,1,8,1,true);private cursor=0;private beamCursor=0;private ringCursor=0;
   private geometry=new T.BufferGeometry();private material:T.ShaderMaterial;private points:T.Points;private cylinder=new T.CylinderGeometry(1,1,1,6,1,true);private ringGeometry=new T.RingGeometry(.88,1,48);
   private positions:Float32Array;private colors:Float32Array;private sizes:Float32Array;private alphas:Float32Array;private styles:Float32Array;
@@ -43,20 +45,22 @@ export class WeaponEffects{
       }`});
       const mesh=new T.Mesh(this.flameGeometry,material);mesh.visible=false;this.group.add(mesh);return{mesh,life:0};
     });
+    this.localFlames=this.flames.splice(0,coarse?5:9);
     scene.add(this.group);
   }
   private particle(position:T.Vector3,color:number,size:number,life:number,style=0,velocity?:T.Vector3){
     const p=this.particles[this.cursor++%this.particles.length];p.position.copy(position);p.color.setHex(color);p.size=size;p.life=p.duration=life;p.style=style;p.velocity.copy(velocity??new T.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*2));
   }
-  private beam(from:T.Vector3,to:T.Vector3,color:number,duration:number,width=.022){
+  private beam(from:T.Vector3,to:T.Vector3,color:number,duration:number,width=.022,localWeapon?:WeaponId){
     const b=this.beams[this.beamCursor++%this.beams.length],delta=to.clone().sub(from),distance=delta.length();if(distance<.01)return;
     b.mesh.position.copy(from).addScaledVector(delta,.5);b.core.position.copy(b.mesh.position);const rotation=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),delta.normalize());b.mesh.quaternion.copy(rotation);b.core.quaternion.copy(rotation);
     b.mesh.scale.set(width,distance,width);b.core.scale.set(width*.24,distance,width*.24);(b.mesh.material as T.MeshBasicMaterial).color.setHex(color);b.life=b.duration=duration;b.mesh.visible=b.core.visible=true;
+    b.localWeapon=localWeapon;b.end=localWeapon?to.clone():undefined;
   }
-  play(shot:ShotEvent,muzzle:T.Vector3,showMuzzle=true){
+  play(shot:ShotEvent,muzzle:T.Vector3,showMuzzle=true,local=false,trails=true,impacts=true){
     const spec=WEAPON_SPECS[shot.weapon],origin=new T.Vector3(...shot.origin),id=shot.weapon;
     if(showMuzzle)this.muzzle(muzzle,id);
-    if(id==='flame'){
+    if(trails&&id==='flame'&&!local){
       // Each tongue follows a clipped authoritative cone ray; no particles beyond its endpoint.
       const stride=this.coarse?3:2;
       for(let n=0;n<shot.rays.length;n+=stride){const ray=shot.rays[n],end=new T.Vector3(...ray.end),delta=end.clone().sub(muzzle),distance=delta.length();if(distance<.1)continue;
@@ -69,8 +73,8 @@ export class WeaponEffects{
           if(k%3===0)this.particle(at,0xffac44,.055,.18,0,new T.Vector3(0,.3,0));
         }
       }
-    }else for(const ray of shot.rays){
-      const end=new T.Vector3(...ray.end);this.beam(muzzle,end,spec.color,id==='smg'?.075:id==='ice'?.16:.105,id==='ice'?.035:id==='rocket'?.06:.02);
+    }else if(trails&&id!=='flame')for(const ray of shot.rays){
+      const end=new T.Vector3(...ray.end);this.beam(muzzle,end,spec.color,id==='smg'?.075:id==='ice'?.16:.105,id==='ice'?.035:id==='rocket'?.06:.02,local?id:undefined);
       if(id==='smg'){
         const delta=end.clone().sub(muzzle),right=new T.Vector3(-delta.z,0,delta.x).normalize();let previous=muzzle.clone().lerp(end,.2);
         for(let n=1;n<=3;n++){const next=muzzle.clone().lerp(end,.2+n*.12).addScaledVector(right,(n%2?1:-1)*.045);this.beam(previous,next,0xffd05d,.06,.007);previous=next;}
@@ -82,10 +86,55 @@ export class WeaponEffects{
         }
       }
     }
-    for(const [index,ray] of shot.rays.entries())if(ray.kind!=='range'&&(id!=='flame'||index%4===0)){
+    if(impacts)for(const [index,ray] of shot.rays.entries())if(ray.kind!=='range'&&(id!=='flame'||index%4===0)){
       const end=new T.Vector3(...ray.end);this.impact(end,id,ray.kind==='head',new T.Vector3(...ray.dir).negate());
     }
-    if(id==='rocket'&&shot.rays[0]?.kind!=='range')this.explosion(new T.Vector3(...along(shot.rays[0].end,shot.rays[0].dir,-.1)));
+    if(impacts&&id==='rocket'&&shot.rays[0]?.kind!=='range')this.explosion(new T.Vector3(...along(shot.rays[0].end,shot.rays[0].dir,-.1)));
+  }
+  /** Keep the near end attached to the rendered barrel while the tracer fades. */
+  updateLocalMuzzle(muzzle:T.Vector3,id:WeaponId,eye:T.Vector3,world:SimWorld){
+    const toMuzzle=muzzle.clone().sub(eye),separation=toMuzzle.length();
+    const obstructed=separation>.001&&rayWallDistance(eye,toMuzzle.normalize(),separation,world)<separation-.01;
+    for(const beam of this.beams){
+      if(!beam.life||!beam.localWeapon||!beam.end)continue;
+      if(beam.localWeapon!==id){beam.localWeapon=undefined;continue;}
+      const delta=beam.end.clone().sub(muzzle),distance=delta.length();
+      if(obstructed||distance<.01){beam.mesh.visible=beam.core.visible=false;continue;}
+      delta.normalize();const clipped=rayWallDistance(muzzle,delta,distance,world);
+      beam.mesh.visible=beam.core.visible=clipped>.01;
+      beam.mesh.position.copy(muzzle).addScaledVector(delta,clipped*.5);beam.core.position.copy(beam.mesh.position);
+      beam.mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),delta);beam.core.quaternion.copy(beam.mesh.quaternion);
+      beam.mesh.scale.y=beam.core.scale.y=clipped;
+    }
+  }
+  /** Presentation only: follows the current rendered muzzle, independently of network latency. */
+  localFlame(active:boolean,muzzle:T.Vector3,eye:T.Vector3,direction:T.Vector3,world:SimWorld,dt:number,targets:Combatant[]=[],level:WeaponLevel=1){
+    this.localFlameTimer+=dt;
+    if(!active)return;
+    // The muzzle can sit beyond a close wall even though the camera is in free space.
+    const toMuzzle=muzzle.clone().sub(eye),separation=toMuzzle.length();
+    if(separation>.001&&rayWallDistance(eye,toMuzzle.normalize(),separation,world)<separation-.01){
+      for(const f of this.localFlames){f.life=0;f.mesh.visible=false;}return;
+    }
+    const emit=this.localFlameTimer>=.04;if(emit)this.localFlameTimer=0;
+    const base=direction.toArray() as [number,number,number],origin=eye.toArray() as [number,number,number];
+    this.localFlames.forEach((flame,index)=>{
+      const radius=index?Math.tan(FLAME_CONE_ANGLE)*.8:0,phase=index*Math.PI*2/(this.localFlames.length-1);
+      const ray=traceRay(origin,offsetDirection(base,Math.cos(phase)*radius,Math.sin(phase)*radius),weaponRange('flame',level),targets,world);
+      const delta=new T.Vector3(...ray.end).sub(muzzle),distance=delta.length();
+      if(distance<.05||delta.dot(direction)<=0){flame.life=0;flame.mesh.visible=false;return;}
+      delta.normalize();
+      const clipped=Math.min(distance,rayWallDistance(muzzle,delta,distance,world));
+      if(clipped<.05){flame.life=0;flame.mesh.visible=false;return;}
+      flame.mesh.position.copy(muzzle).addScaledVector(delta,clipped*.5);
+      flame.mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),delta);
+      flame.mesh.scale.set(.05+clipped*.018,clipped,.05+clipped*.018);flame.life=.16;flame.mesh.visible=true;
+      const material=flame.mesh.material as T.ShaderMaterial;material.uniforms.opacity.value=1;
+      if(emit)for(let n=1;n<=4;n++){
+        const at=muzzle.clone().addScaledVector(delta,clipped*n/5);
+        this.particle(at,n<2?0xffd36b:0xff702a,.18+n*.07,.12,1,new T.Vector3(0,.25,0));
+      }
+    });
   }
   muzzle(at:T.Vector3,id:WeaponId){const color=WEAPON_SPECS[id].color;for(let n=0;n<(this.coarse?3:7);n++)this.particle(at,n===0?0xffffff:color,n===0?.32:.08,.04+Math.random()*.035);}
   private impact(at:T.Vector3,id:WeaponId,head:boolean,normal:T.Vector3){
@@ -110,8 +159,8 @@ export class WeaponEffects{
     });
     for(const attribute of Object.values(this.geometry.attributes))attribute.needsUpdate=true;
     for(const b of this.beams){b.life=Math.max(0,b.life-dt);b.mesh.visible=b.core.visible=b.life>0;(b.mesh.material as T.MeshBasicMaterial).opacity=.32*b.life/b.duration;(b.core.material as T.MeshBasicMaterial).opacity=b.life/b.duration;}
-    for(const f of this.flames){f.life=Math.max(0,f.life-dt);f.mesh.visible=f.life>0;const m=f.mesh.material as T.ShaderMaterial;m.uniforms.time.value=this.material.uniforms.time.value;m.uniforms.opacity.value=f.life/.16;}
+    for(const pool of [this.flames,this.localFlames])for(const f of pool){f.life=Math.max(0,f.life-dt);f.mesh.visible=f.life>0;const m=f.mesh.material as T.ShaderMaterial;m.uniforms.time.value=this.material.uniforms.time.value;m.uniforms.opacity.value=f.life/.16;}
     for(const r of this.rings){r.life=Math.max(0,r.life-dt);r.mesh.visible=r.life>0;r.mesh.scale.setScalar(Math.max(.01,r.radius*(1-r.life/r.duration)));(r.mesh.material as T.MeshBasicMaterial).opacity=r.life/r.duration*.65;}
   }
-  dispose(){this.scene.remove(this.group);this.geometry.dispose();this.material.dispose();this.cylinder.dispose();this.ringGeometry.dispose();this.flameGeometry.dispose();for(const f of this.flames)(f.mesh.material as T.Material).dispose();for(const b of this.beams){(b.mesh.material as T.Material).dispose();(b.core.material as T.Material).dispose();}for(const r of this.rings)(r.mesh.material as T.Material).dispose();this.group.clear();}
+  dispose(){this.scene.remove(this.group);this.geometry.dispose();this.material.dispose();this.cylinder.dispose();this.ringGeometry.dispose();this.flameGeometry.dispose();for(const pool of [this.flames,this.localFlames])for(const f of pool)(f.mesh.material as T.Material).dispose();for(const b of this.beams){(b.mesh.material as T.Material).dispose();(b.core.material as T.Material).dispose();}for(const r of this.rings)(r.mesh.material as T.Material).dispose();this.group.clear();}
 }

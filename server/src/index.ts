@@ -7,13 +7,12 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { groundHeight, arenaWorld, stepPlayer, type SimInput } from '../../shared/arena.js';
 import { chooseRespawnPoint, chooseWeaponPoint, initialWeaponPoints, type SpawnPoint } from '../../shared/spawns.js';
-import { WEAPON_IDS, WEAPON_SPECS, type WeaponId } from '../../shared/weapons.js';
+import { WEAPON_IDS, WEAPON_SPECS, weaponDamageMultiplier, createWeaponStates, collectWeapon, clearWeaponBoosts, refillWeapons, advanceWeaponReload, type WeaponState, type WeaponId } from '../../shared/weapons.js';
 import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound, type RoomNotice } from '../../shared/protocol.js';
 import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyKill, finalStandings, type BountyState, type FinalStanding, type EndReason } from '../../shared/bounty.js';
 
 type Input = SimInput & { roundId?:number; seq:number; clientTime:number; reload?:boolean; yaw:number; pitch:number };
-type WeaponState = Record<WeaponId,{ammo:number;reloadUntil:number}>;
-type BurnState = { attackerId:string; nextTick:number; expiresAt:number } | null;
+type BurnState = { attackerId:string; nextTick:number; expiresAt:number; damage:number } | null;
 type Player = BountyState & {
   id:string; name:string; avatar:string; color:number;
   socketId?:string; resumeToken:string; disconnectedUntil?:number;
@@ -40,8 +39,8 @@ const avatars=['虎','狐','熊','蛙','獅','狼','兔','貓'];
 const previousSpawns=new Map<string,SpawnPoint>();
 const now=()=>Date.now();
 const blankInput=():Input=>({seq:0,clientTime:0,moveX:0,moveY:0,lookX:0,lookY:0,jump:false,reload:false,sprint:false,aim:false,yaw:0,pitch:0});
-const createWeapons=():WeaponState=>Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])) as WeaponState;
-function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];for(const id of WEAPON_IDS.filter(id=>id!=='ar')){const point=chooseWeaponPoint(players.map(p=>({...p,y:p.y-1.65})),pickups,undefined,Math.random,initialWeaponPoints(id));if(!point)throw new Error('No legal weapon candidates');pickups.push({id,...point,available:true,respawnAt:0});}return pickups;}
+const createWeapons=createWeaponStates;
+function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];for(const id of WEAPON_IDS){const point=chooseWeaponPoint(players.map(p=>({...p,y:p.y-1.65})),pickups,undefined,Math.random,initialWeaponPoints(id));if(!point)throw new Error('No legal weapon candidates');pickups.push({id,...point,available:true,respawnAt:0});}return pickups;}
 
 function roomCode(rooms:Map<string,Room>):string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode(rooms):value;}
 function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,consecutiveDeaths,...safe}=p;void resumeToken;void consecutiveDeaths;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
@@ -84,14 +83,14 @@ function resetPlayer(p:Player,room:Room,newRound=false){
   previousSpawns.set(p.id,spawn);
   p.life=(p.life??0)+1;
   Object.assign(p,{x:spawn[0],y:groundHeight(...spawn)+1.65,z:spawn[1],yaw:0,pitch:0,velocityY:0,jumpsUsed:0,hp:100,alive:true,supportId:null,aiming:false,sprinting:false,lastShot:0,slowUntil:0,burn:null,input:blankInput()});
-  p.weapons=createWeapons();
+  if(newRound)p.weapons=createWeapons();else refillWeapons(p.weapons);
   if(newRound){p.lastReceivedSeq=0;p.lastProcessedSeq=0;p.activeWeapon='ar';p.ownedWeapons=['ar'];p.kills=0;p.deaths=0;Object.assign(p,initialBounty());}
 }
 function historicalPlayers(room:Room,clientTime:number){const target=now()-Math.max(0,Math.min(250,now()-clientTime));let frame=room.history[0];for(const sample of room.history)if(sample.at<=target)frame=sample;return frame;}
 export function kill(io:Server,room:Room,attacker:Player,victim:Player,weapon:WeaponId,headshot:boolean,at=now()){
   if(room.state!=='PLAYING'||attacker.id===victim.id||!victim.alive||expireRound(io,room,at))return;
   const settlement=settleBountyKill(attacker,victim);Object.assign(attacker,settlement.attacker);Object.assign(victim,settlement.victim);
-  victim.alive=false;victim.aiming=false;victim.sprinting=false;victim.supportId=null;victim.input=blankInput();victim.hp=0;victim.burn=null;victim.deaths++;attacker.kills++;
+  clearWeaponBoosts(victim.weapons);victim.alive=false;victim.aiming=false;victim.sprinting=false;victim.supportId=null;victim.input=blankInput();victim.hp=0;victim.burn=null;victim.deaths++;attacker.kills++;
   const event=room.killTracker.record(attacker,victim,weapon,headshot,at);
   io.to(room.code).emit('match:kill',{...event,roundId:room.roundId,scoreAwarded:settlement.scoreAwarded,attackerBounty:attacker.bounty,victimBounty:victim.bounty}); // Must precede the terminal room state.
   if(attacker.score>=SCORE_TARGET){finishRound(io,room,'target',event.title);return;}
@@ -114,30 +113,39 @@ function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   shooter.lastShot=time;state.ammo--;const base=aimDirection(shooter.input.yaw,shooter.input.pitch),history=historicalPlayers(room,clientTime);
   const targets:Combatant[]=[...room.players.values()].filter(p=>p.id!==shooter.id&&p.alive).map(p=>{const old=history?.players.get(p.id);return old&&old.life===p.life?{...old,id:p.id}:p;});
   const pastShooter=history?.players.get(shooter.id),shotPosition=pastShooter?.life===shooter.life?pastShooter:shooter;
-  const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000),shooter.aiming),eventId=`${room.code}:shot:${++room.shotSequence}`;
+  const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000),shooter.aiming,state.level),eventId=`${room.code}:shot:${++room.shotSequence}`;
   io.to(room.code).emit('match:shot',{roundId:room.roundId,eventId,id:shooter.id,origin,dir:base,weapon:id,...result});
   const confirmed:ConfirmedHit[]=[];
   for(const hit of result.hits){const victim=room.players.get(hit.targetId);if(!victim)continue;const actual=applyDamage(io,room,shooter,victim,hit,id);if(!actual)continue;confirmed.push(actual);
     if(victim.alive&&id==='ice')victim.slowUntil=time+(spec.slow??0)*1000;
-    if(victim.alive&&id==='flame')victim.burn={attackerId:shooter.id,nextTick:victim.burn?.nextTick??time+250,expiresAt:time+(spec.burn??0)*1000};
+    if(victim.alive&&id==='flame')victim.burn={damage:Math.round(4*weaponDamageMultiplier(state.level)),attackerId:shooter.id,nextTick:victim.burn?.nextTick??time+250,expiresAt:time+(spec.burn??0)*1000};
   }
+  advanceWeaponReload(id,state,time);
+  if(state.reloadUntil){shooter.aiming=false;shooter.input.aim=false;}
   if(confirmed.length)io.to(shooter.socketId??`offline:${shooter.id}`).emit('match:hit',{roundId:room.roundId,eventId,weapon:id,hits:confirmed});
   if(confirmed.some(h=>h.killed))emitRoom(io,room);
 }
 export function step(io:Server,room:Room,dt:number){
   if(room.state!=='PLAYING'||expireRound(io,room))return;const time=now();room.tick++;room.environmentTime=advanceEnvironment(room.environmentTime,dt,true);
   for(const p of room.players.values()){
-    if(!p.alive)continue;const spec=WEAPON_SPECS[p.activeWeapon],state=p.weapons[p.activeWeapon];
-    if(state.reloadUntil&&time>=state.reloadUntil){state.ammo=spec.magazine;state.reloadUntil=0;}
-    if(p.input.reload&&state.ammo<spec.magazine&&!state.reloadUntil)state.reloadUntil=time+spec.reloadTime*1000;
+    if(!p.alive)continue;
+    for(const id of WEAPON_IDS)advanceWeaponReload(id,p.weapons[id],time,id===p.activeWeapon&&!!p.input.reload);
+    const state=p.weapons[p.activeWeapon];
     p.yaw=p.input.yaw;p.pitch=p.input.pitch;
     p.sprinting=!!p.input.sprint;
     if(p.input.reload||state.reloadUntil>time||p.activeWeapon!=='sniper')p.input.aim=false;
     p.aiming=!!p.input.aim;
     stepPlayer(p,{...p.input,lookX:0,lookY:0},dt,undefined,p.slowUntil>time ? .65 : 1,(room.lastStep-room.wheelEpoch)/1000-dt);
     p.lastProcessedSeq=p.lastReceivedSeq;
-    for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(pickup.y+.9),p.z-pickup.z)<2){if(!p.ownedWeapons.includes(pickup.id))p.ownedWeapons.push(pickup.id);p.activeWeapon=pickup.id;p.aiming=false;p.input.aim=false;pickup.available=false;pickup.respawnAt=time+30000;emitRoom(io,room);}
-    if(p.burn){while(p.burn&&p.burn.nextTick<=time&&p.burn.nextTick<=p.burn.expiresAt){const attacker=room.players.get(p.burn.attackerId);p.burn.nextTick+=250;if(attacker){const hit=applyDamage(io,room,attacker,p,{targetId:p.id,damage:4,headshot:false,position:[p.x,p.y-.4,p.z]},'flame');if(hit)io.to(attacker.socketId??`offline:${attacker.id}`).emit('match:hit',{roundId:room.roundId,eventId:`${room.code}:burn:${++room.shotSequence}`,weapon:'flame',hits:[hit]});if(hit?.killed)emitRoom(io,room);if(room.state!=='PLAYING')return;}}if(p.burn&&time>=p.burn.expiresAt)p.burn=null;}
+    for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(pickup.y+.9),p.z-pickup.z)<2){
+      const result=collectWeapon(pickup.id,p.weapons[pickup.id],p.ownedWeapons.includes(pickup.id),time);
+      if(!result)continue;
+      if(result.kind==='unlock')p.ownedWeapons.push(pickup.id);
+      pickup.available=false;pickup.respawnAt=time+30000;
+      if(p.socketId)io.to(p.socketId).emit('match:pickup',{...result,roundId:room.roundId,eventId:randomUUID()});
+      emitRoom(io,room);
+    }
+    if(p.burn){while(p.burn&&p.burn.nextTick<=time&&p.burn.nextTick<=p.burn.expiresAt){const attacker=room.players.get(p.burn.attackerId);p.burn.nextTick+=250;if(attacker){const hit=applyDamage(io,room,attacker,p,{targetId:p.id,damage:p.burn.damage??4,headshot:false,position:[p.x,p.y-.4,p.z]},'flame');if(hit)io.to(attacker.socketId??`offline:${attacker.id}`).emit('match:hit',{roundId:room.roundId,eventId:`${room.code}:burn:${++room.shotSequence}`,weapon:'flame',hits:[hit]});if(hit?.killed)emitRoom(io,room);if(room.state!=='PLAYING')return;}}if(p.burn&&time>=p.burn.expiresAt)p.burn=null;}
     p.input={...p.input,lookX:0,lookY:0,jump:false,reload:false};
   }
   for(const pickup of room.pickups)if(!pickup.available&&pickup.respawnAt<=time){const point=chooseWeaponPoint([...room.players.values()].map(p=>({...p,y:p.y-1.65})),room.pickups.filter(other=>other!==pickup&&other.available),pickup);if(!point){pickup.respawnAt=time+100;continue;}Object.assign(pickup,point);pickup.available=true;emitRoom(io,room);}

@@ -135,6 +135,6 @@ test('sniper enforces 5 shots, 1 second cadence and 2.5 second reload',()=>{
   assert.equal(w.update(.5,true).fired,false);
   assert.equal(w.update(.5,true).fired,true);
   for(let n=0;n<3;n++)assert.equal(w.update(1,true).fired,true);
-  assert.equal(w.ammo,0);assert.equal(w.update(1,true).autoReload,true);
+  assert.equal(w.ammo,0);assert.equal(w.reloading,true);
   w.update(2.4,false);assert.equal(w.ammo,0);w.update(.11,false);assert.equal(w.ammo,5);
 });
