@@ -10,33 +10,47 @@ import '../src/pages/Armory.css';
 import '../src/pages/MobileControls.css';
 import '../src/chroma-ops/ui/SniperScope.css';
 import { MultiplayerGame } from '../src/chroma-ops/core/MultiplayerGame.ts';
-import { WEAPON_IDS, WEAPON_SPECS } from '../shared/weapons.ts';
+import { createWeaponStates } from '../shared/weapons.ts';
 import { dayNightAt, environmentAtSnapshot } from '../shared/dayNight.ts';
 import * as T from 'three';
 
 // Test only: controlled snapshots exercise the production renderer and cleanup without a live match.
 class TestSocket{
-  id='self';connected=true;handlers=new Map();inputs=[];
+  id='self';connected=true;handlers=new Map();inputs=[];weapons=[];sendBuffer=[];
   on(name,handler){if(!this.handlers.has(name))this.handlers.set(name,new Set());this.handlers.get(name).add(handler);return this;}
   off(name,handler){this.handlers.get(name)?.delete(handler);return this;}
-  emit(name,value){if(name==='net:ping')value(Date.now());if(name==='match:input')this.inputs.push(value);}
+  emit(name,value){if(name==='net:ping')value(Date.now());if(name==='match:input')this.inputs.push(value);if(name==='match:weapon')this.weapons.push(value);}
   push(name,value){for(const handler of this.handlers.get(name)||[])handler(value);}
   get count(){return [...this.handlers.values()].reduce((sum,set)=>sum+set.size,0);}
 }
 const root=document.querySelector('#game'),status=document.querySelector('#status'),results=document.querySelector('#results'),run=document.querySelector('#run');
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 const player=(id,x)=>({id,name:id,avatar:'',color:0x55aaff,x,y:1.65,z:0,yaw:.4,pitch:.1,velocityY:0,jumpsUsed:0,hp:100,alive:true,kills:0,deaths:0,score:0,bounty:100,
-  activeWeapon:'ar',ownedWeapons:['ar'],weapons:Object.fromEntries(WEAPON_IDS.map(id=>[id,{ammo:WEAPON_SPECS[id].magazine,reloadUntil:0}])),slowUntil:0,burnUntil:0,ack:0,supportId:null,aiming:false,sprinting:false});
+  activeWeapon:'ar',ownedWeapons:['ar','smg'],weapons:createWeaponStates(),slowUntil:0,burnUntil:0,ack:0,supportId:null,aiming:false,sprinting:false});
 run.onclick=async()=>{
   run.disabled=true;results.textContent='';status.textContent='Running';
   const socket=new TestSocket(),nativeRAF=window.requestAnimationFrame.bind(window),nativeCancel=window.cancelAnimationFrame.bind(window),frames=new Set();
   window.requestAnimationFrame=callback=>{const id=nativeRAF(time=>{frames.delete(id);callback(time);});frames.add(id);return id;};
   window.cancelAnimationFrame=id=>{frames.delete(id);nativeCancel(id);};
   const frame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+  const selectWeapon=async (roundId)=>{
+    root.dispatchEvent(new Event('armory'));
+    await frame();
+    const card=root.querySelector('[data-armory=smg]');
+    card.scrollIntoView({block:'nearest',inline:'center'});
+    await frame();
+    const rect=card.getBoundingClientRect();
+    const init={bubbles:true,cancelable:true,pointerType:'touch',pointerId:17,button:0,clientX:rect.x+rect.width/2,clientY:rect.y+rect.height/2};
+    assert(card.contains(document.elementFromPoint(init.clientX,init.clientY)),'weapon card is not hittable');
+    card.dispatchEvent(new PointerEvent('pointerdown',init));
+    card.dispatchEvent(new PointerEvent('pointerup',init));
+    assert(socket.weapons.length===1&&socket.weapons[0].id==='smg'&&socket.weapons[0].roundId===roundId,'touch release did not request a weapon for the current round');
+    assert(root.querySelector('.co-armory').hidden,'armory did not close after the touch');
+  };
   let baseline;let active;
   try{
     for(let roundId=1;roundId<=10;roundId++){
-      socket.inputs=[];
+      socket.inputs=[];socket.weapons=[];
       const game=new MultiplayerGame(root,socket,'QA',roundId,message=>{throw new Error(message);},'self');active=game;
       game.start();game.resume();game.resume();
       await frame();await frame();
@@ -54,9 +68,11 @@ run.onclick=async()=>{
       socket.push('match:snapshot',delayed);await frame();
       const expected=dayNightAt(environmentAtSnapshot(delayed,game.serverNow())).night;
       assert(Math.abs(game.arena.lastNight-expected)<.01,'environment uses local round age instead of server timestamp');
-      assert(socket.count===7,'duplicate match socket listeners');
-      const basement={...delayed,tick:5,players:[{...player('self',10),y:-4.35,z:18},{...player('peer',10),z:18}],pickups:[{id:'smg',x:-64,y:-6,z:18,available:true,respawnAt:0}]};
+      assert(socket.count===8,'unexpected number of match socket listeners');
+      await selectWeapon(roundId);
+      const basement={...delayed,tick:5,players:[{...player('self',10),activeWeapon:'smg',y:-4.35,z:18},{...player('peer',10),z:18}],pickups:[{id:'smg',x:-64,y:-6,z:18,available:true,respawnAt:0}]};
       socket.push('match:snapshot',basement);await frame();await frame();await frame();
+      assert(root.querySelector('[data-armory=smg]').classList.contains('active'),'equipped weapon was not confirmed by the server snapshot');
       assert(Math.abs(game.player.position.y+4.35)<.01,'B1 reconciliation snapped player to surface');
       assert(Math.abs(game.pickupMeshes.get('smg').position.y+5.1)<.01,'B1 pickup rendered on surface');
       assert(game.radarCanvas.getAttribute('aria-label')==='Radar B1','radar did not identify current floor');
@@ -82,8 +98,18 @@ run.onclick=async()=>{
       assert(game.pending.length===0&&game.snaps.length===0&&game.avatars.size===0,'prediction or avatar caches retained');
       results.textContent+=`Round ${roundId}: PASS | geometries ${memory.geometries}, textures ${memory.textures} | released ${released}/${resources.size} | listeners 0, RAF 0, old DOM 0\n`;
       await frame();
+      if(roundId===10){
+        socket.weapons=[];
+        const restored=new MultiplayerGame(root,socket,'QA',roundId,message=>{throw new Error(message);},'self');
+        active=restored;
+        restored.start();
+        socket.push('match:snapshot',snapshot);
+        await selectWeapon(roundId);
+        restored.dispose();active=null;
+        assert(socket.count===0&&frames.size===0&&root.children.length===0,'reconnect left round resources behind');
+      }
     }
-    status.textContent='PASS: 10 rematches; resource counts stable';
+    status.textContent='PASS: 10 rounds and reconnect; touch weapon selection and cleanup verified';
   }catch(error){active?.dispose();status.textContent=`FAIL: ${error.message}`;console.error(error);}
   finally{window.requestAnimationFrame=nativeRAF;window.cancelAnimationFrame=nativeCancel;run.disabled=false;}
 };

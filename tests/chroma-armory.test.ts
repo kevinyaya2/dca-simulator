@@ -20,17 +20,19 @@ class UI extends EventTarget {
 function dispatch(target:EventTarget,type:string,properties:Record<string,unknown>={}){
   const event=new Event(type,{cancelable:true});for(const [key,value] of Object.entries(properties))Object.defineProperty(event,key,{value});target.dispatchEvent(event);return event;
 }
-function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;chosen:WeaponId[];levels:Partial<Record<WeaponId,WeaponLevel>>})=>void,touch=false){
-  const names=['window','HTMLElement','matchMedia','navigator','requestAnimationFrame','document'];
+function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;doc:EventTarget&{hidden:boolean};hit:(target:UI)=>void;chosen:WeaponId[];levels:Partial<Record<WeaponId,WeaponLevel>>})=>void,touch=false){
+  const names=['window','HTMLElement','matchMedia','navigator','requestAnimationFrame','cancelAnimationFrame','document'];
   const previous=names.map(n=>Object.getOwnPropertyDescriptor(globalThis,n));
   const win=Object.assign(new EventTarget(),{PointerEvent:touch?undefined:Event});
-  const values=[win,UI,()=>({matches:touch}),{maxTouchPoints:touch?1:0},(cb:()=>void)=>cb(),{pointerLockElement:null}];
+  let target:UI|null=null;
+  const doc=Object.assign(new EventTarget(),{pointerLockElement:null,hidden:false,elementFromPoint:()=>target});
+  const values=[win,UI,()=>({matches:touch}),{maxTouchPoints:touch?1:0},()=>1,()=>{},doc];
   names.forEach((n,i)=>Object.defineProperty(globalThis,n,{value:values[i],configurable:true}));
   const root=new UI('root'),box=new UI('.co-armory'),track=new UI('.co-armory-track'),chosen:WeaponId[]=[];
   root.append(box);box.append(track);
   const levels:Partial<Record<WeaponId,WeaponLevel>>={};
-  const armory=new Armory(root as unknown as HTMLElement,id=>chosen.push(id),()=>new Set<WeaponId>(['ar','sniper']),undefined,id=>levels[id]??1);
-  try{armory.toggle();run({armory,root,box,track,win,chosen,levels});}finally{armory.dispose();names.forEach((n,i)=>{if(previous[i])Object.defineProperty(globalThis,n,previous[i]!);else Reflect.deleteProperty(globalThis,n);});}
+  const armory=new Armory(root as unknown as HTMLElement,id=>{chosen.push(id);},()=>new Set<WeaponId>(['ar','sniper']),undefined,id=>levels[id]??1);
+  try{armory.toggle();run({armory,root,box,track,win,doc,hit:element=>{target=element;},chosen,levels});}finally{armory.dispose();names.forEach((n,i)=>{if(previous[i])Object.defineProperty(globalThis,n,previous[i]!);else Reflect.deleteProperty(globalThis,n);});}
 }
 function pointer(root:UI,win:EventTarget,target:UI,move=0,cancel=false){
   dispatch(root,'pointerdown',{pointerId:2,button:0,clientX:100,clientY:100,target});
@@ -55,16 +57,47 @@ test('cancelled gestures cannot select; outside taps close without firing and do
   pointer(root,win,root);assert.equal(armory.isOpen,false);assert.equal(clicks,0);
   pointer(root,win,root);assert.equal(clicks,1);
 }));
-test('touch fallback preserves panel swipes, ignores an existing joystick finger and equips on a new tap',()=>fixture(({armory,root,track,win,chosen})=>{
+test('touch fallback preserves panel swipes, ignores an existing joystick finger and equips on a new tap',()=>fixture(({armory,root,track,win,hit,chosen})=>{
   const card=track.children[0],locked=track.children[1];
   dispatch(root,'touchstart',{target:locked,changedTouches:[{identifier:2,clientX:100,clientY:100}]});
   dispatch(win,'touchmove',{changedTouches:[{identifier:1,clientX:20,clientY:30},{identifier:2,clientX:30,clientY:100}]});
   dispatch(win,'touchend',{changedTouches:[{identifier:2,clientX:30,clientY:100}]});
-  dispatch(root,'click',{target:locked});assert.equal(armory.isOpen,true);assert.deepEqual(chosen,[]);
+  dispatch(root,'click',{target:locked,detail:1,clientX:30,clientY:100});assert.equal(armory.isOpen,true);assert.deepEqual(chosen,[]);
+  hit(card);
   dispatch(root,'touchstart',{target:card,changedTouches:[{identifier:3,clientX:100,clientY:100}]});
   dispatch(win,'touchend',{changedTouches:[{identifier:3,clientX:100,clientY:100}]});
-  dispatch(root,'click',{target:card});assert.equal(armory.isOpen,false);assert.deepEqual(chosen,['ar']);
+  assert.equal(armory.isOpen,false);assert.deepEqual(chosen,['ar']);
 },true));
+
+test('touch pointers equip at release, reject a different hit or cancellation, and suppress the matching duplicate click',()=>fixture(({armory,root,track,win,hit,chosen})=>{
+  const card=track.children[6],properties={pointerType:'touch',pointerId:2,button:0,clientX:150,clientY:100,target:card};
+  hit(track);
+  dispatch(root,'pointerdown',properties);dispatch(win,'pointerup',properties);
+  hit(card);
+  dispatch(root,'pointerdown',properties);dispatch(win,'pointercancel',properties);
+  assert.equal(armory.isOpen,true);assert.deepEqual(chosen,[]);
+  dispatch(root,'pointerdown',properties);dispatch(win,'pointerup',{...properties,pointerId:1});
+  assert.deepEqual(chosen,[]);
+  dispatch(win,'pointerup',properties);
+  assert.equal(armory.isOpen,false);assert.deepEqual(chosen,['sniper']);
+  assert.equal(dispatch(root,'click',{...properties,detail:1,target:root}).defaultPrevented,true);
+  assert.deepEqual(chosen,['sniper']);
+}));
+
+test('backgrounding and round pause discard unfinished touches before the next weapon selection',()=>fixture(({armory,root,track,win,doc,hit,chosen})=>{
+  const card=track.children[6],properties={pointerType:'touch',pointerId:2,button:0,clientX:150,clientY:100,target:card};
+  hit(card);
+  for(const interrupt of [()=>{doc.hidden=true;dispatch(doc,'visibilitychange');doc.hidden=false;},()=>{armory.setEnabled(false);armory.setEnabled(true);}]) {
+    dispatch(root,'pointerdown',properties);
+    interrupt();
+    assert.equal(armory.isOpen,false);
+    armory.toggle();
+    dispatch(win,'pointerup',properties);
+    assert.deepEqual(chosen,[]);
+  }
+  dispatch(root,'pointerdown',properties);dispatch(win,'pointerup',properties);
+  assert.deepEqual(chosen,['sniper']);
+}));
 
 test('armory updates level and actual magazine capacity without changing equipped weapon',()=>fixture(({armory,track,levels,chosen})=>{
   const card=track.children[0],locked=track.children[1];

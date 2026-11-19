@@ -1,3 +1,4 @@
+import { observeArenaSize } from '../ui/ArenaSize';
 import { PickupPreview } from '../ui/PickupPreview';
 import { weaponMuzzle } from '../weapons/WeaponMuzzle';
 import { PickupFeedback } from '../ui/PickupFeedback';
@@ -48,7 +49,7 @@ export class MultiplayerGame{
   private input=new InputManager(()=>this.sendResetInput());private arena=new Arena();private player=new Player();private avatars=new Map<string,Bot>();private pickupMeshes=new Map<WeaponId,T.Mesh>();
   private pending:PendingCommand[]=[];private snaps:Snapshot[]=[];private seq=0;private hud:HUD;private aimFeedback:AimFeedback;private armory:Armory;private feedback:DamageFeedbackSystem;
   private effects:WeaponEffects;private battle:BattleFeedback;private seenShots=new Set<string>();private statusTimer=0;private loop:GameLoop;private settings?:GameSettings;private desktop?:DesktopInput;private mobile?:MobileInput;
-  private resize=()=>{};private owned=new Set<WeaponId>(['ar']);private active:WeaponId='ar';private weapons:WeaponState=createWeaponStates();
+  private stopResize=()=>{};private owned=new Set<WeaponId>(['ar']);private active:WeaponId='ar';private weapons:WeaponState=createWeaponStates();
   private score=0;private bounty=BASE_BOUNTY;private scoreTarget=SCORE_TARGET;private endsAt=0;private kills=0;private deaths=0;private dead=false;private killer='';private ping=0;private pingTimer=0;private serverClockOffset=0;private hasClockOffset=false;private notice='';private noticeT=0;private slowUntil=0;
   private disposed=false;private ready=false;private paused=false;private lastLocalShot=0;private recoilPitch=0;private recoilYaw=0;private gun=new T.Group();private gunFlash:T.Mesh;private gunMaterial=new T.MeshBasicMaterial({color:0x202634});private handMaterial=new T.MeshBasicMaterial({color:0xffffff});private coarse=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0;
   private cameraOffset=new T.Vector3();private visualPosition=new T.Vector3();private remoteTarget=new T.Vector3();private moveIntent=new T.Vector3();
@@ -63,10 +64,16 @@ export class MultiplayerGame{
     root.insertAdjacentHTML('beforeend','<div class="co-feedback"></div><div class="co-hud"></div><div class="co-minimap"><canvas aria-label="以自己為中心的戰術雷達"></canvas></div>'+mobileMarkup());
     this.tacticalBoard=new TacticalBoard(root,this.coarse);
     this.radarCanvas=root.querySelector('.co-minimap canvas')!;this.radarContext=this.radarCanvas.getContext('2d')!;
-    this.hud=new HUD(root.querySelector('.co-hud')!);this.aimFeedback=new AimFeedback(root);this.feedback=new DamageFeedbackSystem(root.querySelector('.co-feedback')!);this.armory=new Armory(root,id=>{this.input.set({aim:false});this.socket.emit('match:weapon',{id,roundId:this.roundId});},()=>this.owned,this.restorePointerLock,id=>this.weapons[id].level);
+    this.hud=new HUD(root.querySelector('.co-hud')!);this.aimFeedback=new AimFeedback(root);this.feedback=new DamageFeedbackSystem(root.querySelector('.co-feedback')!);
+    this.armory=new Armory(root,id=>{
+      if(!this.ready||this.paused||!this.player.alive||!this.socket.connected)return false;
+      this.input.set({aim:false});
+      this.socket.emit('match:weapon',{id,roundId:this.roundId});
+      return true;
+    },()=>this.owned,this.restorePointerLock,id=>this.weapons[id].level);
     this.scene.add(this.arena.group,new T.HemisphereLight(0xffffff,0x16b9dc,2));this.effects=new WeaponEffects(this.scene,this.coarse);this.battle=new BattleFeedback(root);this.makeGun();this.appearance=new WeaponAppearance(this.gun);this.pickupFeedback=new PickupFeedback(root,this.coarse);this.pickupPreview=new PickupPreview(root);this.scope=new SniperScope(root,this.gun,this.coarse);this.makePickups();
     if(this.coarse)this.mobile=new MobileInput(root,this.input);else{this.desktop=new DesktopInput(root,this.input);root.onclick=e=>{if(!(e.target as HTMLElement).closest('.co-armory, [data-game-ui], button, input'))this.restorePointerLock();};}
-    this.resize=()=>{this.cam.aspect=root.clientWidth/root.clientHeight;this.cam.updateProjectionMatrix();this.renderer.setSize(root.clientWidth,root.clientHeight,false);this.sizeRadar();};window.addEventListener('resize',this.resize);this.resize();
+    this.stopResize=observeArenaSize(root,(width,height)=>{this.cam.aspect=width/height;this.cam.updateProjectionMatrix();this.renderer.setSize(width,height,false);this.sizeRadar();});
     this.socket.on('match:pickup',this.onPickup);this.socket.on('match:snapshot',this.onSnapshot);this.socket.on('match:shot',this.onShot);this.socket.on('match:hit',this.onHit);this.socket.on('match:kill',this.onKill);this.socket.on('match:damage',this.onDamage);this.socket.on('disconnect',this.onDisconnect);this.socket.on('connect_error',this.onConnectError);this.loop=new GameLoop(dt=>this.update(dt));this.settings=new GameSettings(root,()=>{this.tacticalBoard.close();this.root.dispatchEvent(new Event('combat:reset'));this.socket.emit('match:input',{roundId:this.roundId,seq:++this.seq,clientTime:this.serverNow(),moveX:0,moveY:0,yaw:this.player.yaw,pitch:this.player.pitch,jump:false,reload:false,sprint:false,aim:false});this.desktop?.setEnabled(false);this.mobile?.setEnabled(false);this.armory.setEnabled(false);},requestLock=>{this.desktop?.setEnabled(true);this.mobile?.setEnabled(true);this.armory.setEnabled(true);if(requestLock)this.restorePointerLock();},true,roomActions?{...roomActions,code:roomCode??''}:undefined);
   }
 
@@ -91,7 +98,7 @@ export class MultiplayerGame{
     const arrival=performance.now();if(this.lastSnapshotArrival){const interval=arrival-this.lastSnapshotArrival;this.snapshotJitter=this.snapshotJitter*.8+Math.abs(interval-this.snapshotInterval)*.2;this.snapshotInterval=this.snapshotInterval*.85+interval*.15;}this.lastSnapshotArrival=arrival;
     snapshot.byId=new Map(snapshot.players.map(player=>[player.id,player]));this.snaps.push(snapshot);while(this.snaps.length>12)this.snaps.shift();
     const me=snapshot.byId.get(this.playerId);if(!me)return;if(firstSnapshot)this.seq=Math.max(this.seq,me.ack);const wasAlive=this.player.alive,respawned=!wasAlive&&me.alive;this.slowUntil=me.slowUntil;
-    this.pending=this.pending.filter(command=>command.seq>me.ack);if(firstSnapshot||respawned||wasAlive!==me.alive){this.pending.length=0;this.input.reset();this.mobile?.reset();this.desktop?.setEnabled(!this.paused&&!this.settings?.isOpen);}
+    this.pending=this.pending.filter(command=>command.seq>me.ack);if(firstSnapshot||wasAlive!==me.alive){this.pending.length=0;this.armory.close(false);this.input.reset();this.mobile?.reset();this.desktop?.setEnabled(!this.paused&&!this.settings?.isOpen);}
     this.visualPosition.copy(this.player.position).add(this.cameraOffset);
     const reconciled:SimPlayer={x:me.x,y:me.y,z:me.z,yaw:me.yaw,pitch:me.pitch,velocityY:me.velocityY,supportId:me.supportId,jumpsUsed:me.jumpsUsed,alive:me.alive};this.physicsTime=snapshot.simulationTime;for(const command of this.pending){this.simulate(reconciled,command,command.dt,this.physicsTime);this.physicsTime+=command.dt;}
     const correction=Math.hypot(reconciled.x-this.player.position.x,reconciled.y-this.player.position.y,reconciled.z-this.player.position.z),hardCorrection=firstSnapshot||respawned||correction>4;
@@ -168,7 +175,7 @@ export class MultiplayerGame{
     this.socket.off('match:pickup',this.onPickup);this.socket.off('match:snapshot',this.onSnapshot);this.socket.off('match:shot',this.onShot);
     this.socket.off('match:hit',this.onHit);this.socket.off('match:kill',this.onKill);this.socket.off('match:damage',this.onDamage);
     this.socket.off('disconnect',this.onDisconnect);this.socket.off('connect_error',this.onConnectError);
-    window.removeEventListener('resize',this.resize);this.root.onclick=null;
+    this.stopResize();this.root.onclick=null;
     this.desktop?.dispose();this.mobile?.dispose();this.tacticalBoard.dispose();this.settings?.dispose();this.armory.dispose();
     this.pickupPreview.dispose();this.pickupFeedback.dispose();this.scope.dispose();this.effects.dispose();this.battle.dispose();this.feedback.dispose();this.hud.dispose();this.aimFeedback.dispose();
     for(const avatar of this.avatars.values())avatar.dispose();

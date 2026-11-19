@@ -37,7 +37,7 @@ const ERROR_MESSAGES = {
 };
 const errorMessage = (error) => ERROR_MESSAGES[error] || error || '操作失敗，請重試';
 
-export default function Multiplayer({ onBack, resumeOnMount = false }) {
+export default function Multiplayer({ onBack, resumeOnMount = false, enterFullscreen, exitFullscreen, enterOnFirstTouch, fullscreenButton }) {
   const [screen, setScreen] = useState(resumeOnMount ? 'reconnecting' : 'join');
   const [name, setName] = useState(localStorage.getItem('chroma-name') || '');
   const [code, setCode] = useState(new URLSearchParams(location.search).get('room') || '');
@@ -58,6 +58,10 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
   const socket = useMemo(() => io(serverUrl, { autoConnect: false }), []);
   const inMatch = screen === 'playing' || screen === 'results';
   const isHost = playerId === room?.host;
+
+  useEffect(() => {
+    if (screen === 'lobby' || screen === 'join') exitFullscreen?.();
+  }, [screen, exitFullscreen]);
 
   const request = async (event, ...args) => {
     if (!socket.connected) throw new Error('連線已中斷，請等待重連後再操作');
@@ -174,7 +178,10 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
     if (hostActionRef.current) return;
     hostActionRef.current = true;
     setBusy(true);setError('');
-    try { await request(event); } catch (cause) { setError(cause.message); }
+    try { await request(event); } catch (cause) {
+      if (event === 'game:start') exitFullscreen?.();
+      setError(cause.message);
+    }
     finally { hostActionRef.current = false;if (activeRef.current) setBusy(false); }
   };
 
@@ -229,14 +236,15 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
   };
   const resume = async () => {
     if (!sessionRef.current || busy) return;
+    enterFullscreen?.();
     setScreen('reconnecting');setError('');resumeRef.current = true;
     // Reconnect through the same listener used for transient network failures.
     socket.disconnect();socket.sendBuffer.length = 0;socket.connect();
   };
   const create = () => { void enter('room:create'); };
   const join = () => { void enter('room:join'); };
-  const start = () => { void hostAction('game:start'); };
-  const playAgain = () => { void hostAction('game:again'); };
+  const start = () => { enterFullscreen?.(); void hostAction('game:start'); };
+  const playAgain = () => { enterFullscreen?.(); void hostAction('game:again'); };
   const returnLobby = () => { void hostAction('game:lobby'); };
   const loadingLabel = busy ? <><i className="mp-spinner" aria-hidden="true" />連線中…</> : null;
 
@@ -256,8 +264,9 @@ export default function Multiplayer({ onBack, resumeOnMount = false }) {
     const ranked = room?.finalStandings || [];
     const winners = ranked.filter(player => room?.winnerIds?.includes(player.id));
     const isWinner = room?.winnerIds?.includes(playerId);
-    return <main className="chroma-ops co-multiplayer-shell">
+    return <main className="chroma-ops co-multiplayer-shell" onPointerUpCapture={screen === 'playing' ? enterOnFirstTouch : undefined}>
       <div key={room?.roundId} className="co-game-stage" ref={arenaRef} aria-label="CHROMA OPS multiplayer arena" />
+      {screen === 'playing' && fullscreenButton}
       <RoomBroadcast notices={broadcasts} floating />
       {error && <p className="mp-match-error" role="alert">{error}</p>}
       {screen === 'results' && <section className="mp-result" role="dialog" aria-modal="true" aria-labelledby="mp-result-title">
