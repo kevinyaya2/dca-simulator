@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-20",
+  "baselineCommit": "a4be28a11be33fae4846304b55a604649e5226c0",
+  "units": "milliseconds",
+  "columns": ["median","p95","max"],
+  "aggregation": "Median of three runs of 540 samples per scene (three fresh rounds per run). Navigation graphs warmed before measurement.",
+  "notes": ["CPU-only stress case with eight ground/roof players; no GPU or Internet latency measurements.","The 3ms search deadline is cooperative, checked between bounded operations. It does not impose a hard 3ms limit on the whole room tick or prevent OS/GC scheduling delays.","Searches retain their frontier across retries instead of repeatedly restarting. Actual movement validates collisions against the current world.","General gameplay responsiveness is separately verified by two real socket clients moving, firing and switching weapons beside the enlarged Warden."],
+  "scenarios": [
+    {"location":"city-west","scale":2,"before":[0.0404,0.1556,10.8194],"after":[0.0443,0.1734,11.8968],"maxSearchSamples":17,"maxSearchNodes":0,"maxRoutesPerTick":1},
+    {"location":"city-west","scale":4,"before":[0.0412,0.2588,194.1318],"after":[0.0382,0.145,1.9578],"maxSearchSamples":15,"maxSearchNodes":0,"maxRoutesPerTick":1},
+    {"location":"city-west","scale":8,"before":[0.0379,0.1009,260.4855],"after":[0.0384,0.0926,3.8007],"maxSearchSamples":67,"maxSearchNodes":1,"maxRoutesPerTick":1},
+    {"location":"city-west","scale":20,"before":[0.0084,0.0254,0.6465],"after":[0.016,0.0438,0.9105],"maxSearchSamples":119,"maxSearchNodes":0,"maxRoutesPerTick":0},
+    {"location":"lab","scale":2,"before":[0.046,0.4055,2.1965],"after":[0.0462,0.4306,2.3806],"maxSearchSamples":25,"maxSearchNodes":0,"maxRoutesPerTick":1},
+    {"location":"lab","scale":4,"before":[0.0504,0.09,3.7214],"after":[0.0509,0.1329,1.7869],"maxSearchSamples":30,"maxSearchNodes":0,"maxRoutesPerTick":1},
+    {"location":"lab","scale":8,"before":[0.0512,0.11,4.3694],"after":[0.0589,0.6297,1.8303],"maxSearchSamples":21,"maxSearchNodes":0,"maxRoutesPerTick":1},
+    {"location":"lab","scale":20,"before":[0.0647,0.1515,4.3548],"after":[0.0638,0.7119,2.0991],"maxSearchSamples":16,"maxSearchNodes":0,"maxRoutesPerTick":1}
+  ]
+}

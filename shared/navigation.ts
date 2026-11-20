@@ -2,6 +2,7 @@ import { blocked, supportHeight } from './arena.js';
 import { MALL_ENTRIES } from './underground.js';
 import { LIFT } from './movingPlatforms.js';
 import { FERRIS_WHEEL } from './ferrisWheel.js';
+import type { NavigationBudget } from './navigationBudget.js';
 export type NavPoint={x:number;y:number;z:number};
 type Node=NavPoint&{edges:number[]};
 export function walkSegment(a:NavPoint,b:NavPoint){
@@ -43,46 +44,93 @@ export function navigationGraph(open=false):Node[]{
   if(open)openGraph=nodes;else graph=nodes;
   return nodes;
 }
-function closest(p:NavPoint,nodes:Node[],canWalk:typeof walkSegment,nearest=false){
-  const sorted=nodes.map((n,id)=>({id,d:Math.hypot(n.x-p.x,n.z-p.z)+Math.abs(n.y-p.y)*4})).sort((a,b)=>a.d-b.d);
-  return sorted.find(({id,d})=>d<30&&canWalk(nearest?nodes[id]:p,nodes[id]))?.id;
+const finite=(p:NavPoint)=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.z);
+export type NavigationStep='check'|'sample'|'node';
+export type NavigationWalk=(a:NavPoint,b:NavPoint)=>Generator<NavigationStep,boolean>;
+
+// The generator retains its frontier and partial edge checks when its budget is
+// spent. A new budget can resume it later without repeating the same dead end.
+export class NavigationSearch {
+  private request:NavigationStep|undefined;
+  result:NavPoint[]|undefined;
+  constructor(private readonly work:Generator<NavigationStep,NavPoint[]>){}
+  advance(budget?:NavigationBudget){
+    while(this.result===undefined){
+      if(this.request!==undefined){
+        const allowed=!budget||(this.request==='sample'?budget.sample():this.request==='node'?budget.node():budget.check());
+        if(!allowed)return undefined;
+        this.request=undefined;
+      }
+      const next=this.work.next();
+      if(next.done){this.result=next.value;return this.result;}
+      this.request=next.value;
+    }
+    return this.result;
+  }
 }
-export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nearestGoal=false,includeBlockedEdges=false):NavPoint[]{
-  // Scoped to this search: clearance depends on current obstacles and actor size.
-  // Keep directions separate; ramp traversal need not be symmetric.
+
+export function* navigationSteps(from:NavPoint,to:NavPoint,canWalk:NavigationWalk,nearestGoal=false,includeBlockedEdges=false):Generator<NavigationStep,NavPoint[]>{
+  yield 'check';
+  if(!finite(from)||!finite(to))return [];
   const checks=new WeakMap<NavPoint,WeakMap<NavPoint,boolean>>();
-  const walk=canWalk===walkSegment?canWalk:(a:NavPoint,b:NavPoint)=>{
+  function* walk(a:NavPoint,b:NavPoint):Generator<NavigationStep,boolean>{
+    yield 'check';
     let destinations=checks.get(a);
     if(!destinations){destinations=new WeakMap();checks.set(a,destinations);}
     const cached=destinations.get(b);
     if(cached!==undefined)return cached;
-    const result=canWalk(a,b);
-    destinations.set(b,result);
-    return result;
-  };
-  const nodes=navigationGraph(includeBlockedEdges),start=closest(from,nodes,walk);
+    const result=yield* canWalk(a,b);
+    destinations.set(b,result);return result;
+  }
+  const nodes=navigationGraph(includeBlockedEdges);
+  function* closest(p:NavPoint,nearest=false):Generator<NavigationStep,number|undefined>{
+    const sorted=nodes.map((n,id)=>({id,d:Math.hypot(n.x-p.x,n.z-p.z)+Math.abs(n.y-p.y)*4})).sort((a,b)=>a.d-b.d);
+    for(const {id,d} of sorted){
+      yield 'check';
+      if(d<30&&finite(nodes[id])&&(yield* walk(nearest?nodes[id]:p,nodes[id])))return id;
+    }
+  }
+  const start=yield* closest(from);
   if(start===undefined)return [];
-  const goal=closest(to,nodes,walk,nearestGoal);
+  const goal=yield* closest(to,nearestGoal);
   if(goal===undefined&&!nearestGoal)return [];
-  const open=new Set([start]),cost=new Map([[start,0]]),previous=new Map<number,number>();
-  let nearest=start, nearestDistance=Infinity;
+  const open=new Set([start]),closed=new Set<number>(),cost=new Map([[start,0]]),previous=new Map<number,number>();
+  let nearest=start,nearestDistance=Infinity;
   const destination=goal===undefined?to:nodes[goal];
-  function pathTo(id:number){
-    const path=[id];
-    while(previous.has(path[0]))path.unshift(previous.get(path[0])!);
-    while(path.length>1&&walk(from,nodes[path[1]]))path.shift();
-    return [...path.map(index=>nodes[index]),...(walk(nodes[id],to)?[to]:[])];
+  function* pathTo(id:number):Generator<NavigationStep,NavPoint[]>{
+    const path=[id],visited=new Set(path);
+    while(previous.has(path[0])){
+      yield 'check';
+      const parent=previous.get(path[0])!;
+      if(visited.has(parent)||!nodes[parent]||!finite(nodes[parent]))return [];
+      visited.add(parent);path.unshift(parent);
+    }
+    while(path.length>1&&(yield* walk(from,nodes[path[1]])))path.shift();
+    return [...path.map(index=>nodes[index]),...((yield* walk(nodes[id],to))?[to]:[])];
   }
   while(open.size){
+    yield 'node';
     let current=-1,best=Infinity;
-    for(const id of open){const n=nodes[id],score=cost.get(id)!+Math.hypot(n.x-destination.x,n.y-destination.y,n.z-destination.z);if(score<best){current=id;best=score;}}
-    if(current===goal)return pathTo(current);
-    if(nearestGoal){
-      const n=nodes[current],distance=Math.hypot(n.x-to.x,n.z-to.z)+Math.abs(n.y-to.y)*4;
-      if(distance<nearestDistance){nearest=current;nearestDistance=distance;}
+    for(const id of open){
+      yield 'check';
+      const n=nodes[id],score=cost.get(id)!+Math.hypot(n.x-destination.x,n.y-destination.y,n.z-destination.z);
+      if(score<best){current=id;best=score;}
     }
-    open.delete(current);
-    for(const next of nodes[current].edges){const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);if(nextCost<(cost.get(next)??Infinity)&&(canWalk===walkSegment||walk(a,b))){cost.set(next,nextCost);previous.set(next,current);open.add(next);}}
+    if(current<0||!finite(nodes[current]))return [];
+    if(current===goal)return yield* pathTo(current);
+    if(nearestGoal){const n=nodes[current],distance=Math.hypot(n.x-to.x,n.z-to.z)+Math.abs(n.y-to.y)*4;if(distance<nearestDistance){nearest=current;nearestDistance=distance;}}
+    open.delete(current);closed.add(current);
+    for(const next of nodes[current].edges){
+      yield 'check';
+      if(closed.has(next)||!nodes[next]||!finite(nodes[next]))continue;
+      const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+      if(nextCost<(cost.get(next)??Infinity)&&(yield* walk(a,b))){cost.set(next,nextCost);previous.set(next,current);open.add(next);}
+    }
   }
-  return nearestGoal?pathTo(nearest):[];
+  return nearestGoal?yield* pathTo(nearest):[];
+}
+
+export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nearestGoal=false,includeBlockedEdges=false,budget?:NavigationBudget):NavPoint[]{
+  const walk:NavigationWalk=function*(a,b){return canWalk(a,b);};
+  return new NavigationSearch(navigationSteps(from,to,walk,nearestGoal,includeBlockedEdges)).advance(budget)??[];
 }

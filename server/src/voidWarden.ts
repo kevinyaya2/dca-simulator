@@ -5,7 +5,8 @@
 import { movingBoxes } from '../../shared/movingPlatforms.js';
 import { intactBox } from '../../shared/destruction.js';
 import { MALL_ENTRIES } from '../../shared/underground.js';
-import { navigationPath } from '../../shared/navigation.js';
+import { NavigationSearch, navigationSteps, type NavigationStep, type NavigationWalk } from '../../shared/navigation.js';
+import { NavigationBudget, type NavigationStats } from '../../shared/navigationBudget.js';
 import {
   VOID_WARDEN as rules, WARDEN_ATTACKS as moves, WARDEN_ENTRANCE, WARDEN_PATROL, wardenCanBeHit,
   type WardenAttack, type WardenAttackKind, type WardenPoint, type WardenSnapshot, type WardenSpawnWarning,
@@ -20,6 +21,9 @@ export type WardenRound = {
   destroyed:ReadonlySet<string>; patrol:number; retaliator:string|null; lostAt:number; stuckAt:number;
   lastSeen:WardenPoint|null; lastFittingScale:number; retreat:WardenPoint|null;
   routeGoal?:WardenPoint; routeScale?:number;
+  searchRetryAt?:number; searchRetryTarget?:string; searchScale?:number; searchStats?:NavigationStats;
+  searchJob?:{from:WardenPoint;to:WardenPoint;scale:number;destroyed:ReadonlySet<string>;near:boolean;neutral:boolean;work:NavigationSearch;approach?:WardenPoint};
+  contact?:WardenPoint&{air:number;scale:number};
 };
 
 export function createWardenRound(startAt:number,delay:number=rules.spawnDelayMs):WardenRound {
@@ -40,7 +44,20 @@ const between=(value:number)=>Math.max(0,Math.min(1,value));
 const feet=(player:WardenPlayer)=>player.y-PLAYER_EYE_HEIGHT;
 const maxStep=.27;
 
-type Terrain={dynamic:Obstacles;round:WardenRound;scale:number;breakable:boolean};
+type Terrain={dynamic:Obstacles;round:WardenRound;scale:number;breakable:boolean;search:NavigationBudget};
+
+function clearContact(boss:WardenSnapshot,terrain:Terrain){
+  if(!terrain.breakable)return;
+  const previous=terrain.round.contact;
+  if(previous&&previous.x===boss.x&&previous.y===boss.y&&previous.z===boss.z&&previous.air===boss.air&&previous.scale===boss.scale)return;
+  // Static geometry can only disappear during a round; unchanged contact cannot
+  // introduce new overlapping parts. Growth and movement always invalidate it.
+  terrain.round.contact={x:boss.x,y:boss.y,z:boss.z,air:boss.air,scale:boss.scale};
+  const radius=rules.radius*boss.scale,y=boss.y+boss.air+.10,height=rules.height*boss.scale;
+  const hits=arenaBoxesNear(boss.x,boss.z,Math.min(radius,Math.hypot(ARENA_BOUNDS.width,ARENA_BOUNDS.depth)))
+    .filter(box=>box.breakKey&&intactBox(box,terrain.round.destroyed)&&box.maxY>y+.025&&box.minY<y+height&&overlapsBox(boss.x,boss.z,box,radius));
+  if(hits.length)terrain.round.destroyed=new Set([...terrain.round.destroyed,...hits.map(box=>box.breakKey!)]);
+}
 
 function hasClearance(p:WardenPoint,terrain:Terrain,breakable=false,commit=false) {
   const radius=rules.radius*terrain.scale,height=rules.height*terrain.scale;
@@ -64,10 +81,12 @@ function canStand(p:WardenPoint,terrain:Terrain,breakable=false,commit=false) {
   return hasClearance({...p,y:p.y+.10},terrain,breakable,commit);
 }
 
-function traceWalk(from:WardenPoint,to:WardenPoint,terrain:Terrain,air=0,breakable=false,commit=false) {
+function traceWalk(from:WardenPoint,to:WardenPoint,terrain:Terrain,air=0,breakable=false,commit=false,search?:NavigationBudget) {
+  if(!Number.isFinite(gap(from,to)))return from;
   const steps=Math.max(1,Math.ceil(gap(from,to)/maxStep));
   let previous=from;
   for(let i=1;i<=steps;i++){
+    if(search&&!search.sample())return previous;
     const p=mix(from,to,i/steps);
     if(!canStand(p,terrain,breakable,commit)||(air>0&&!hasClearance({...p,y:p.y+air},terrain)))return previous;
     previous=p;
@@ -76,10 +95,37 @@ function traceWalk(from:WardenPoint,to:WardenPoint,terrain:Terrain,air=0,breakab
 }
 
 function routeTo(from:WardenPoint,to:WardenPoint,terrain:Terrain,near=false,neutral=false) {
-  const canWalk=(a:WardenPoint,b:WardenPoint)=>(!neutral||gap(b,rules.location)<=rules.leash)&&gap(traceWalk(a,b,terrain,0,true),b)<.015;
-  if(canWalk(from,to))return [to];
-  const path=navigationPath(from,to,canWalk,near,terrain.breakable||terrain.round.destroyed.size>0);
-  return path.length&&(near||gap(path[path.length-1],to)<.1) ? path : [];
+  if(!terrain.search.route())return [];
+  const {round}=terrain;
+  let job=round.searchJob;
+  if(!job||gap(job.from,from)>1||gap(job.to,to)>=1.5||job.scale!==terrain.scale||job.destroyed!==round.destroyed||job.near!==near||job.neutral!==neutral){
+    const begin=point(from),end=point(to);
+    let direct=true;
+    const canWalk:NavigationWalk=function*(a,b){
+      if(neutral&&gap(b,rules.location)>rules.leash)return false;
+      const length=gap(a,b);
+      if(!Number.isFinite(length))return false;
+      const steps=Math.max(1,Math.ceil(length/maxStep));
+      for(let i=1;i<=steps;i++){
+        yield 'sample';
+        const sample=mix(a,b,i/steps);
+        if(!canStand(sample,terrain,true))return false;
+        if(direct&&Math.abs(begin.y-end.y)<1.6)job!.approach=sample;
+      }
+      return true;
+    };
+    function* route():Generator<NavigationStep,WardenPoint[]>{
+      if(yield* canWalk(begin,end))return [end];
+      direct=false;
+      const path=yield* navigationSteps(begin,end,canWalk,near,terrain.breakable||round.destroyed.size>0);
+      return path.length&&(near||gap(path[path.length-1],end)<.1)?path:[];
+    }
+    job={from:begin,to:end,scale:terrain.scale,destroyed:round.destroyed,near,neutral,work:new NavigationSearch(route())};
+    round.searchJob=job;
+  }
+  const result=job.work.advance(terrain.search);
+  if(result!==undefined)round.searchJob=undefined;
+  return result??(near&&job.approach&&gap(from,job.approach)>.1?[job.approach]:[]);
 }
 
 function retreatToSurface(boss:WardenPoint,terrain:Terrain) {
@@ -104,7 +150,8 @@ function escapeSurfaceOverlap(boss:WardenPoint,terrain:Terrain,previousScale:num
     candidates.push({x:inset.x+Math.cos(angle)*distance,y:inset.y,z:inset.z+Math.sin(angle)*distance});
   }
   for(const exit of candidates){
-    if(canStand(exit,terrain,true)&&gap(traceWalk(boss,exit,smaller,0,true),exit)<.015)return exit;
+    if(!terrain.search.check())return null;
+    if(canStand(exit,terrain,true)&&gap(traceWalk(boss,exit,smaller,0,true,false,terrain.search),exit)<.015)return exit;
   }
   return null;
 }
@@ -136,6 +183,9 @@ function cancel(round:WardenRound,boss:WardenSnapshot) {
   round.route=[];
   round.routeGoal=undefined;
   round.repathAt=0;
+  round.searchJob=undefined;
+  round.searchRetryAt=0;
+  round.searchRetryTarget=undefined;
 }
 
 export function suspendWarden(round:WardenRound|undefined,playerId:string,at:number,leaving=false) {
@@ -197,11 +247,12 @@ function startAttack(round:WardenRound,boss:WardenSnapshot,target:WardenPlayer,a
   if(kind==='dash'||kind==='leap'){
     const length=limitAdvance(boss,yaw,Math.min(moves[kind].range*scale,distance+(kind==='dash'?2:.3)));
     const end={x:from.x+Math.sin(yaw)*length,y:from.y,z:from.z+Math.cos(yaw)*length};
-    to=traceWalk(from,end,terrain,0,kind==='dash');
+    to=traceWalk(from,end,terrain,0,kind==='dash',false,terrain.search);
     if(planar(from,to)<1.5)return false;
     if(kind==='leap'){
       for(const height of [2.45,1.3,.65,.3]){
-        if(hasClearance({...from,y:from.y+height},terrain)&&gap(traceWalk(from,to,terrain,height),to)<.03){jumpHeight=height;break;}
+        if(!terrain.search.check())break;
+        if(hasClearance({...from,y:from.y+height},terrain)&&gap(traceWalk(from,to,terrain,height,false,false,terrain.search),to)<.03){jumpHeight=height;break;}
       }
       if(!jumpHeight)return false;
     }
@@ -264,7 +315,7 @@ function runAttack(round:WardenRound,boss:WardenSnapshot,at:number,dt:number,tar
           const angle=look(from,player);
           const length=limitAdvance(boss,angle,Math.min(moves.leap.range*scale,planar(from,player)));
           const desired={x:from.x+Math.sin(angle)*length,y:from.y,z:from.z+Math.cos(angle)*length};
-          const reached=traceWalk(from,desired,terrain,attack.jumpHeight);
+          const reached=traceWalk(from,desired,terrain,attack.jumpHeight,false,false,terrain.search);
           if(planar(reached,from)>1){
             landing=reached;boss.yaw=angle;boss.attack={...attack,to:landing,yaw:angle};
           }
@@ -356,18 +407,24 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
     if(!ground){ground=groundPoint(p,round.destroyed);groundCache.set(p,ground);}
     return ground;
   };
-  const scale=boss.state==='ATTACK'&&boss.attack?boss.attack.scale:boss.scale;
-  const terrain:Terrain={dynamic,round,scale,breakable:boss.kills>0&&boss.y>=-.05};
+  const scale=boss.scale;
+  const search=new NavigationBudget();
+  round.searchStats=search.stats;
+  const terrain:Terrain={dynamic,round,scale,breakable:boss.kills>0&&boss.y>=-.05,search};
+  clearContact(boss,terrain);
+  if(round.searchScale!==scale){round.searchRetryAt=0;round.repathAt=0;round.searchScale=scale;}
+  if(round.routeScale!==undefined&&round.routeScale!==scale){round.route=[];round.routeGoal=undefined;}
   if(boss.y>=-.05){
     if(canStand(boss,terrain,true)){
       if(round.retreat){round.retreat=null;round.repathAt=0;round.route=[];}
       round.lastFittingScale=scale;
     }else if(round.lastFittingScale<scale&&boss.state!=='ATTACK'){
       if(!round.route.length||!round.retreat){
-        if(at>=round.repathAt){
+        if(at>=Math.max(round.repathAt,round.searchRetryAt??0)){
           round.retreat=escapeSurfaceOverlap(boss,terrain,round.lastFittingScale);
           round.route=round.retreat?[round.retreat]:[];
           round.repathAt=at+620;
+          if(!round.retreat)round.searchRetryAt=at+620;
         }
       }
       if(round.retreat){
@@ -378,11 +435,12 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
     }
   }else if(round.retreat||(!canStand(boss,terrain)&&round.lastFittingScale<scale)){
     terrain.scale=round.lastFittingScale;
-    if((!round.retreat||!round.route.length)&&at>=round.repathAt){
+    if((!round.retreat||!round.route.length)&&at>=Math.max(round.repathAt,round.searchRetryAt??0)){
       const escape=retreatToSurface(boss,terrain);
       round.repathAt=at+620;
       round.retreat=escape?.exit??null;
       round.route=escape?.route??[];
+      if(!escape)round.searchRetryAt=at+620;
     }
     if(boss.state!=='ATTACK'){
       boss.targetId=null;
@@ -409,15 +467,34 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
   const previous=legal.find(p=>p.id===boss.targetId);
   const retaliator=legal.find(p=>p.id===round.retaliator);
   if(!retaliator){round.retaliator=null;round.stuckAt=0;}
-  if(at>=round.repathAt||boss.targetId!==null&&!previous){
+  const searchTarget=retaliator?.id??previous?.id??legal[0]?.id??owner?.id??'patrol';
+  if(round.searchRetryTarget!==searchTarget){round.searchRetryAt=0;round.repathAt=0;round.searchRetryTarget=searchTarget;}
+  if(boss.targetId!==null&&!previous){boss.targetId=null;round.route=[];round.routeGoal=undefined;round.repathAt=0;}
+  // If the owner is just inside a structure we cannot enter, waiting beside
+  // them is better than navigating around an entire city block to a grid node.
+  if(!legal.length&&owner?.alive&&!round.guard&&gap(boss,anchor)<=rules.followDistance+rules.radius*scale){
+    const close=gap(boss,anchor)<=rules.followDistance;
+    const waiting=at<round.repathAt&&!round.route.length;
+    const blocked=!close&&!waiting&&gap(traceWalk(boss,anchor,terrain,0,true,false,search),anchor)>.015;
+    if(close||waiting||blocked){
+      round.route=[];round.routeGoal=undefined;
+      if(blocked)round.repathAt=at+620;
+      setState(boss,'FOLLOW',at);return;
+    }
+  }
+  if(at>=Math.max(round.repathAt,round.searchRetryAt??0)){
     round.repathAt=at+620;
     const previousRoute=round.route,previousGoal=round.routeGoal;
     boss.targetId=null;
     round.route=[];
     round.routeGoal=undefined;
     const plan=(goal:WardenPoint,near:boolean,sameTarget:boolean)=>{
-      const route=sameTarget&&previousRoute.length&&previousGoal&&round.routeScale===terrain.scale&&gap(goal,previousGoal)<1.5
+      let route=sameTarget&&previousRoute.length&&previousGoal&&round.routeScale===terrain.scale&&gap(goal,previousGoal)<1.5
         ?previousRoute:routeTo(boss,goal,terrain,near,!owner);
+      if(!route.length){
+        round.searchRetryAt=at+620;
+        if(round.searchJob&&sameTarget&&previousRoute.length&&previousGoal&&round.routeScale===terrain.scale)route=previousRoute;
+      }
       if(route.length){
         round.routeGoal=route===previousRoute?previousGoal:goal;
         round.routeScale=terrain.scale;
@@ -441,35 +518,34 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
     if(!boss.targetId){
       const sorted=legal.sort((a,b)=>gap(roomGround(a),boss)-gap(roomGround(b),boss)||a.id.localeCompare(b.id));
       for(const enemy of sorted){
+        if(search.stats.routes||!search.check())break;
         if(!sees(enemy))continue;
         const goal=roomGround(enemy);
         const near=boss.scale>1;
         const route=plan(goal,near,previous?.id===enemy.id);
-        if(!route.length||near&&gap(boss,route[route.length-1])<.18&&planar(boss,enemy)>moves.slash.range*boss.scale)continue;
+        if(!route.length||near&&gap(boss,route[route.length-1])<.18&&planar(boss,enemy)>moves.slash.range*boss.scale)break;
         boss.targetId=enemy.id;round.route=route;round.lastSeen=goal;round.lostAt=0;
         break;
       }
     }
-    if(!boss.targetId&&!owner&&previous&&round.lastSeen){
+    if(!boss.targetId&&!search.stats.routes&&!owner&&previous&&round.lastSeen){
       round.lostAt ||= at;
       if(at-round.lostAt<rules.searchMs){
         boss.targetId=previous.id;
         if(gap(boss,round.lastSeen)>.25)round.route=plan(round.lastSeen,false,true);
       }
     }
-    if(!boss.targetId){
+    if(!boss.targetId&&!search.stats.routes&&!search.stats.exhausted){
       round.lastSeen=null;round.lostAt=0;
       if(owner){
         if(gap(boss,anchor)>(owner.alive?rules.followDistance:.25))
           round.route=plan(anchor,true,!previous);
       }else{
-        for(let i=0;i<WARDEN_PATROL.length;i++){
-          const destination=WARDEN_PATROL[round.patrol];
-          if(gap(boss,destination)>.4)round.route=plan(destination,boss.scale>1,!previous);
-          if(round.route.length&&gap(boss,round.route[round.route.length-1])<.18)round.route=[];
-          if(round.route.length)break;
-          round.patrol=(round.patrol+1)%WARDEN_PATROL.length;
-        }
+        let destination=WARDEN_PATROL[round.patrol];
+        if(gap(boss,destination)<=.4){round.patrol=(round.patrol+1)%WARDEN_PATROL.length;destination=WARDEN_PATROL[round.patrol];}
+        round.route=plan(destination,boss.scale>1,!previous);
+        if(round.route.length&&gap(boss,round.route[round.route.length-1])<.18)round.route=[];
+        if(!round.route.length&&!round.searchJob)round.patrol=(round.patrol+1)%WARDEN_PATROL.length;
       }
     }
   }
@@ -491,7 +567,8 @@ function advance(round:WardenRound,boss:WardenSnapshot,terrain:Terrain,at:number
   setState(boss,state,at);
   while(round.route.length&&gap(boss,round.route[0])<.08)round.route.shift();
   const next=round.route[0];
-  if(!next){if(state==='CHASE'||state==='PATROL')setState(boss,'IDLE',at);return;}
+  if(!next){if(state==='CHASE')setState(boss,'IDLE',at);return;}
+  if(!Number.isFinite(next.x)||!Number.isFinite(next.y)||!Number.isFinite(next.z)){round.route=[];return;}
   const p=mix(boss,next,Math.min(1,speed*dt/gap(boss,next)));
   const reached=traceWalk(boss,p,terrain,0,true,true);
   if(gap(reached,boss)>.005){

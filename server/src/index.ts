@@ -313,6 +313,6 @@ export function createGameServer(options:{reconnectGraceMs?:number;wardenSpawnDe
   const timer=setInterval(()=>clock.advance(now(),(dt,at)=>{
     for(const room of rooms.values())if(room.state==='PLAYING'&&advanceRoomClock(room,at,dt))step(io,room,dt);
   }),1000/60);
-  return{app,http,io,close:()=>{closing=true;clearInterval(timer);for(const room of rooms.values())clearRoom(room);rooms.clear();io.close();}};
+  return{app,http,io,rooms,close:()=>{closing=true;clearInterval(timer);for(const room of rooms.values())clearRoom(room);rooms.clear();io.close();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const game=createGameServer();game.http.listen(Number(process.env.PORT??3001),'0.0.0.0');}

@@ -57,11 +57,16 @@ test('Warden spawns once at 90 seconds, stays bound through the entrance, and th
   assert.equal(round.boss,boss);
   assert.equal(boss.x,VOID_WARDEN.location.x);
   assert.equal(boss.targetId,null);
-  stepWarden(round,100_000+WARDEN_ENTRANCE.finish,dt,96,[target]);
+  let pursuitAt=100_000+WARDEN_ENTRANCE.finish;
+  stepWarden(round,pursuitAt,dt,96,[target]);
+  // A busy server may yield the route search; pursuit must resume after retry.
+  for(let i=0;i<180&&round.boss?.state!=='CHASE';i++){
+    pursuitAt+=dt*1000;stepWarden(round,pursuitAt,dt,96+(i+1)*dt,[target]);
+  }
   assert.equal(boss.state,'CHASE');
   assert.equal(boss.targetId,target.id);
   assert.ok(boss.x>VOID_WARDEN.location.x);
-  stepWarden(round,100_000+WARDEN_ENTRANCE.finish+17,dt,96.017,[{...target,alive:false}]);
+  stepWarden(round,pursuitAt+17,dt,96.017,[{...target,alive:false}]);
   assert.equal(boss.targetId,null);
 });
 
@@ -133,10 +138,14 @@ test('the neutral Warden patrols and prioritizes the latest distant shooter',()=
   damageWarden(round,east,80,at+1);
   stepWarden(round,at+17,dt,0,[east,west]);
   assert.equal(boss.targetId,east.id);
+  let pursuitAt=at+17;
+  for(let i=0;i<180&&round.boss?.state!=='CHASE';i++){
+    pursuitAt+=dt*1000;stepWarden(round,pursuitAt,dt,0,[east,west]);
+  }
   assert.equal(boss.state,'CHASE');
   assert.notDeepEqual({x:boss.x,y:boss.y,z:boss.z},initial);
-  damageWarden(round,west,80,at+20);
-  stepWarden(round,at+34,dt,0,[east,west]);
+  damageWarden(round,west,80,pursuitAt+3);
+  stepWarden(round,pursuitAt+17,dt,0,[east,west]);
   assert.equal(boss.targetId,west.id);
 });
 
