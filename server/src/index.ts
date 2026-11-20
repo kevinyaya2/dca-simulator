@@ -13,6 +13,8 @@ import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyDeath, sett
 
 import { createWardenRound, damageWarden, stepWarden, suspendWarden, wardenSpawnWarning, type WardenRound } from './voidWarden.js';
 import { VOID_WARDEN, VOID_BLESSING, WARDEN_ID, playerMoveScale, wardenCanBeHit, wardenGrowth, type WardenAttackKind, type WardenNotice, type WardenPoint, type WardenSnapshot } from '../../shared/voidWarden.js';
+import { navigationGraph } from '../../shared/navigation.js';
+import { SimulationClock, advanceRoomClock } from './SimulationClock.js';
 
 type Input = SimInput & { roundId?:number; seq:number; clientTime:number; reload?:boolean; yaw:number; pitch:number };
 type BurnState = { attackerId:string; nextTick:number; expiresAt:number; damage:number } | null;
@@ -219,6 +221,9 @@ function clearRoom(room:Room){clearRespawns(room);clearGameOverTimer(room);clear
 export const RECONNECT_GRACE_MS=60_000;
 
 export function createGameServer(options:{reconnectGraceMs?:number;wardenSpawnDelayMs?:number}={}){
+  // Build immutable map connectivity before accepting players. The first Boss
+  // route must not compile the entire navigation graph inside the room tick.
+  navigationGraph();navigationGraph(true);
   const graceMs=options.reconnectGraceMs??RECONNECT_GRACE_MS;
   const rooms=new Map<string,Room>();
   let closing=false;
@@ -304,8 +309,10 @@ export function createGameServer(options:{reconnectGraceMs?:number;wardenSpawnDe
       selectHost(target);announceConnection(io,target,p,'disconnected');emitRoom(io,target);
     });
   });
-  const fixedStep=1/60;let lastLoop=now(),accumulator=0;
-  const timer=setInterval(()=>{const time=now();accumulator=Math.min(.25,accumulator+(time-lastLoop)/1000);lastLoop=time;while(accumulator>=fixedStep){for(const room of rooms.values()){room.lastStep+=fixedStep*1000;step(io,room,fixedStep);}accumulator-=fixedStep;}},1000/60);
+  const clock=new SimulationClock(now());
+  const timer=setInterval(()=>clock.advance(now(),(dt,at)=>{
+    for(const room of rooms.values())if(room.state==='PLAYING'&&advanceRoomClock(room,at,dt))step(io,room,dt);
+  }),1000/60);
   return{app,http,io,close:()=>{closing=true;clearInterval(timer);for(const room of rooms.values())clearRoom(room);rooms.clear();io.close();}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const game=createGameServer();game.http.listen(Number(process.env.PORT??3001),'0.0.0.0');}

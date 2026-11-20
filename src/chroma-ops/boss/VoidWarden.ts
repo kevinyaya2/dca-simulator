@@ -439,7 +439,6 @@ export class VoidWarden {
     this.elbowBend.set(.85,-.58,-.37);
     this.elbowBend.addScaledVector(this.handDirection,-this.elbowBend.dot(this.handDirection)).normalize();
     this.elbowDirection.copy(this.handDirection).multiplyScalar(along).addScaledVector(this.elbowBend,outward);
-    this.group.getWorldQuaternion(this.rootRotation);
     this.aimJoint(shoulder,armDown,this.elbowDirection);
     this.handDirection.multiplyScalar(distance).sub(this.elbowDirection);
     this.aimJoint(elbow,armDown,this.handDirection);
@@ -448,7 +447,6 @@ export class VoidWarden {
 
   private aimBlade(heading:number,elevation:number) {
     const {hand} = this.arms[1];
-    this.group.getWorldQuaternion(this.rootRotation);
     hand.getWorldPosition(this.hiltPosition).applyMatrix4(this.inverseRoot);
     const azimuth = T.MathUtils.degToRad(heading);
     const pitch = T.MathUtils.degToRad(elevation);
@@ -548,11 +546,15 @@ export class VoidWarden {
   }
 
   private plantFeet() {
-    this.group.updateWorldMatrix(true,false);
+    // Root transform stays fixed throughout a pose. Refresh it once before IK.
+    this.group.getWorldQuaternion(this.rootRotation);
     this.inverseRoot.copy(this.group.matrixWorld).invert();
+    this.hips.updateWorldMatrix(false,false);
     let floor = Infinity;
-    for (const {foot} of this.legs) {
-      foot.updateWorldMatrix(true,false);
+    for (const {thigh,shin,foot} of this.legs) {
+      thigh.updateWorldMatrix(false,false);
+      shin.updateWorldMatrix(false,false);
+      foot.updateWorldMatrix(false,false);
       for (const point of solePoints) {
         this.sole.copy(point).applyMatrix4(foot.matrixWorld).applyMatrix4(this.inverseRoot);
         floor = Math.min(floor,this.sole.y);
@@ -573,7 +575,10 @@ export class VoidWarden {
       this.particlePositions[index*3+1] = .4+rise*3.85;
       this.particlePositions[index*3+2] = Math.sin(angle)*radius;
     }
-    this.particleGeometry.attributes.position.needsUpdate = true;
+    const positions=this.particleGeometry.getAttribute('position') as T.BufferAttribute;
+    positions.clearUpdateRanges();
+    positions.addUpdateRange(0,count*3);
+    positions.needsUpdate=true;
     this.particleMaterial.size = enraged ? .16 : .13;
     this.infectionBurst.update(rageElapsed,low);
   }

@@ -19,6 +19,7 @@ export class WardenCombatFx {
   private readonly boltMatrix=new T.Matrix4();
   private cursor=0;
   private readonly emitter=new T.Vector3();
+  private readonly corners=Array.from({length:4},()=>new T.Vector3());
   private readonly trail=Array.from({length:8},()=>({base:new T.Vector3(),tip:new T.Vector3(),at:0}));
   private trailIndex=0;
   private trailCount=0;
@@ -28,6 +29,7 @@ export class WardenCombatFx {
     this.geometry.setAttribute('position',new T.BufferAttribute(this.positions,3).setUsage(T.DynamicDrawUsage));
     this.geometry.setAttribute('color',new T.BufferAttribute(this.colors,3).setUsage(T.DynamicDrawUsage));
     this.geometry.setAttribute('strength',new T.BufferAttribute(this.accents,1).setUsage(T.DynamicDrawUsage));
+    this.geometry.setDrawRange(0,0);
     const mesh=new T.Mesh(this.geometry,new T.ShaderMaterial({
       transparent:true,depthWrite:false,side:T.DoubleSide,vertexColors:true,toneMapped:false,
       vertexShader:`attribute float strength; varying vec4 tint;
@@ -40,6 +42,7 @@ export class WardenCombatFx {
     this.bolts=new T.InstancedMesh(new T.IcosahedronGeometry(.29,coarse?0:1),
       new T.MeshBasicMaterial({color:0xff762d,toneMapped:false}),moves.burst.count);
     this.bolts.count=0;
+    this.bolts.instanceMatrix.setUsage(T.DynamicDrawUsage);
     this.bolts.frustumCulled=false;
     this.group.add(this.bolts);
   }
@@ -94,16 +97,23 @@ export class WardenCombatFx {
               this.bolts.count++;
             }
           }
-          this.bolts.instanceMatrix.needsUpdate=true;
+          if(this.bolts.count){
+            this.bolts.instanceMatrix.clearUpdateRanges();
+            this.bolts.instanceMatrix.addUpdateRange(0,this.bolts.count*16);
+            this.bolts.instanceMatrix.needsUpdate=true;
+          }
           break;
         }
       }
     }
     this.drawBladeTrail(attack,serverNow,bladeBase,bladeTip);
     this.geometry.setDrawRange(0,this.cursor);
-    this.geometry.attributes.position.needsUpdate=true;
-    this.geometry.attributes.color.needsUpdate=true;
-    this.geometry.attributes.strength.needsUpdate=true;
+    if(this.cursor)for(const name of ['position','color','strength']){
+      const attribute=this.geometry.getAttribute(name) as T.BufferAttribute;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0,this.cursor*attribute.itemSize);
+      attribute.needsUpdate=true;
+    }
   }
 
   private drawBladeTrail(attack:WardenAttack|null,now:number,base:T.Vector3,tip:T.Vector3){
@@ -144,14 +154,14 @@ export class WardenCombatFx {
     this.vertex(a,color,alpha);this.vertex(b,color,alpha);this.vertex(c,color,alpha);
   }
 
-  private ringPoint(center:WardenPoint,radius:number,angle:number){
-    return {x:center.x+Math.sin(angle)*radius,y:center.y,z:center.z+Math.cos(angle)*radius};
+  private ringPoint(out:T.Vector3,center:WardenPoint,radius:number,angle:number){
+    return out.set(center.x+Math.sin(angle)*radius,center.y,center.z+Math.cos(angle)*radius);
   }
 
   private fan(center:WardenPoint,radius:number,yaw:number,angle:number,color:T.Color,alpha:number){
     for(let i=0;i<segments;i++){
       const a=yaw-angle/2+angle*i/segments,b=yaw-angle/2+angle*(i+1)/segments;
-      this.triangle(center,this.ringPoint(center,radius,a),this.ringPoint(center,radius,b),color,alpha);
+      this.triangle(center,this.ringPoint(this.corners[0],center,radius,a),this.ringPoint(this.corners[1],center,radius,b),color,alpha);
     }
     this.arc(center,radius,yaw,angle,color,Math.min(.82,alpha*2.8),.095);
   }
@@ -159,8 +169,8 @@ export class WardenCombatFx {
   private arc(center:WardenPoint,radius:number,yaw:number,angle:number,color:T.Color,alpha:number,width:number){
     for(let i=0;i<segments;i++){
       const a=yaw-angle/2+angle*i/segments,b=yaw-angle/2+angle*(i+1)/segments;
-      const left=this.ringPoint(center,radius,a),right=this.ringPoint(center,radius,b);
-      const innerLeft=this.ringPoint(center,radius-width,a),innerRight=this.ringPoint(center,radius-width,b);
+      const left=this.ringPoint(this.corners[0],center,radius,a),right=this.ringPoint(this.corners[1],center,radius,b);
+      const innerLeft=this.ringPoint(this.corners[2],center,radius-width,a),innerRight=this.ringPoint(this.corners[3],center,radius-width,b);
       this.triangle(left,innerLeft,right,color,alpha);
       this.triangle(right,innerLeft,innerRight,color,alpha);
     }
@@ -169,15 +179,16 @@ export class WardenCombatFx {
   private strip(from:WardenPoint,to:WardenPoint,width:number,color:T.Color,alpha:number){
     const dx=to.x-from.x,dz=to.z-from.z,length=Math.hypot(dx,dz)||1;
     const x=dz/length*width,z=-dx/length*width;
-    const edge=(p:WardenPoint,m:number)=>({x:p.x+x*m,y:p.y,z:p.z+z*m});
-    const a=edge(from,-1),b=edge(from,1),c=edge(to,-1),d=edge(to,1);
+    const [a,b,c,d]=this.corners;
+    a.set(from.x-x,from.y,from.z-z);b.set(from.x+x,from.y,from.z+z);
+    c.set(to.x-x,to.y,to.z-z);d.set(to.x+x,to.y,to.z+z);
     this.triangle(a,b,c,color,alpha);
     this.triangle(c,b,d,color,alpha);
-    for(const side of [-1,1]){
-      const outerFrom=edge(from,side),outerTo=edge(to,side);
-      const innerFrom=edge(from,side*.92),innerTo=edge(to,side*.92);
-      this.triangle(outerFrom,innerFrom,outerTo,color,alpha*2.6);
-      this.triangle(outerTo,innerFrom,innerTo,color,alpha*2.6);
+    for(let side=-1;side<=1;side+=2){
+      a.set(from.x+x*side,from.y,from.z+z*side);b.set(to.x+x*side,to.y,to.z+z*side);
+      c.set(from.x+x*(side*.92),from.y,from.z+z*(side*.92));d.set(to.x+x*(side*.92),to.y,to.z+z*(side*.92));
+      this.triangle(a,c,b,color,alpha*2.6);
+      this.triangle(b,c,d,color,alpha*2.6);
     }
   }
 

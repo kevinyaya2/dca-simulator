@@ -48,9 +48,21 @@ function closest(p:NavPoint,nodes:Node[],canWalk:typeof walkSegment,nearest=fals
   return sorted.find(({id,d})=>d<30&&canWalk(nearest?nodes[id]:p,nodes[id]))?.id;
 }
 export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nearestGoal=false,includeBlockedEdges=false):NavPoint[]{
-  const nodes=navigationGraph(includeBlockedEdges),start=closest(from,nodes,canWalk);
+  // Scoped to this search: clearance depends on current obstacles and actor size.
+  // Keep directions separate; ramp traversal need not be symmetric.
+  const checks=new WeakMap<NavPoint,WeakMap<NavPoint,boolean>>();
+  const walk=canWalk===walkSegment?canWalk:(a:NavPoint,b:NavPoint)=>{
+    let destinations=checks.get(a);
+    if(!destinations){destinations=new WeakMap();checks.set(a,destinations);}
+    const cached=destinations.get(b);
+    if(cached!==undefined)return cached;
+    const result=canWalk(a,b);
+    destinations.set(b,result);
+    return result;
+  };
+  const nodes=navigationGraph(includeBlockedEdges),start=closest(from,nodes,walk);
   if(start===undefined)return [];
-  const goal=closest(to,nodes,canWalk,nearestGoal);
+  const goal=closest(to,nodes,walk,nearestGoal);
   if(goal===undefined&&!nearestGoal)return [];
   const open=new Set([start]),cost=new Map([[start,0]]),previous=new Map<number,number>();
   let nearest=start, nearestDistance=Infinity;
@@ -58,8 +70,8 @@ export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nea
   function pathTo(id:number){
     const path=[id];
     while(previous.has(path[0]))path.unshift(previous.get(path[0])!);
-    while(path.length>1&&canWalk(from,nodes[path[1]]))path.shift();
-    return [...path.map(index=>nodes[index]),...(canWalk(nodes[id],to)?[to]:[])];
+    while(path.length>1&&walk(from,nodes[path[1]]))path.shift();
+    return [...path.map(index=>nodes[index]),...(walk(nodes[id],to)?[to]:[])];
   }
   while(open.size){
     let current=-1,best=Infinity;
@@ -70,7 +82,7 @@ export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nea
       if(distance<nearestDistance){nearest=current;nearestDistance=distance;}
     }
     open.delete(current);
-    for(const next of nodes[current].edges){const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);if(nextCost<(cost.get(next)??Infinity)&&(canWalk===walkSegment||canWalk(a,b))){cost.set(next,nextCost);previous.set(next,current);open.add(next);}}
+    for(const next of nodes[current].edges){const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);if(nextCost<(cost.get(next)??Infinity)&&(canWalk===walkSegment||walk(a,b))){cost.set(next,nextCost);previous.set(next,current);open.add(next);}}
   }
   return nearestGoal?pathTo(nearest):[];
 }

@@ -38,6 +38,7 @@ export class WardenInfectionBurst {
     this.emitters[1].position.set(-.38,1.24,-.58);
     this.geometry.setAttribute('position',new T.BufferAttribute(this.vertices,3).setUsage(T.DynamicDrawUsage));
     this.geometry.setAttribute('color',new T.BufferAttribute(this.colors,3).setUsage(T.DynamicDrawUsage));
+    this.geometry.setDrawRange(0,0);
     const sparks = new T.Mesh(this.geometry,new T.MeshBasicMaterial({
       vertexColors:true,side:T.DoubleSide,depthWrite:false,transparent:true,
       blending:T.AdditiveBlending,toneMapped:false,
@@ -113,8 +114,12 @@ export class WardenInfectionBurst {
       offset = this.vertex(offset,x-side*tail,y-tail,z-direction*tail*.5,cooling,fade*.42);
     }
     this.geometry.setDrawRange(0,offset/3);
-    this.geometry.attributes.position.needsUpdate = true;
-    this.geometry.attributes.color.needsUpdate = true;
+    if(offset)for(const name of ['position','color']){
+      const attribute=this.geometry.getAttribute(name) as T.BufferAttribute;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0,offset);
+      attribute.needsUpdate=true;
+    }
   }
 
   private vertex(offset:number,x:number,y:number,z:number,color:T.Color,strength:number) {

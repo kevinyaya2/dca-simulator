@@ -323,7 +323,10 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
   }
   if(boss.state==='DEFEATED'){
     if(at<boss.stateAt+rules.surrenderMs)return;
-    boss.hp=rules.alliedHp;setState(boss,'ALLIED',at);return;
+    // Keep the scheduled transition time after an overloaded tick. Starting a
+    // fresh stand-up timer at recovery would extend the surrender animation.
+    const joinedAt=boss.stateAt+rules.surrenderMs;
+    boss.hp=rules.alliedHp;setState(boss,'ALLIED',joinedAt);
   }
   if(boss.state==='ALLIED'&&at<boss.stateAt+400)return;
   if(owner&&!owner.socketId){
@@ -344,7 +347,15 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
     cancel(round,boss);boss.enraged=true;setState(boss,'ENRAGED',at);return;
   }
   const dynamic=movingBoxes(simulationTime);
-  const roomGround=(p:WardenPlayer)=>groundPoint(p,round.destroyed);
+  let groundTerrain=round.destroyed;
+  const groundCache=new Map<WardenPlayer,WardenPoint>();
+  const roomGround=(p:WardenPlayer)=>{
+    // Contact can destroy floors during this update; never reuse their old height.
+    if(groundTerrain!==round.destroyed){groundCache.clear();groundTerrain=round.destroyed;}
+    let ground=groundCache.get(p);
+    if(!ground){ground=groundPoint(p,round.destroyed);groundCache.set(p,ground);}
+    return ground;
+  };
   const scale=boss.state==='ATTACK'&&boss.attack?boss.attack.scale:boss.scale;
   const terrain:Terrain={dynamic,round,scale,breakable:boss.kills>0&&boss.y>=-.05};
   if(boss.y>=-.05){

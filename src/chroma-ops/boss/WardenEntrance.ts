@@ -138,13 +138,16 @@ export class WardenEntrance {
   update(boss:WardenSnapshot,serverNow:number,dt:number) {
     const elapsed=Math.max(0,serverNow-boss.spawnAt);
     const intro=boss.state==='SPAWN';
-    this.title.hidden=elapsed<cue.title||elapsed>=cue.title+cue.titleDuration;
-    this.hud.hidden=elapsed<cue.title&&intro;
-    this.meter.max=boss.ownerId&&boss.state!=='DEFEATED'?VOID_WARDEN.alliedHp:boss.maxHp;
-    this.meter.value=boss.hp;
-    this.hud.classList.toggle('is-infected',boss.phaseTwo&&!boss.ownerId);
-    this.hud.classList.toggle('is-allied',!!boss.ownerId);
-    this.hud.classList.toggle('is-owned',boss.ownerId===this.localId);
+    const titleHidden=elapsed<cue.title||elapsed>=cue.title+cue.titleDuration;
+    const hudHidden=elapsed<cue.title&&intro;
+    if(this.title.hidden!==titleHidden)this.title.hidden=titleHidden;
+    if(this.hud.hidden!==hudHidden)this.hud.hidden=hudHidden;
+    const maxHp=boss.ownerId&&boss.state!=='DEFEATED'?VOID_WARDEN.alliedHp:boss.maxHp;
+    if(this.meter.max!==maxHp)this.meter.max=maxHp;
+    if(this.meter.value!==boss.hp)this.meter.value=boss.hp;
+    this.toggleHudClass('is-infected',boss.phaseTwo&&!boss.ownerId);
+    this.toggleHudClass('is-allied',!!boss.ownerId);
+    this.toggleHudClass('is-owned',boss.ownerId===this.localId);
     const allegiance=boss.ownerId?`◆ ${boss.ownerId===this.localId?'你的隊友':boss.ownerName??'已收編'}`
       : boss.enraged?'狂暴':boss.phaseTwo?'感染階段':'';
     if(this.allegiance.textContent!==allegiance)this.allegiance.textContent=allegiance;
@@ -265,8 +268,12 @@ export class WardenEntrance {
   }
 
   hideHud() {
-    this.title.hidden=true;
-    this.hud.hidden=true;
+    if(!this.title.hidden)this.title.hidden=true;
+    if(!this.hud.hidden)this.hud.hidden=true;
+  }
+
+  private toggleHudClass(name:string,enabled:boolean) {
+    if(this.hud.classList.contains(name)!==enabled)this.hud.classList.toggle(name,enabled);
   }
 
   target(boss:WardenSnapshot,playerId:string):Combatant|null {
