@@ -53,6 +53,51 @@
 .co-warden-title span { color: #ffb675; font-size: 11px; font-weight: 800; letter-spacing: .25em; }
 .co-warden-title strong { margin-top: 4px; font-size: clamp(25px, 5vw, 53px); letter-spacing: .15em; }
 .co-warden-title[hidden], .co-warden-hud[hidden] { display: none; }
+.co-warden-spawn-warning {
+  position:absolute;
+  top:calc(max(18px,env(safe-area-inset-top)) + 40px);
+  left:50%;
+  transform:translateX(-50%);
+  z-index:9;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  column-gap:14px;
+  row-gap:3px;
+  width:max-content;
+  max-width: min(310px, 68vw);
+  padding:8px 12px;
+  border:1px solid #ffac62;
+  border-left-width:3px;
+  border-radius:5px;
+  background:#221423ed;
+  color:#fff0dd;
+  box-shadow:0 3px 14px #1c0c22a8;
+  pointer-events:none;
+}
+.co-warden-spawn-warning strong { font-size:15px; line-height:1.2; }
+.co-warden-spawn-warning span { grid-column:1; font-size:11px; color:#ffc997; }
+.co-warden-spawn-warning b { grid-column:2; grid-row:1 / span 2; align-self:center; color:#ffaf66; font-size:15px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.co-warden-spawn-warning[hidden] { display:none; }
+.co-warden-growth { color:#ffe0a4;line-height:1.05; }
+.co-warden-royal {
+  position:absolute;
+  left:max(18px,env(safe-area-inset-left));
+  top:calc(max(18px,env(safe-area-inset-top)) + 136px);
+  z-index:5;
+  pointer-events:none;
+  padding:5px 8px;
+  border:1px solid #cf79ff;
+  border-radius:6px;
+  background:#2d1145;
+  color:#f5d2ff;
+  font-size:12px;
+  font-weight:850;
+  box-shadow:0 0 12px #a836eea0;
+}
+.co-warden-royal[hidden] { display:none; }
+@media(pointer:coarse) {
+  .co-warden-royal { left:max(12px,env(safe-area-inset-left)); top:calc(max(14px,env(safe-area-inset-top)) + 111px); }
+}
 .co-warden-buff,.co-warden-notice {
   position:absolute;
   z-index:5;
@@ -98,5 +143,9 @@
 @media (max-height: 480px) {
   .co-warden-hud { top: calc(max(13px, env(safe-area-inset-top)) + 33px); gap: 2px; }
   .co-warden-title { top: 23%; }
+  .co-warden-spawn-warning { top:calc(max(13px,env(safe-area-inset-top)) + 33px); }
   .co-warden-buff { top:calc(max(13px,env(safe-area-inset-top)) + 86px); }
+}
+@media (max-width: 550px) {
+  .co-warden-spawn-warning { top:calc(max(14px,env(safe-area-inset-top)) + 112px); }
 }

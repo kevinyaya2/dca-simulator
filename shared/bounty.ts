@@ -20,8 +20,13 @@ export function settleBountyKill(attacker:BountyState,victim:BountyState) {
   return {
     scoreAwarded,
     attacker:{score:attacker.score+scoreAwarded,bounty:Math.min(MAX_BOUNTY,attacker.bounty+Math.min(50,Math.round(scoreAwarded*.25))),consecutiveDeaths:0},
-    victim:{score:victim.score,bounty:Math.max(MIN_BOUNTY,victim.bounty-(victim.consecutiveDeaths===0?25:50)),consecutiveDeaths:victim.consecutiveDeaths+1},
+    victim:settleBountyDeath(victim),
   };
+}
+
+export function settleBountyDeath(victim:BountyState):BountyState {
+  return {score:victim.score,bounty:Math.max(MIN_BOUNTY,victim.bounty-(victim.consecutiveDeaths===0?25:50)),
+    consecutiveDeaths:victim.consecutiveDeaths+1};
 }
 
 export function rankScores<T extends ScoreRow>(players:readonly T[]):(T & {rank:number})[] {

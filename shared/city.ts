@@ -1,4 +1,5 @@
 import type { ArenaBox } from './arena.js';
+import { breakableSections } from './destruction.js';
 
 export const CITY_BUILDINGS=[{x:-65,z:45,color:0x35c955,name:'WEST ARCADE',side:-1},{x:68,z:44,color:0x19aee1,name:'EAST STATION',side:1},
   {x:-68,z:-47,color:0xee3c87,name:'PINK GALLERY',side:-1},{x:66,z:-48,color:0xf1a72c,name:'SUN MARKET',side:1},
@@ -20,8 +21,12 @@ export function cityRampHeight(x:number,z:number):number|null {
 }
 
 const structures:ArenaBox[]=[];
-for(const b of CITY_BUILDINGS){
-  const add=(x:number,z:number,w:number,d:number,top:number,color=b.color,bottom=0)=>structures.push(cityBox(b.x+x,b.z+z,w,d,top,color,bottom));
+for(const [id,b] of CITY_BUILDINGS.entries()){
+  let part=0;
+  const add=(x:number,z:number,w:number,d:number,top:number,color=b.color,bottom=0,breakable=true)=>{
+    const box=cityBox(b.x+x,b.z+z,w,d,top,color,bottom);
+    structures.push(...(breakable?breakableSections(box,`city:${id}:${part++}`):[box]));
+  };
   // All four facades have a door and actual open windows at both levels.
   for(const base of [0,6])for(const side of [-1,1])for(const axis of ['x','z']){
     const wall=(u:number,width:number,lo:number,hi:number)=>axis==='x'?add(side*12,u,.4,width,hi,b.color,lo):add(u,side*12,width,.4,hi,b.color,lo);
@@ -48,9 +53,9 @@ for(const b of CITY_BUILDINGS){
     add(side*12,0,.25,10,13.1,0xffffff,12);
     add(0,side*12,6,.25,13.1,0xffffff,12);
   }
-  add(b.side*18,-1,12,4,6,0xffc330,5.7);
-  add(b.side*15,27,18,4,12,0xffc330,11.7);
-  add(b.side*8,20.5,4,17,12,0xffc330,11.7);
+  add(b.side*18,-1,12,4,6,0xffc330,5.7,false);
+  add(b.side*15,27,18,4,12,0xffc330,11.7,false);
+  add(b.side*8,20.5,4,17,12,0xffc330,11.7,false);
 }
 // The middle bridge leaves the entire street below open.
 structures.push(cityBox(0,36,88,4,6,0xffc330,5.7));

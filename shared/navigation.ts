@@ -15,13 +15,15 @@ export function walkSegment(a:NavPoint,b:NavPoint){
   return true;
 }
 let graph:Node[]|undefined;
-export function navigationGraph():Node[]{
-  if(graph)return graph;
+let openGraph:Node[]|undefined;
+export function navigationGraph(open=false):Node[]{
+  const cached=open?openGraph:graph;
+  if(cached)return cached;
   const nodes:Node[]=[],grid=new Map<string,number>();
   const add=(x:number,y:number,z:number)=>{nodes.push({x,y,z,edges:[]});return nodes.length-1;};
-  const link=(a:number,b:number)=>{if(walkSegment(nodes[a],nodes[b])){nodes[a].edges.push(b);nodes[b].edges.push(a);}};
+  const link=(a:number,b:number)=>{if(open||walkSegment(nodes[a],nodes[b])){nodes[a].edges.push(b);nodes[b].edges.push(a);}};
   for(let x=-144;x<=144;x+=8)for(let z=-128;z<=128;z+=8){
-    const p={x,y:0,z};if(walkSegment(p,p))grid.set(`${x},${z}`,add(x,0,z));
+    const p={x,y:0,z};if(open||walkSegment(p,p))grid.set(`${x},${z}`,add(x,0,z));
   }
   for(const [key,id]of grid){const [x,z]=key.split(',').map(Number);for(const [dx,dz]of [[8,0],[0,8],[8,8],[8,-8]]){const other=grid.get(`${x+dx},${z+dz}`);if(other!==undefined)link(id,other);}}
   const mallIds:number[]=[];
@@ -38,22 +40,37 @@ export function navigationGraph():Node[]{
     for(const id of grid.values())if(Math.hypot(nodes[id].x-nodes[first].x,nodes[id].z-nodes[first].z)<13)link(first,id);
     for(const id of mallIds)if(Math.hypot(nodes[id].x-nodes[previous].x,nodes[id].z-nodes[previous].z)<20)link(previous,id);
   }
-  graph=nodes;return nodes;
+  if(open)openGraph=nodes;else graph=nodes;
+  return nodes;
 }
 function closest(p:NavPoint,nodes:Node[],canWalk:typeof walkSegment,nearest=false){
   const sorted=nodes.map((n,id)=>({id,d:Math.hypot(n.x-p.x,n.z-p.z)+Math.abs(n.y-p.y)*4})).sort((a,b)=>a.d-b.d);
   return sorted.find(({id,d})=>d<30&&canWalk(nearest?nodes[id]:p,nodes[id]))?.id;
 }
-export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nearestGoal=false):NavPoint[]{
-  const nodes=navigationGraph(),start=closest(from,nodes,canWalk),goal=closest(to,nodes,canWalk,nearestGoal);
-  if(start===undefined||goal===undefined)return [];
+export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nearestGoal=false,includeBlockedEdges=false):NavPoint[]{
+  const nodes=navigationGraph(includeBlockedEdges),start=closest(from,nodes,canWalk);
+  if(start===undefined)return [];
+  const goal=closest(to,nodes,canWalk,nearestGoal);
+  if(goal===undefined&&!nearestGoal)return [];
   const open=new Set([start]),cost=new Map([[start,0]]),previous=new Map<number,number>();
+  let nearest=start, nearestDistance=Infinity;
+  const destination=goal===undefined?to:nodes[goal];
+  function pathTo(id:number){
+    const path=[id];
+    while(previous.has(path[0]))path.unshift(previous.get(path[0])!);
+    while(path.length>1&&canWalk(from,nodes[path[1]]))path.shift();
+    return [...path.map(index=>nodes[index]),...(canWalk(nodes[id],to)?[to]:[])];
+  }
   while(open.size){
     let current=-1,best=Infinity;
-    for(const id of open){const n=nodes[id],g=nodes[goal],score=cost.get(id)!+Math.hypot(n.x-g.x,n.y-g.y,n.z-g.z);if(score<best){current=id;best=score;}}
-    if(current===goal){const path:number[]=[goal];while(previous.has(path[0]))path.unshift(previous.get(path[0])!);while(path.length>1&&canWalk(from,nodes[path[1]]))path.shift();return [...path.map(id=>nodes[id]),...(canWalk(nodes[goal],to)?[to]:[])];}
+    for(const id of open){const n=nodes[id],score=cost.get(id)!+Math.hypot(n.x-destination.x,n.y-destination.y,n.z-destination.z);if(score<best){current=id;best=score;}}
+    if(current===goal)return pathTo(current);
+    if(nearestGoal){
+      const n=nodes[current],distance=Math.hypot(n.x-to.x,n.z-to.z)+Math.abs(n.y-to.y)*4;
+      if(distance<nearestDistance){nearest=current;nearestDistance=distance;}
+    }
     open.delete(current);
     for(const next of nodes[current].edges){const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);if(nextCost<(cost.get(next)??Infinity)&&(canWalk===walkSegment||canWalk(a,b))){cost.set(next,nextCost);previous.set(next,current);open.add(next);}}
   }
-  return [];
+  return nearestGoal?pathTo(nearest):[];
 }

@@ -22,7 +22,23 @@ export class BattleFeedback{
     // Upgrade the same attacker's banner in place; other announcements replace it.
     const same=this.bannerAttacker===event.attackerId&&this.bannerLife>0;this.bannerAttacker=event.attackerId;this.banner.replaceChildren();const name=document.createElement('small'),title=document.createElement('strong');name.textContent=event.attackerName;title.textContent=[multi,event.title].filter(Boolean).join(' · ');this.banner.append(name,title);this.banner.hidden=false;this.bannerLife=2;if(!same){this.banner.classList.remove('is-entering');void this.banner.offsetWidth;this.banner.classList.add('is-entering');}
   }
-  private tone(rank:number){const context=this.audio;if(!context||context.state!=='running')return;const oscillator=context.createOscillator(),gain=context.createGain();oscillator.type='sine';oscillator.frequency.setValueAtTime(rank===3?660:rank===2?1040:780,context.currentTime);oscillator.frequency.exponentialRampToValueAtTime(rank===3?980:500,context.currentTime+.075);gain.gain.setValueAtTime(.045,context.currentTime);gain.gain.exponentialRampToValueAtTime(.001,context.currentTime+.09);oscillator.connect(gain).connect(context.destination);oscillator.start();oscillator.stop(context.currentTime+.1);oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};}
+  wardenWarning(){this.playTone(360,510,.16,0);this.playTone(510,710,.22,.18);}
+  private tone(rank:number){this.playTone(rank===3?660:rank===2?1040:780,rank===3?980:500,.1,0);}
+  private playTone(from:number,to:number,duration:number,delay:number){
+    const context=this.audio;
+    if(!context||context.state!=='running')return;
+    const begin=context.currentTime+delay;
+    const oscillator=context.createOscillator(),gain=context.createGain();
+    oscillator.type='sine';
+    oscillator.frequency.setValueAtTime(from,begin);
+    oscillator.frequency.exponentialRampToValueAtTime(to,begin+duration*.75);
+    gain.gain.setValueAtTime(.045,begin);
+    gain.gain.exponentialRampToValueAtTime(.001,begin+duration*.9);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(begin);
+    oscillator.stop(begin+duration);
+    oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
+  }
   update(dt:number,camera:T.Camera){if(this.disposed)return;this.markerLife=Math.max(0,this.markerLife-dt);if(!this.markerLife){this.marker.hidden=true;this.markerRank=0;}this.bannerLife=Math.max(0,this.bannerLife-dt);this.banner.hidden=this.bannerLife===0;this.banner.style.opacity=String(Math.min(1,this.bannerLife/.25));
     this.entries=this.entries.filter(e=>{e.life-=dt;if(e.life<=0){e.el.remove();return false;}e.el.style.opacity=String(Math.min(1,e.life/.4));return true;});
     this.numbers=this.numbers.filter(n=>{n.life-=dt;if(n.life<=0){n.el.remove();return false;}const p=n.position.clone().project(camera),visible=p.z>=-1&&p.z<=1&&Math.abs(p.x)<1.1&&Math.abs(p.y)<1.1;n.el.hidden=!visible;n.el.style.left=`${(p.x*.5+.5)*100}%`;n.el.style.top=`calc(${(-p.y*.5+.5)*100}% - ${(1-n.life/.7)*34}px)`;n.el.style.opacity=String(Math.min(1,n.life/.2));return true;});

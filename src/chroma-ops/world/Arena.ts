@@ -2,7 +2,8 @@ import * as T from 'three';
 import { FerrisWheel } from './FerrisWheel';
 import { GROUND_SURFACES, groundCoversBoxTop, uniqueBoxTops } from './GroundSurfaces';
 import { SAFE_SPAWNS } from '../../../shared/spawns';
-import { ARENA_BOXES, terrainHeight, type ArenaBox } from '../../../shared/arena';
+import { ARENA_BOXES, arenaBoxesNear, terrainHeight, type ArenaBox } from '../../../shared/arena';
+import { breakableSections } from '../../../shared/destruction';
 import { CITY_BUILDINGS, CITY_RAMPS, CITY_GARDENS, CITY_LAMPS, CITY_WAYPOINTS, cityBox } from '../../../shared/city';
 import { MALL_ENTRIES, MALL_SHOPS } from '../../../shared/underground';
 import { liftBoxes } from '../../../shared/movingPlatforms';
@@ -30,6 +31,8 @@ export class Arena {
   private nightSky=new T.Color(0x100c35);
   private sky=new T.Color();
   private lastNight=-1;
+  private destroyed:ReadonlySet<string>=new Set();
+  private breakable=new Map<string,(() => void)[]>();
   groundHeight(x:number,z:number){return terrainHeight(x,z);}
 
   constructor(){
@@ -41,8 +44,9 @@ export class Arena {
     const glass=new Set(GLASSHOUSE_GLASS);
     const solids=[...ARENA_BOXES.filter(b=>b.maxY>0&&!glass.has(b)),
       cityBox(0,62,44,20,12,0x188bd0),cityBox(4,100,32,24,6,0x795ad8)];
-    this.drawSolids(solids);
-    this.drawBoxes(GLASSHOUSE_DETAILS);
+    this.drawSolids(solids.filter(b=>!b.breakKey));
+    this.drawBoxes(solids.filter(b=>b.breakKey));
+    this.drawBoxes(this.coupledDetails(GLASSHOUSE_DETAILS));
     this.makeGlasshouseWindows();
     this.drawBoxes(ARENA_BOXES.filter(b=>b.maxY<=0&&!groundCoversBoxTop(b)),undefined,true);
     this.drawBoxes(ARENA_BOXES.filter(groundCoversBoxTop),undefined,true,this.openTopBox);
@@ -84,7 +88,12 @@ export class Arena {
     for(const [color,items] of batches){
       const material=new T.MeshBasicMaterial({color});material.userData.fixedLight=fixedLight;if(glow!==undefined)material.userData.glow=glow;
       const mesh=new T.InstancedMesh(geometry,material,items.length);
-      items.forEach((b,index)=>{this.matrix.makeScale(b.maxX-b.minX,flat?1:b.maxY-b.minY,b.maxZ-b.minZ);this.matrix.setPosition((b.minX+b.maxX)/2,flat?b.maxY:(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);mesh.setMatrixAt(index,this.matrix);});
+      items.forEach((b,index)=>{
+        this.matrix.makeScale(b.maxX-b.minX,flat?1:b.maxY-b.minY,b.maxZ-b.minZ);
+        this.matrix.setPosition((b.minX+b.maxX)/2,flat?b.maxY:(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);
+        mesh.setMatrixAt(index,this.matrix);
+        if(b.breakKey)this.trackPart(b.breakKey,mesh,index,this.matrix.clone());
+      });
       mesh.instanceMatrix.needsUpdate=true;this.group.add(mesh);
     }
   }
@@ -111,14 +120,61 @@ export class Arena {
   }
 
   private makeGlasshouseWindows(){
-    // Separate panes sort back-to-front individually, sharing geometry and material.
+    // Sections of one pane share a draw call. The original panes still sort separately.
     const material=new T.MeshBasicMaterial({color:0xc9f1ed,transparent:true,opacity:.28,depthWrite:false});
+    const panes=new Map<string,ArenaBox[]>();
     for(const b of GLASSHOUSE_GLASS){
-      const pane=new T.Mesh(this.unitBox,material);
-      pane.scale.set(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ);
-      pane.position.set((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);
+      const key=b.breakKey?.split(':').slice(0,-3).join(':')??`pane:${panes.size}`;
+      const sections=panes.get(key)??[];
+      sections.push(b);panes.set(key,sections);
+    }
+    for(const [key,sections] of panes){
+      const pane=new T.InstancedMesh(this.unitBox,material,sections.length);
+      pane.name=key;
+      const first=sections[0],last=sections[sections.length-1];
+      pane.position.set((first.minX+last.maxX)/2,(first.minY+last.maxY)/2,(first.minZ+last.maxZ)/2);
+      sections.forEach((b,index)=>{
+        this.matrix.makeScale(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ);
+        this.matrix.setPosition((b.minX+b.maxX)/2-pane.position.x,(b.minY+b.maxY)/2-pane.position.y,(b.minZ+b.maxZ)/2-pane.position.z);
+        pane.setMatrixAt(index,this.matrix);
+        if(b.breakKey)this.trackPart(b.breakKey,pane,index,this.matrix.clone());
+      });
+      pane.instanceMatrix.needsUpdate=true;
       this.group.add(pane);
     }
+  }
+
+  private trackPart(key:string,mesh:T.InstancedMesh,index:number,intact:T.Matrix4){
+    const parts=this.breakable.get(key)??[];
+    parts.push(()=>{
+      mesh.setMatrixAt(index,this.destroyed.has(key)?this.matrix.makeScale(0,0,0):intact);
+      mesh.instanceMatrix.needsUpdate=true;
+    });
+    this.breakable.set(key,parts);
+  }
+
+  setDestroyed(next:ReadonlySet<string>){
+    if(next===this.destroyed)return;
+    const previous=this.destroyed;
+    this.destroyed=next;
+    for(const key of new Set([...previous,...next])){
+      if(previous.has(key)===next.has(key))continue;
+      this.breakable.get(key)?.forEach(update=>update());
+    }
+  }
+
+  private coupledDetails(boxes:readonly ArenaBox[]){
+    return boxes.flatMap(box=>breakableSections(box,'decoration')).map(box=>{
+      const x=(box.minX+box.maxX)/2,y=(box.minY+box.maxY)/2,z=(box.minZ+box.maxZ)/2;
+      let key:string|undefined,best=.7;
+      for(const part of arenaBoxesNear(x,z,1)){
+        if(!part.breakKey)continue;
+        const distance=Math.hypot(Math.max(0,part.minX-x,x-part.maxX),Math.max(0,part.minY-y,y-part.maxY),
+          Math.max(0,part.minZ-z,z-part.maxZ));
+        if(distance<best){key=part.breakKey;best=distance;}
+      }
+      return {...box,breakKey:key};
+    });
   }
 
   private ramp(x0:number,z0:number,x1:number,z1:number,y0:number,y1:number,width:number){
@@ -138,7 +194,7 @@ export class Arena {
       if(b.name.includes('STUDIO')||b.name.includes('GALLERY'))add(u,.06,base+2.35,2.3);
       if(b.name.includes('GARDEN')||b.name.includes('MARKET'))add(u,w,base+2.7,.06);
     }
-    this.drawBoxes(frames,0x75ffe1);
+    this.drawBoxes(this.coupledDetails(frames),0x75ffe1);
 
   }
 

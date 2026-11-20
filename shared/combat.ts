@@ -1,7 +1,7 @@
 import { ARENA_BOXES, terrainHeight, PLAYER_EYE_HEIGHT, rayBoxDistance, rayWallDistance, type SimWorld } from './arena.js';
 import { WEAPON_SPECS, weaponRange, weaponDamageMultiplier, type WeaponLevel, type WeaponId } from './weapons.js';
 export type Vec3=[number,number,number];
-export type Combatant={id:string;x:number;y:number;z:number;yaw:number;alive:boolean;kind?:'warden'};
+export type Combatant={id:string;x:number;y:number;z:number;yaw:number;alive:boolean;kind?:'warden';scale?:number};
 export type ShotRay={dir:Vec3;end:Vec3;kind:'range'|'wall'|'body'|'head';targetId?:string};
 export type PlannedHit={targetId:string;damage:number;headshot:boolean;position:Vec3};
 export type ShotResult={rays:ShotRay[];hits:PlannedHit[]};
@@ -17,9 +17,21 @@ const length=(v:Vec3)=>Math.hypot(...v);
 export const normalize=(v:Vec3):Vec3=>{const l=length(v)||1;return v.map(n=>n/l) as Vec3;};
 export const along=(origin:Vec3,dir:Vec3,t:number):Vec3=>[origin[0]+dir[0]*t,origin[1]+dir[1]*t,origin[2]+dir[2]*t];
 export const FLAME_CONE_ANGLE=12*Math.PI/180;
-export function flameTargetPoints(target:Combatant):Vec3[]{
+export function flameTargetPoints(target:Combatant,origin?:Vec3):Vec3[]{
   const feet=target.y-PLAYER_EYE_HEIGHT;
-  if(target.kind==='warden')return [[0,1,0],[0,2.35,0],[0,3.55,0],[-.49,2.6,0],[.49,2.6,0]].map(([x,y,z])=>[target.x+x,feet+y,target.z+z]);
+  if(target.kind==='warden'){
+    const scale=target.scale??1;
+    const points:Vec3[]=[[0,1,0],[0,2.35,0],[0,3.55,0],[-.49,2.6,0],[.49,2.6,0]]
+      .map(([x,y,z])=>[target.x+x*scale,feet+y*scale,target.z+z*scale]);
+    if(origin){
+      const c=Math.cos(target.yaw),s=Math.sin(target.yaw),dx=origin[0]-target.x,dz=origin[2]-target.z;
+      const x=Math.max(-.76*scale,Math.min(.76*scale,c*dx-s*dz));
+      const z=Math.max(-.62*scale,Math.min(.58*scale,s*dx+c*dz));
+      const y=Math.max(feet+.13,Math.min(feet+4.69*scale,origin[1]));
+      points.push([target.x+c*x+s*z,y,target.z-s*x+c*z]);
+    }
+    return points;
+  }
   return [[0,1.22,0],[0,1.92,0],[-.28,1.22,0],[.28,1.22,0],[0,.46,0]].map(([x,y,z])=>[target.x+x,feet+y,target.z+z]);
 }
 export const aimDirection=(yaw:number,pitch:number):Vec3=>[-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
@@ -38,7 +50,8 @@ export function intersectCharacter(origin:Vec3,dir:Vec3,target:Combatant,max:num
   const o={x:c*dx-s*dz,y:origin[1]-(target.y-PLAYER_EYE_HEIGHT),z:s*dx+c*dz};
   const d={x:c*dir[0]-s*dir[2],y:dir[1],z:s*dir[0]+c*dir[2]};
   if(target.kind==='warden'){
-    const distance=rayBoxDistance(o,d,{minX:-.77,maxX:.77,minY:.12,maxY:4.7,minZ:-.63,maxZ:.59},max);
+    const scale=target.scale??1;
+    const distance=rayBoxDistance(o,d,{minX:-.77*scale,maxX:.77*scale,minY:.12,maxY:4.7*scale,minZ:-.63*scale,maxZ:.59*scale},max);
     return distance===null?undefined:{distance,kind:'body' as const};
   }
   // Rest-pose boxes match the actual head, torso, arms, and legs. Animation is cosmetic.
@@ -70,7 +83,7 @@ export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[
     for(let n=0;n<24;n++){const radius=Math.sqrt((n+.5)/24)*Math.tan(angle),phase=n*2.399963;const dir=offsetDirection(base,Math.cos(phase)*radius,Math.sin(phase)*radius);rays.push(traceRay(origin,dir,range,targets,simulationWorld));}
     for(const target of targets){if(!target.alive)continue;
       let selected:{position:Vec3;angle:number}|undefined;
-      for(const position of flameTargetPoints(target)){
+      for(const position of flameTargetPoints(target,origin)){
         const delta=sub(position,origin),distance=length(delta);
         if(distance>range||distance<.001)continue;const dir=normalize(delta),a=Math.acos(Math.max(-1,Math.min(1,dot(dir,base))));
         if(a<=angle&&rayWallDistance(point(origin),point(dir),distance,simulationWorld)>=distance-.001&&(!selected||a<selected.angle))selected={position,angle:a};
@@ -87,7 +100,7 @@ export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[
         const explosion=along(ray.end,ray.dir,-.06);
         for(const target of targets){if(!target.alive)continue;
           if(target.id===ray.targetId){add(target.id,Math.round(damage),false,ray.end);continue;}
-          const samples=target.kind==='warden'?flameTargetPoints(target):[[target.x,target.y-PLAYER_EYE_HEIGHT+1.22,target.z] as Vec3];
+          const samples=target.kind==='warden'?flameTargetPoints(target,explosion):[[target.x,target.y-PLAYER_EYE_HEIGHT+1.22,target.z] as Vec3];
           let nearest=spec.splash??0,position:Vec3|undefined;
           for(const sample of samples){
             const delta=sub(sample,explosion),distance=length(delta);

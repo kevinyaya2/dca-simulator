@@ -5,14 +5,14 @@ import { resolveShot, aimDirection, KillTracker, type ConfirmedHit, type Combata
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { groundHeight, arenaWorld, stepPlayer, type SimInput } from '../../shared/arena.js';
+import { groundHeight, arenaWorld, staticArenaWorld, stepPlayer, type SimInput } from '../../shared/arena.js';
 import { chooseRespawnPoint, chooseWeaponPoint, initialWeaponPoints, type SpawnPoint } from '../../shared/spawns.js';
 import { WEAPON_IDS, WEAPON_SPECS, weaponDamageMultiplier, createWeaponStates, collectWeapon, clearWeaponBoosts, refillWeapons, advanceWeaponReload, type WeaponState, type WeaponId } from '../../shared/weapons.js';
 import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound, type RoomNotice } from '../../shared/protocol.js';
-import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyKill, finalStandings, type BountyState, type FinalStanding, type EndReason } from '../../shared/bounty.js';
+import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyDeath, settleBountyKill, finalStandings, type BountyState, type FinalStanding, type EndReason } from '../../shared/bounty.js';
 
-import { createWardenRound, damageWarden, stepWarden, suspendWarden, type WardenRound } from './voidWarden.js';
-import { VOID_WARDEN, VOID_BLESSING, WARDEN_ID, playerMoveScale, wardenCanBeHit, type WardenAttackKind, type WardenNotice, type WardenPoint, type WardenSnapshot } from '../../shared/voidWarden.js';
+import { createWardenRound, damageWarden, stepWarden, suspendWarden, wardenSpawnWarning, type WardenRound } from './voidWarden.js';
+import { VOID_WARDEN, VOID_BLESSING, WARDEN_ID, playerMoveScale, wardenCanBeHit, wardenGrowth, type WardenAttackKind, type WardenNotice, type WardenPoint, type WardenSnapshot } from '../../shared/voidWarden.js';
 
 type Input = SimInput & { roundId?:number; seq:number; clientTime:number; reload?:boolean; yaw:number; pitch:number };
 type BurnState = { attackerId:string; nextTick:number; expiresAt:number; damage:number } | null;
@@ -26,7 +26,7 @@ type Player = BountyState & {
   life:number; lastShot:number; lastReceivedSeq:number; lastProcessedSeq:number; input:Input; slowUntil:number; burn:BurnState;
 };
 type Pickup = { id:WeaponId; x:number; y:number; z:number; available:boolean; respawnAt:number };
-type History = { at:number; simulationTime:number; warden?:WardenSnapshot|null; players:Map<string,{x:number;y:number;z:number;alive:boolean;yaw:number;life:number}> };
+type History = { at:number; simulationTime:number; warden?:WardenSnapshot|null; destroyed?:ReadonlySet<string>; players:Map<string,{x:number;y:number;z:number;alive:boolean;yaw:number;life:number}> };
 type Room = {
   environmentTime:number; code:string; host:string; roundId:number; state:'LOBBY'|'PLAYING'|'GAME_OVER';
   players:Map<string,Player>; pickups:Pickup[]; history:History[];
@@ -49,14 +49,14 @@ function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];f
 
 function roomCode(rooms:Map<string,Room>):string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode(rooms):value;}
 function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,consecutiveDeaths,...safe}=p;void resumeToken;void consecutiveDeaths;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
-function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups,warden:room.warden?.boss??null};}
+function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups,warden:room.warden?.boss??null,wardenWarning:wardenSpawnWarning(room.warden,room.lastStep),destroyedBuildingParts:[...(room.warden?.destroyed??[])]};}
 function announceConnection(io:Server,room:Room,player:Player,kind:RoomNotice['kind']){
   const notice:RoomNotice={id:randomUUID(),code:room.code,playerId:player.id,name:player.name,kind,at:now()};
   room.notices=[...(room.notices??[]),notice].slice(-20);
   io.to(room.code).emit('room:notice',notice);
 }
 function emitRoom(io:Server,room:Room){io.to(room.code).emit('room:state',roomState(room));}
-function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups,warden:room.warden?.boss??null});}
+function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups,warden:room.warden?.boss??null,wardenWarning:wardenSpawnWarning(room.warden,room.lastStep),destroyedBuildingParts:[...(room.warden?.destroyed??[])]});}
 function clearRespawns(room:Room){for(const timer of room.respawnTimers.values())clearTimeout(timer);room.respawnTimers.clear();}
 function clearGameOverTimer(room:Room){if(room.gameOverTimer)clearTimeout(room.gameOverTimer);room.gameOverTimer=undefined;room.returnAt=undefined;}
 function clearWarden(room:Room){room.warden=undefined;for(const player of room.players.values())player.blessingUntil=0;}
@@ -117,12 +117,22 @@ function wardenNotice(io:Server,room:Room,notice:WardenNotice){
 export function applyWardenDamage(io:Server,room:Room,victim:Player,amount:number,from:WardenPoint,attack:WardenAttackKind){
   const at=now();
   if(room.state!=='PLAYING'||expireRound(io,room,at)||!victim.alive||!victim.socketId||(victim.protectUntil??0)>at||room.warden?.boss?.ownerId===victim.id)return;
+  const boss=room.warden?.boss;
+  if(!boss||boss.state==='DEFEATED'||boss.state==='DESPAWN')return;
   const damage=Math.min(victim.hp,amount);
   victim.hp-=damage;
   io.to(victim.socketId).emit('match:damage',{roundId:room.roundId,from,hp:victim.hp,damage,name:VOID_WARDEN.name,wardenAttack:attack});
   if(victim.hp>0)return;
-  markDeath(victim);room.killTracker.death(victim.id);scheduleRespawn(io,room,victim);
-  wardenNotice(io,room,{kind:'player-slain',name:victim.name});emitRoom(io,room);
+  const award=victim.bounty;
+  Object.assign(victim,settleBountyDeath(victim));
+  markDeath(victim);room.killTracker.death(victim.id);
+  boss.scale=wardenGrowth(++boss.kills);
+  const owner=boss.ownerId?room.players.get(boss.ownerId):undefined;
+  if(owner)owner.score+=award;
+  else if(!boss.ownerId)boss.heldBounty+=award;
+  wardenNotice(io,room,{kind:'player-slain',name:victim.name,scoreAwarded:award,ownerName:owner?.name});
+  if(owner&&owner.score>=SCORE_TARGET){finishRound(io,room,'target');return;}
+  scheduleRespawn(io,room,victim);emitRoom(io,room);
 }
 function applyDamage(io:Server,room:Room,attacker:Player,victim:Player,hit:PlannedHit,weapon:WeaponId):ConfirmedHit|undefined{
   const at=now();
@@ -140,19 +150,26 @@ export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   const targets:Combatant[]=[...room.players.values()].filter(p=>p.id!==shooter.id&&p.alive).map(p=>{const old=history?.players.get(p.id);return old&&old.life===p.life?{...old,id:p.id}:p;});
   const boss=room.warden?.boss,rewound=history?history.warden:boss;
   if(boss&&rewound&&rewound.ownerId===boss.ownerId&&wardenCanBeHit(boss,shooter.id)&&wardenCanBeHit(rewound,shooter.id))
-    targets.push({id:WARDEN_ID,x:rewound.x,y:rewound.y+rewound.air+1.65,z:rewound.z,yaw:rewound.yaw,alive:true,kind:'warden'});
+    targets.push({id:WARDEN_ID,x:rewound.x,y:rewound.y+rewound.air+1.65,z:rewound.z,yaw:rewound.yaw,alive:true,kind:'warden',scale:rewound.scale});
   const multiplier=(shooter.blessingUntil??0)>time?VOID_BLESSING.damage:1;
   const pastShooter=history?.players.get(shooter.id),shotPosition=pastShooter?.life===shooter.life?pastShooter:shooter;
-  const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000),shooter.aiming,state.level),eventId=`${room.code}:shot:${++room.shotSequence}`;
+  const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000,history?history.destroyed:room.warden?.destroyed),shooter.aiming,state.level),eventId=`${room.code}:shot:${++room.shotSequence}`;
   io.to(room.code).emit('match:shot',{roundId:room.roundId,eventId,id:shooter.id,origin,dir:base,weapon:id,...result});
   const confirmed:ConfirmedHit[]=[];
+  let wardenVictory=false;
   for(const raw of result.hits){
     const hit={...raw,damage:Math.round(raw.damage*multiplier)};
     if(hit.targetId===WARDEN_ID&&room.warden){
       const hitBoss=damageWarden(room.warden,shooter,hit.damage,time);
       if(!hitBoss)continue;
       confirmed.push({...hit,damage:hitBoss.damage,killed:hitBoss.killed});
-      if(hitBoss.recruited){shooter.blessingUntil=time+VOID_BLESSING.durationMs;wardenNotice(io,room,{kind:'recruited',name:shooter.name});}
+      if(hitBoss.recruited){
+        const scoreAwarded=hitBoss.scoreAwarded??0;
+        shooter.score+=scoreAwarded;
+        shooter.blessingUntil=time+VOID_BLESSING.durationMs;
+        wardenNotice(io,room,{kind:'recruited',name:shooter.name,scoreAwarded});
+        if(shooter.score>=SCORE_TARGET){wardenVictory=true;break;}
+      }
       else if(hitBoss.killed)wardenNotice(io,room,{kind:'destroyed',name:shooter.name});
       continue;
     }
@@ -163,7 +180,8 @@ export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   advanceWeaponReload(id,state,time);
   if(state.reloadUntil){shooter.aiming=false;shooter.input.aim=false;}
   if(confirmed.length)io.to(shooter.socketId??`offline:${shooter.id}`).emit('match:hit',{roundId:room.roundId,eventId,weapon:id,hits:confirmed});
-  if(confirmed.some(h=>h.killed))emitRoom(io,room);
+  if(wardenVictory)finishRound(io,room,'target');
+  else if(confirmed.some(h=>h.killed)&&room.state==='PLAYING')emitRoom(io,room);
 }
 export function step(io:Server,room:Room,dt:number){
   if(room.state!=='PLAYING'||expireRound(io,room))return;const time=now();room.tick++;room.environmentTime=advanceEnvironment(room.environmentTime,dt,true);
@@ -175,7 +193,7 @@ export function step(io:Server,room:Room,dt:number){
     p.sprinting=!!p.input.sprint;
     if(p.input.reload||state.reloadUntil>time||p.activeWeapon!=='sniper')p.input.aim=false;
     p.aiming=!!p.input.aim;
-    stepPlayer(p,{...p.input,lookX:0,lookY:0},dt,undefined,playerMoveScale(p.slowUntil,p.blessingUntil??0,time),(room.lastStep-room.wheelEpoch)/1000-dt);
+    stepPlayer(p,{...p.input,lookX:0,lookY:0},dt,staticArenaWorld(room.warden?.destroyed),playerMoveScale(p.slowUntil,p.blessingUntil??0,time),(room.lastStep-room.wheelEpoch)/1000-dt);
     p.lastProcessedSeq=p.lastReceivedSeq;
     for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(pickup.y+.9),p.z-pickup.z)<2){
       const result=collectWeapon(pickup.id,p.weapons[pickup.id],p.ownedWeapons.includes(pickup.id),time);
@@ -192,7 +210,8 @@ export function step(io:Server,room:Room,dt:number){
   if(room.warden)stepWarden(room.warden,room.lastStep,dt,(room.lastStep-room.wheelEpoch)/1000,room.players.values(),(victim,damage,from,attack)=>{
     const player=room.players.get(victim.id);if(player)applyWardenDamage(io,room,player,damage,from,attack);
   });
-  room.history.push({at:room.lastStep,simulationTime:(room.lastStep-room.wheelEpoch)/1000,warden:room.warden?.boss?{...room.warden.boss}:null,players:new Map([...room.players].map(([id,p])=>[id,{x:p.x,y:p.y,z:p.z,alive:p.alive,yaw:p.yaw,life:p.life}]))});while(room.history[0]?.at<time-300)room.history.shift();
+  if(room.state!=='PLAYING')return;
+  room.history.push({at:room.lastStep,simulationTime:(room.lastStep-room.wheelEpoch)/1000,warden:room.warden?.boss?{...room.warden.boss}:null,destroyed:room.warden?.destroyed,players:new Map([...room.players].map(([id,p])=>[id,{x:p.x,y:p.y,z:p.z,alive:p.alive,yaw:p.yaw,life:p.life}]))});while(room.history[0]?.at<time-300)room.history.shift();
   if(room.tick%3===0)emitSnapshot(io,room);
 }
 function clearRoom(room:Room){clearRespawns(room);clearGameOverTimer(room);clearWarden(room);for(const timer of room.reconnectTimers.values())clearTimeout(timer);room.reconnectTimers.clear();for(const id of room.players.keys())previousSpawns.delete(id);}

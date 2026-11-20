@@ -1,5 +1,6 @@
 ﻿import * as T from 'three';
 import { WARDEN_ATTACKS as moves, type WardenAttack, type WardenPoint } from '../../../shared/voidWarden';
+import { ARENA_BOUNDS } from '../../../shared/arena';
 import { disposeResources } from '../systems/DisposeResources';
 
 const segments=42;
@@ -48,6 +49,7 @@ export class WardenCombatFx {
     this.bolts.count=0;
     if(attack){
       const t=Math.max(0,(serverNow-attack.startedAt)*attack.rate);
+      const scale=attack.scale??1;
       const color=enraged?warning:amber;
       const {from,to}=attack;
       switch(attack.kind){
@@ -57,21 +59,21 @@ export class WardenCombatFx {
           if(index<0)break;
           const remaining=spec.impact[index]-t;
           const alpha=remaining>=0?.12+.19*(1-Math.min(1,remaining/550)):.38*(1+remaining/135);
-          this.fan(from,spec.range,attack.yaw,spec.angle,remaining<0?hit:color,alpha);
+          this.fan(from,spec.range*scale,attack.yaw,spec.angle,remaining<0?hit:color,alpha);
           break;
         }
         case 'dash': {
           const pulse=t>=moves.dash.windup;
           if(t<moves.dash.duration+145)
-            this.strip(from,to,moves.dash.width,pulse?hit:color,pulse?.31*(1-Math.max(0,t-moves.dash.duration)/145):.19);
+            this.strip(from,to,moves.dash.width*scale,pulse?hit:color,pulse?.31*(1-Math.max(0,t-moves.dash.duration)/145):.19);
           break;
         }
         case 'leap': {
           const impact=t-moves.leap.duration;
           if(impact<230){
-            this.fan(to,moves.leap.radius,0,Math.PI*2,impact>=0?hit:color,impact>=0?.42*(1-impact/230):.21);
+            this.fan(to,moves.leap.radius*scale,0,Math.PI*2,impact>=0?hit:color,impact>=0?.42*(1-impact/230):.21);
             if(impact>=0){
-              const radius=moves.leap.radius*(.28+.72*impact/230);
+              const radius=moves.leap.radius*scale*(.28+.72*impact/230);
               this.arc(to,radius,0,Math.PI*2,hit,.94*(1-impact/230),.16);
             }
           }
@@ -83,8 +85,8 @@ export class WardenCombatFx {
           if(t>spec.impact+210)break;
           const elapsed=(t-spec.launch)/(spec.impact-spec.launch);
           for(const [i,end] of rays.entries()){
-            if(elapsed<1)this.strip(from,end,.20,color,t<spec.launch?.16:.25);
-            this.fan(end,spec.radius,0,Math.PI*2,elapsed>=1?hit:color,elapsed>=1?.38*(1-(t-spec.impact)/210):.18);
+            if(elapsed<1)this.strip(from,end,spec.width*scale,color,t<spec.launch?.16:.25);
+            this.fan(end,spec.radius*scale,0,Math.PI*2,elapsed>=1?hit:color,elapsed>=1?.38*(1-(t-spec.impact)/210):.18);
             if(elapsed>=0&&elapsed<1){
               this.emitter.set(T.MathUtils.lerp(from.x,end.x,elapsed),from.y+.83,T.MathUtils.lerp(from.z,end.z,elapsed));
               this.boltMatrix.makeTranslation(this.emitter.x,this.emitter.y,this.emitter.z);
@@ -129,9 +131,9 @@ export class WardenCombatFx {
 
   private vertex(p:WardenPoint,color:T.Color,alpha:number){
     const offset=this.cursor*3;
-    this.positions[offset]=p.x;
-    this.positions[offset+1]=p.y+.065;
-    this.positions[offset+2]=p.z;
+    this.positions[offset]=T.MathUtils.clamp(p.x,ARENA_BOUNDS.minX,ARENA_BOUNDS.maxX);
+    this.positions[offset+1]=T.MathUtils.clamp(p.y+.065,-10,650);
+    this.positions[offset+2]=T.MathUtils.clamp(p.z,ARENA_BOUNDS.minZ,ARENA_BOUNDS.maxZ);
     this.colors[offset]=color.r;
     this.colors[offset+1]=color.g;
     this.colors[offset+2]=color.b;

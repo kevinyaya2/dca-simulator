@@ -1,12 +1,16 @@
 import type { ArenaBox } from './arena.js';
 import { cityBox } from './city.js';
+import { breakableSections } from './destruction.js';
 
 // A bespoke building, deliberately separate from the square city templates.
 export const GLASSHOUSE = { x:58, z:104, width:56, depth:24, floors:[0,6,12], roof:18, name:'CHROMA LAB' } as const;
 const structure:ArenaBox[]=[],glass:ArenaBox[]=[],details:ArenaBox[]=[];
 const white=0xe9edf1,steel=0x607987,trim=0x99d9df;
-const box=(target:ArenaBox[],x:number,z:number,w:number,d:number,top:number,bottom:number,color=white)=>
-  target.push(cityBox(x,z,w,d,top,color,bottom));
+const box=(target:ArenaBox[],x:number,z:number,w:number,d:number,top:number,bottom:number,color=white)=>{
+  const part=cityBox(x,z,w,d,top,color,bottom);
+  if(target===details)target.push(part);
+  else target.push(...breakableSections(part,`lab:${target===glass?'glass':'solid'}:${target.length}`));
+};
 
 // Upper levels project beyond the recessed ground-floor frontage.
 for(const top of [6,12,18])box(structure,58,104,56.8,24.8,top,top-.3);

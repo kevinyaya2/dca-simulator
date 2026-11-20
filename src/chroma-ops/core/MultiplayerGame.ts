@@ -5,7 +5,7 @@ import { PickupFeedback } from '../ui/PickupFeedback';
 import { WeaponAppearance } from '../weapons/WeaponAppearance';
 import { TacticalBoard } from '../ui/TacticalBoard';
 import { BASE_BOUNTY, SCORE_TARGET } from '../../../shared/bounty';
-import { arenaWorld } from '../../../shared/arena';
+import { arenaWorld, staticArenaWorld } from '../../../shared/arena';
 import { queryAim, aimFromPlayer } from '../../../shared/aim';
 import { AimFeedback } from '../ui/AimFeedback';
 import { disposeResources } from '../systems/DisposeResources';
@@ -36,11 +36,12 @@ import { WEAPON_IDS, WEAPON_SPECS, createWeaponStates, magazineCapacity, type We
 
 type Net={id:string;name:string;color:number;x:number;y:number;z:number;yaw:number;pitch:number;velocityY:number;jumpsUsed:number;hp:number;alive:boolean;score:number;bounty:number;kills:number;deaths:number;activeWeapon:WeaponId;ownedWeapons:WeaponId[];weapons:WeaponState;slowUntil:number;burnUntil:number;blessingUntil?:number;ack:number;supportId:number|null;aiming:boolean;sprinting:boolean};
 import { WardenEntrance } from '../boss/WardenEntrance';
-import { WARDEN_ATTACKS, playerMoveScale, type WardenAttackKind, type WardenNotice, type WardenSnapshot } from '../../../shared/voidWarden';
+import { WARDEN_ATTACKS, playerMoveScale, wardenOwner, type WardenAttackKind, type WardenNotice, type WardenSnapshot, type WardenSpawnWarning } from '../../../shared/voidWarden';
 import { WardenBlessingView } from '../boss/WardenBlessingView';
+import { projectRadarPoint, wardenRadarMarker } from '../ui/WardenRadar';
 
 type Pickup={id:WeaponId;x:number;y:number;z:number;available:boolean;respawnAt:number};
-type Snapshot={scoreTarget:number;endsAt:number;environmentTime:number;roundId:number;simulationTime:number;serverTime:number;tick:number;players:Net[];pickups:Pickup[];warden?:WardenSnapshot|null;byId?:Map<string,Net>};
+type Snapshot={scoreTarget:number;endsAt:number;environmentTime:number;roundId:number;simulationTime:number;serverTime:number;tick:number;players:Net[];pickups:Pickup[];warden?:WardenSnapshot|null;wardenWarning?:WardenSpawnWarning|null;destroyedBuildingParts?:string[];byId?:Map<string,Net>};
 type Command={roundId:number;seq:number;clientTime:number;moveX:number;moveY:number;yaw:number;pitch:number;jump:boolean;reload:boolean;sprint:boolean;aim:boolean};
 type PendingCommand=Command&{dt:number};
 
@@ -60,6 +61,7 @@ export class MultiplayerGame{
   private pickupPreview:PickupPreview;private pickupFeedback:PickupFeedback;private appearance:WeaponAppearance;
   private tacticalBoard:TacticalBoard;private scope:SniperScope;private physicsTime=0;private awaitingWeapon=false;
   private warden?:WardenEntrance;
+  private destroyedParts:ReadonlySet<string>=new Set();
   private blessing:WardenBlessingView;
   private blessingUntil=0;
   private snapshotInterval=50;private snapshotJitter=0;private lastSnapshotArrival=0;
@@ -96,7 +98,7 @@ export class MultiplayerGame{
   private serverNow(){return Date.now()-this.serverClockOffset;}
   private makeGun(){const barrel=new T.Mesh(new T.BoxGeometry(.18,.16,.9),this.gunMaterial);barrel.position.set(.34,-.28,-.8);const pieces:[[number,number,number],[number,number,number]][]=[[[.17,.48,.18],[.47,-.52,-.5]],[[.17,.43,.18],[.12,-.55,-.63]],[[.2,.18,.2],[.37,-.43,-.74]],[[.2,.18,.2],[.17,-.42,-.86]]];for(const[geo,pos]of pieces){const mesh=new T.Mesh(new T.BoxGeometry(...geo),this.handMaterial);mesh.position.set(...pos);this.gun.add(mesh);}this.gunFlash=new T.Mesh(new T.OctahedronGeometry(.08),new T.MeshBasicMaterial({color:0xffd45d}));this.gunFlash.position.set(.34,-.25,-1.3);this.gunFlash.visible=false;this.gun.add(barrel,this.gunFlash);this.cam.add(this.gun);this.scene.add(this.cam);}
   private makePickups(){for(const id of WEAPON_IDS){const spec=WEAPON_SPECS[id],mesh=new T.Mesh(new T.OctahedronGeometry(.75),new T.MeshBasicMaterial({color:spec.color}));mesh.visible=false;this.pickupMeshes.set(id,mesh);this.scene.add(mesh);}}
-  private simulate(state:SimPlayer,command:Command,dt:number,timeSeconds:number){state.yaw=command.yaw;state.pitch=command.pitch;stepPlayer(state,{moveX:command.moveX,moveY:command.moveY,lookX:0,lookY:0,jump:command.jump,sprint:command.sprint},dt,undefined,playerMoveScale(this.slowUntil,this.blessingUntil,command.clientTime),timeSeconds);}
+  private simulate(state:SimPlayer,command:Command,dt:number,timeSeconds:number){state.yaw=command.yaw;state.pitch=command.pitch;stepPlayer(state,{moveX:command.moveX,moveY:command.moveY,lookX:0,lookY:0,jump:command.jump,sprint:command.sprint},dt,staticArenaWorld(this.destroyedParts),playerMoveScale(this.slowUntil,this.blessingUntil,command.clientTime),timeSeconds);}
   private predict(command:Command,dt:number){const state={x:this.player.position.x,y:this.player.position.y,z:this.player.position.z,yaw:this.player.yaw,pitch:this.player.pitch,velocityY:this.player.velocityY,supportId:this.player.supportId,jumpsUsed:this.player.jumpsUsed,alive:this.player.alive};this.simulate(state,command,dt,this.physicsTime);this.physicsTime+=dt;this.player.position.set(state.x,state.y,state.z);this.player.yaw=state.yaw;this.player.pitch=state.pitch;this.player.velocityY=state.velocityY;this.player.jumpsUsed=state.jumpsUsed;this.player.supportId=state.supportId??null;}
 
   private onSnapshot=(snapshot:Snapshot)=>{
@@ -105,6 +107,10 @@ export class MultiplayerGame{
     const firstSnapshot=!this.ready;this.ready=true;
     const arrival=performance.now();if(this.lastSnapshotArrival){const interval=arrival-this.lastSnapshotArrival;this.snapshotJitter=this.snapshotJitter*.8+Math.abs(interval-this.snapshotInterval)*.2;this.snapshotInterval=this.snapshotInterval*.85+interval*.15;}this.lastSnapshotArrival=arrival;
     snapshot.byId=new Map(snapshot.players.map(player=>[player.id,player]));this.snaps.push(snapshot);while(this.snaps.length>12)this.snaps.shift();
+    const parts=snapshot.destroyedBuildingParts??[];
+    if(parts.length!==this.destroyedParts.size||parts.some(part=>!this.destroyedParts.has(part))){
+      this.destroyedParts=new Set(parts);this.arena.setDestroyed(this.destroyedParts);
+    }
     const me=snapshot.byId.get(this.playerId);if(!me)return;if(firstSnapshot)this.seq=Math.max(this.seq,me.ack);const wasAlive=this.player.alive,respawned=!wasAlive&&me.alive;this.slowUntil=me.slowUntil;this.blessingUntil=me.alive?(me.blessingUntil??0):0;
     this.pending=this.pending.filter(command=>command.seq>me.ack);if(firstSnapshot||wasAlive!==me.alive){this.pending.length=0;this.armory.close(false);this.input.reset();this.mobile?.reset();this.desktop?.setEnabled(!this.paused&&!this.settings?.isOpen);}
     this.visualPosition.copy(this.player.position).add(this.cameraOffset);
@@ -124,7 +130,83 @@ export class MultiplayerGame{
   private syncPickups(pickups:Pickup[]){for(const pickup of pickups){const mesh=this.pickupMeshes.get(pickup.id);if(!mesh)continue;mesh.position.set(pickup.x,pickup.y+.9,pickup.z);mesh.visible=pickup.available;}}
 
   private sizeRadar(){const rect=this.radarCanvas?.getBoundingClientRect();if(!rect?.width||!rect.height)return;const ratio=Math.min(window.devicePixelRatio||1,1.5),width=Math.round(rect.width*ratio),height=Math.round(rect.height*ratio);if(this.radarCanvas.width!==width||this.radarCanvas.height!==height){this.radarCanvas.width=width;this.radarCanvas.height=height;}}
-  private drawRadar(dt:number){this.radarTimer+=dt;if(this.radarTimer<1/30)return;this.radarTimer%=1/30;const canvas=this.radarCanvas,rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;this.sizeRadar();const ratio=canvas.width/rect.width,ctx=this.radarContext,width=rect.width,height=rect.height,cx=width/2,cy=height/2+4,radius=Math.min(width,height)*.38;ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,width,height);ctx.strokeStyle='#ffffff24';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.moveTo(cx-radius,cy);ctx.lineTo(cx+radius,cy);ctx.moveTo(cx,cy-radius);ctx.lineTo(cx,cy+radius);ctx.stroke();ctx.fillStyle='#dfffff';ctx.font='800 9px Arial';ctx.fillText('戰術雷達',8,14);const feet=this.player.position.y-1.65,floor=feet< -2?'B1':feet>=9?'RF':feet>=3?'2F':'1F';this.radarCanvas.setAttribute('aria-label',`Radar ${floor}`);ctx.fillText(floor,60,14);const cos=Math.cos(this.player.yaw),sin=Math.sin(this.player.yaw);for(const player of this.radarPlayers.values()){if(player.id===this.playerId||!player.alive)continue;const avatar=this.avatars.get(player.id),x=avatar?.position.x??player.x,z=avatar?.position.z??player.z,dx=x-this.player.position.x,dz=z-this.player.position.z,distance=Math.max(.001,Math.hypot(dx,dz));const right=dx*cos-dz*sin,forward=-dx*sin-dz*cos,scale=radius*Math.min(distance/70,1)/distance,px=cx+right*scale,py=cy-forward*scale;ctx.beginPath();ctx.arc(px,py,distance>70?5:4,0,Math.PI*2);ctx.fillStyle=`#${player.color.toString(16).padStart(6,'0')}`;ctx.fill();const dy=player.y-this.player.position.y;if(Math.abs(dy)>2.5){ctx.fillStyle='#fff';ctx.fillText(String.fromCodePoint(dy>0?0x25b2:0x25bc),px-4,py-7);}if(distance>70){ctx.strokeStyle='#ffffffcc';ctx.lineWidth=1.5;ctx.stroke();}}ctx.save();ctx.translate(cx,cy);ctx.fillStyle='#fff';ctx.shadowColor='#55f1ae';ctx.shadowBlur=7;ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(5,6);ctx.lineTo(0,3);ctx.lineTo(-5,6);ctx.closePath();ctx.fill();ctx.restore();}
+  private drawRadar(dt:number){
+    this.radarTimer+=dt;
+    if(this.radarTimer<1/30)return;
+    this.radarTimer%=1/30;
+    const canvas=this.radarCanvas,rect=canvas.getBoundingClientRect();
+    if(!rect.width||!rect.height)return;
+    this.sizeRadar();
+    const latest=this.snaps[this.snaps.length-1];
+    const royal=wardenOwner(latest?.warden);
+    const marker=wardenRadarMarker(latest?.warden??null,latest?.wardenWarning??null,this.playerId);
+    const ratio=canvas.width/rect.width,ctx=this.radarContext,width=rect.width,height=rect.height;
+    const cx=width/2,cy=height/2+(marker?2:4),radius=Math.min(width,height)*(marker ? .32 : .38);
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    ctx.clearRect(0,0,width,height);
+    ctx.strokeStyle='#ffffff24';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.moveTo(cx-radius,cy);ctx.lineTo(cx+radius,cy);
+    ctx.moveTo(cx,cy-radius);ctx.lineTo(cx,cy+radius);
+    ctx.stroke();
+    ctx.fillStyle='#dfffff';
+    ctx.font='800 9px Arial';
+    ctx.fillText('戰術雷達',8,14);
+    const feet=this.player.position.y-1.65,floor=feet< -2?'B1':feet>=9?'RF':feet>=3?'2F':'1F';
+    const label='戰術雷達 '+floor+(marker?' · '+marker.label:'');
+    if(canvas.getAttribute('aria-label')!==label)canvas.setAttribute('aria-label',label);
+    ctx.fillText(floor,60,14);
+    const cos=Math.cos(this.player.yaw),sin=Math.sin(this.player.yaw);
+    const project=(x:number,z:number)=>projectRadarPoint(x-this.player.position.x,z-this.player.position.z,cos,sin,radius);
+    const writeHeight=(difference:number,x:number,y:number)=>{
+      if(Math.abs(difference)<=2.5)return;
+      ctx.fillStyle='#fff';
+      ctx.fillText(difference>0?'▲':'▼',x-4,y-8);
+    };
+    const drawCrown=(x:number,y:number)=>{
+      ctx.fillStyle='#bf65ff';ctx.strokeStyle='#f2ccff';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x-6,y-5);ctx.lineTo(x-3,y-3);ctx.lineTo(x,y-8);
+      ctx.lineTo(x+3,y-3);ctx.lineTo(x+6,y-5);ctx.lineTo(x+4,y+1);ctx.lineTo(x-4,y+1);
+      ctx.closePath();ctx.fill();ctx.stroke();
+    };
+    for(const player of this.radarPlayers.values()){
+      if(player.id===this.playerId||!player.alive)continue;
+      const avatar=this.avatars.get(player.id);
+      const {x,y,offRadar}=project(avatar?.position.x??player.x,avatar?.position.z??player.z);
+      const px=cx+x,py=cy+y;
+      ctx.beginPath();
+      ctx.arc(px,py,offRadar?5:4,0,Math.PI*2);
+      ctx.fillStyle='#'+player.color.toString(16).padStart(6,'0');
+      ctx.fill();
+      if(offRadar){ctx.strokeStyle='#ffffffcc';ctx.lineWidth=1.5;ctx.stroke();}
+      if(player.id===royal)drawCrown(px,py);
+      writeHeight(player.y-this.player.position.y,px,py);
+    }
+    if(marker){
+      const {x,y,offRadar}=project(marker.x,marker.z);
+      const px=cx+x,py=cy+y;
+      ctx.beginPath();
+      ctx.moveTo(px,py-7);ctx.lineTo(px+7,py);ctx.lineTo(px,py+7);ctx.lineTo(px-7,py);ctx.closePath();
+      ctx.fillStyle=marker.pending?'#172742':marker.color;
+      ctx.fill();
+      ctx.lineWidth=offRadar?2.2:1.6;
+      ctx.strokeStyle=marker.pending?marker.color:'#2f1723';
+      ctx.stroke();
+      writeHeight(marker.y-feet,px,py);
+      ctx.fillStyle=marker.color;
+      ctx.fillText('◆ '+marker.label,8,height-5);
+    }
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.fillStyle='#fff';
+    ctx.shadowColor='#55f1ae';ctx.shadowBlur=7;
+    ctx.beginPath();
+    ctx.moveTo(0,-7);ctx.lineTo(5,6);ctx.lineTo(0,3);ctx.lineTo(-5,6);
+    ctx.closePath();ctx.fill();ctx.restore();
+    if(royal===this.playerId&&this.player.alive)drawCrown(cx,cy-9);
+  }
 
   private onShot=(shot:RoundEvent<ShotEvent>)=>{
     if(this.disposed||this.paused||!this.ready||!isCurrentRound(shot,this.roundId))return;
@@ -139,7 +221,15 @@ export class MultiplayerGame{
   };
   private onHit=(event:RoundEvent<HitConfirmation>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.hit(event);};
   private onKill=(event:RoundEvent<MultiplayerKillEvent>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.kill(event);};
-  private onDamage=(damage:{roundId:number;from:{x:number;z:number};hp:number;damage:number;name:string;weapon?:WeaponId;wardenAttack?:WardenAttackKind})=>{if(this.disposed||this.paused||!this.ready||!isCurrentRound(damage,this.roundId))return;this.player.hp=damage.hp;this.killer=damage.name;this.notice=damage.wardenAttack?'? '+damage.name+' ?'+WARDEN_ATTACKS[damage.wardenAttack].name+'??':damage.weapon?'? '+damage.name+' ?? '+WEAPON_SPECS[damage.weapon].label+' ??':'? '+damage.name+' ??';this.noticeT=.8;this.feedback.damage(damage.damage,new T.Vector3(damage.from.x,0,damage.from.z),this.player.position,new T.Vector3(-Math.sin(this.player.yaw),0,-Math.cos(this.player.yaw)));};
+  private onDamage=(damage:{roundId:number;from:{x:number;z:number};hp:number;damage:number;name:string;weapon?:WeaponId;wardenAttack?:WardenAttackKind})=>{
+    if(this.disposed||this.paused||!this.ready||!isCurrentRound(damage,this.roundId))return;
+    this.player.hp=damage.hp;
+    this.killer=damage.name;
+    const attack=damage.wardenAttack?WARDEN_ATTACKS[damage.wardenAttack].name:damage.weapon?WEAPON_SPECS[damage.weapon].label:'';
+    this.notice=attack?`遭 ${damage.name} 的 ${attack} 擊中`:`遭 ${damage.name} 擊中`;
+    this.noticeT=.8;
+    this.feedback.damage(damage.damage,new T.Vector3(damage.from.x,0,damage.from.z),this.player.position,new T.Vector3(-Math.sin(this.player.yaw),0,-Math.cos(this.player.yaw)));
+  };
   private onWardenNotice=(event:RoundEvent<WardenNotice>)=>{
     if(!this.disposed&&!this.paused&&isCurrentRound(event,this.roundId))this.blessing.announce(event,this.serverNow());
   };
@@ -150,9 +240,11 @@ export class MultiplayerGame{
 
   private updateWarden(dt:number){
     const latest=this.snaps[this.snaps.length-1];
+    const serverTime=this.hasClockOffset?this.serverNow():latest?.serverTime??this.serverNow();
+    if(this.blessing.showSpawnWarning(latest?.wardenWarning??null,serverTime))this.battle.wardenWarning();
     if(!latest?.warden){this.warden?.dispose();this.warden=undefined;return;}
     this.warden??=new WardenEntrance(this.scene,this.root,this.coarse,this.playerId);
-    this.warden.update(latest.warden,this.hasClockOffset ? this.serverNow() : latest.serverTime,dt);
+    this.warden.update(latest.warden,serverTime,dt);
   }
 
   private update(dt:number){
@@ -171,11 +263,11 @@ export class MultiplayerGame{
     let firedLocal=false;
     const spec=WEAPON_SPECS[this.active],state=this.weapons[this.active],time=this.serverNow();if(this.player.alive&&input.shoot&&!blocked&&!this.awaitingWeapon&&time-this.lastLocalShot>=spec.fireDelay*1000&&state.ammo>0&&state.reloadUntil<=time){firedLocal=true;this.recoilPitch=Math.min(.04,this.recoilPitch+.009);this.recoilYaw=clamp(this.recoilYaw+(this.seq%2?.0025:-.0025),-.012,.012);navigator.vibrate?.(8);this.socket.emit('match:fire',{roundId:this.roundId,seq:command.seq});this.lastLocalShot=time;}
     this.updateWarden(dt);
-    this.updateRemotePlayers(dt);this.blessing.update(this.radarPlayers.values(),this.avatars,this.blessingUntil,this.serverNow());for(const mesh of this.pickupMeshes.values())mesh.rotation.y+=dt*2;this.drawRadar(dt);
+    this.updateRemotePlayers(dt);this.blessing.update(this.radarPlayers.values(),this.avatars,this.blessingUntil,this.serverNow(),wardenOwner(this.snaps[this.snaps.length-1]?.warden),this.playerId);for(const mesh of this.pickupMeshes.values())mesh.rotation.y+=dt*2;this.drawRadar(dt);
     this.noticeT=Math.max(0,this.noticeT-dt);this.effects.update(dt);this.feedback.update(dt,this.player.hp);const recoilDecay=Math.exp(-dt*16);this.recoilPitch*=recoilDecay;this.recoilYaw*=recoilDecay;const horizontalDecay=Math.pow(.5,dt/.12),verticalDecay=Math.pow(.5,dt/.08),moving=this.moveIntent.lengthSq()>.01,correctionAlongMove=(-this.cameraOffset.x)*this.moveIntent.x+(-this.cameraOffset.z)*this.moveIntent.z;if(!moving||correctionAlongMove>=0){this.cameraOffset.x*=horizontalDecay;this.cameraOffset.z*=horizontalDecay;}this.cameraOffset.y*=verticalDecay;if(this.cameraOffset.lengthSq()<1e-6)this.cameraOffset.set(0,0,0);this.visualPosition.copy(this.player.position);if(!aiming)this.visualPosition.add(this.cameraOffset);this.cam.position.copy(this.visualPosition);this.cam.rotation.set(this.player.pitch,this.player.yaw,0,'YXZ');this.gun.rotation.set(this.recoilPitch,this.recoilYaw,0);this.gun.position.z=this.recoilPitch*2;
     const reloading=state.reloadUntil>this.serverNow();this.appearance.update(this.active,state.level);this.pickupFeedback.update(dt);this.hud.render({quickReloadSeconds:Math.max(0,Math.ceil((state.quickReloadUntil-this.serverNow())/1000)),level:state.level,capacity:magazineCapacity(this.active,state.level),hp:this.player.hp,ammo:state.ammo,reserve:Infinity,label:spec.label,notice:this.noticeT?this.notice:'',kills:this.kills,deaths:this.deaths,dead:this.dead,killer:this.killer,hit:false,kill:false,reloading,score:this.score,bounty:this.bounty,scoreTarget:this.scoreTarget,remainingSeconds:Math.max(0,Math.ceil((this.endsAt-this.serverNow())/1000))});this.cam.updateMatrixWorld(true);this.battle.update(dt,this.cam);
     this.statusTimer+=dt;if(this.statusTimer>=.08){this.statusTimer=0;const time=this.serverNow();for(const p of this.radarPlayers.values())if(p.alive&&(p.burnUntil>time||p.slowUntil>time)){const avatar=this.avatars.get(p.id);if(avatar)this.effects.status(avatar.position.clone().add(new T.Vector3(0,1.22,0)),p.burnUntil>time?'flame':'ice');}}
-    this.arena.update(this.physicsTime,environmentAtSnapshot(this.snaps[this.snaps.length-1],this.serverNow()),this.renderer);const aim=aimFromPlayer({x:this.player.position.x,y:this.player.position.y,z:this.player.position.z,yaw:this.player.yaw,pitch:this.player.pitch});const targets:import('../../../shared/combat').Combatant[]=[...this.avatars].map(([id,avatar])=>({id,x:avatar.position.x,y:avatar.position.y+1.65,z:avatar.position.z,yaw:avatar.group.rotation.y,alive:avatar.alive}));const effectWorld=arenaWorld(this.physicsTime);
+    this.arena.update(this.physicsTime,environmentAtSnapshot(this.snaps[this.snaps.length-1],this.serverNow()),this.renderer);const aim=aimFromPlayer({x:this.player.position.x,y:this.player.position.y,z:this.player.position.z,yaw:this.player.yaw,pitch:this.player.pitch});const targets:import('../../../shared/combat').Combatant[]=[...this.avatars].map(([id,avatar])=>({id,x:avatar.position.x,y:avatar.position.y+1.65,z:avatar.position.z,yaw:avatar.group.rotation.y,alive:avatar.alive}));const effectWorld=arenaWorld(this.physicsTime,this.destroyedParts);
     const warden=this.snaps[this.snaps.length-1]?.warden;
     const bossTarget=warden&&this.warden?.target(warden,this.playerId);if(bossTarget)targets.push(bossTarget);
     const muzzle=weaponMuzzle(this.gunFlash,this.active);

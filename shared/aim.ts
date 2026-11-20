@@ -19,7 +19,7 @@ export function queryAim(id:WeaponId,origin:Vec3,direction:Vec3,targets:readonly
   let visibleDistance=Infinity;
   for(const target of targets){
     if(!target.alive)continue;
-    for(const sample of flameTargetPoints(target)){
+    for(const sample of flameTargetPoints(target,origin)){
       const x=sample[0]-origin[0],y=sample[1]-origin[1],z=sample[2]-origin[2],distance=Math.hypot(x,y,z);
       if(distance<.001||distance>previewRange)continue;
       const dir={x:x/distance,y:y/distance,z:z/distance};

@@ -3,10 +3,11 @@ import { WHEEL_SUPPORTS } from './ferrisWheel.js';
 import { movingBoxes, platformPosition, supportingPlatform } from './movingPlatforms.js';
 import { CITY_BOXES, CITY_PROPS, CITY_SPAWNS, CITY_BUILDINGS, cityRampHeight } from './city.js';
 import { GLASSHOUSE_BOXES } from './glasshouse.js';
-export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number };
+import { breakableSections, intactBox } from './destruction.js';
+export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number;breakKey?:string };
 export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean; sprint?: boolean; aim?: boolean };
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
-export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number };
+export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number;destroyed?:ReadonlySet<string> };
 export const ARENA_BOUNDS = { minX: -154, maxX: 154, minZ: -140, maxZ: 140, width: 308, depth: 280 } as const;
 export const ARENA_CAMERA_FAR = 560;
 export const PLAYER_MOVE_SPEED = 8;
@@ -26,15 +27,27 @@ export const ARENA_BOXES: ArenaBox[] = [
   ...WHEEL_SUPPORTS,...CITY_BOXES,...CITY_PROPS,...MALL_BOXES,...GLASSHOUSE_BOXES,
   rect(-152,0,4,280,19,0x2d58c8), rect(152,0,4,280,19,0xec3478),
   rect(0,-138,308,4,17,0xf3a72d), rect(0,138,308,4,17,0x35c955),
+  ...[
   rect(0,-3,6,6,3,0xf04b55), rect(-22,13,8,3,2,0xffb738),
   rect(24,-14,8,3,2,0x4b75e8), rect(-3,20,3,8,2,0x7a4bd5), rect(5,-25,3,8,2,0x35c955),
   rect(-40,-8,12,2,4,0x8d55d5), rect(-34,-19,2,18,4,0x8d55d5), rect(-49,-19,2,18,4,0x8d55d5),
   rect(42,10,13,2,4,0xef4c7b), rect(36,20,2,18,4,0xef4c7b), rect(49,20,2,18,4,0xef4c7b),
   rect(-43,-34,4,4,2,0xffc330), rect(42,34,4,4,2,0x35c955),
   rect(-12,92,32,3,3,0x35c955),
+  ].flatMap((box,index)=>breakableSections(box,`cover:${index}`)),
 ];
-export function arenaWorld(seconds:number):SimWorld {
-  return {boxes:[...ARENA_BOXES,...movingBoxes(seconds)],heightAt:terrainHeight};
+export function staticArenaWorld(destroyed?:ReadonlySet<string>):SimWorld {
+  return {boxes:ARENA_BOXES,heightAt:terrainHeight,destroyed};
+}
+const filteredArenas=new WeakMap<ReadonlySet<string>,ArenaBox[]>();
+export function arenaWorld(seconds:number,destroyed?:ReadonlySet<string>):SimWorld {
+  let boxes=ARENA_BOXES;
+  if(destroyed?.size){
+    const cached=filteredArenas.get(destroyed);
+    boxes=cached??ARENA_BOXES.filter(box=>intactBox(box,destroyed));
+    if(!cached)filteredArenas.set(destroyed,boxes);
+  }
+  return {boxes:[...boxes,...movingBoxes(seconds)],heightAt:terrainHeight};
 }
 export function groundHeight(x: number, z: number) {
   const ramp=cityRampHeight(x,z);if(ramp!==null)return ramp;
@@ -92,6 +105,7 @@ export function rayWallDistance(origin: {x:number;y:number;z:number}, direction:
 export function supportHeight(x: number, z: number, ceiling: number, world: SimWorld={boxes:ARENA_BOXES,heightAt:terrainHeight}) {
   let height = world.heightAt(x,z);
   for (const box of world.boxes===ARENA_BOXES?arenaBoxesNear(x,z):world.boxes) {
+    if(!intactBox(box,world.destroyed))continue;
     if(box.maxY <= ceiling+EPSILON && overlapsBox(x,z,box)) height=Math.max(height,box.maxY);
   }
   return height;
@@ -99,7 +113,7 @@ export function supportHeight(x: number, z: number, ceiling: number, world: SimW
 export function stepPlayer(player: SimPlayer, input: SimInput, dt: number,
   world: SimWorld = { boxes: ARENA_BOXES, heightAt: terrainHeight }, moveScale=1, timeSeconds?:number) {
   if(!player.alive)return;
-  if(world.boxes===ARENA_BOXES)world={...world,boxes:arenaBoxesNear(player.x,player.z,7)};
+  if(world.boxes===ARENA_BOXES)world={...world,boxes:arenaBoxesNear(player.x,player.z,7).filter(box=>intactBox(box,world.destroyed))};
   const staticWorld=world;
   if(timeSeconds!==undefined)world={...staticWorld,boxes:[...staticWorld.boxes,...movingBoxes(timeSeconds)]};
   player.yaw-=input.lookX*.0024;

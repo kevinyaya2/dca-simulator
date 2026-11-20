@@ -19,6 +19,7 @@ export class WardenEntrance {
   private readonly hud = document.createElement('div');
   private readonly allegiance = document.createElement('small');
   private readonly warning = document.createElement('small');
+  private readonly growth = document.createElement('small');
   private readonly meter = document.createElement('progress');
   private readonly combat:WardenCombatFx;
   private readonly ownerRing = new T.Mesh(new T.RingGeometry(1.03,1.18,42),new T.MeshBasicMaterial({
@@ -129,7 +130,8 @@ export class WardenEntrance {
     this.meter.setAttribute('aria-label',`${VOID_WARDEN.name}生命值`);
     this.allegiance.className='co-warden-allegiance';
     this.warning.className='co-warden-warning';
-    this.hud.append(name,this.meter,this.allegiance,this.warning);
+    this.growth.className='co-warden-growth';
+    this.hud.append(name,this.meter,this.allegiance,this.growth,this.warning);
     root.append(this.title,this.hud);
   }
 
@@ -143,15 +145,21 @@ export class WardenEntrance {
     this.hud.classList.toggle('is-infected',boss.phaseTwo&&!boss.ownerId);
     this.hud.classList.toggle('is-allied',!!boss.ownerId);
     this.hud.classList.toggle('is-owned',boss.ownerId===this.localId);
-    const allegiance=boss.ownerId?`◆ ${boss.ownerId===this.localId?'你的隊友':boss.ownerName??'已收編'} · ${Math.max(0,Math.ceil((boss.alliedUntil-serverNow)/1000))}s`
+    const allegiance=boss.ownerId?`◆ ${boss.ownerId===this.localId?'你的隊友':boss.ownerName??'已收編'}`
       : boss.enraged?'狂暴':boss.phaseTwo?'感染階段':'';
     if(this.allegiance.textContent!==allegiance)this.allegiance.textContent=allegiance;
+    const size=boss.scale??1;
+    const scaleLabel=size>=1000?size.toExponential(1):size.toFixed(2);
+    const growth=boss.ownerId?`體型 ×${scaleLabel}`:`賞金 ${boss.heldBounty??0} · 體型 ×${scaleLabel}`;
+    if(this.growth.textContent!==growth)this.growth.textContent=growth;
     const warning=boss.state==='ATTACK'&&boss.attack?WARDEN_ATTACKS[boss.attack.kind].name:boss.state==='ENRAGED'?'自刺狂暴':'';
     if(this.warning.textContent!==warning)this.warning.textContent=warning;
     this.ownerRing.visible=!!boss.ownerId&&boss.state!=='DESPAWN'&&boss.state!=='DEFEATED';
     this.effects.visible=intro;
     this.model.group.visible=!intro||elapsed>=cue.reveal;
     const group=this.model.group;
+    const collapse=boss.state==='DESPAWN'?Math.max(.001,1-fade(serverNow-boss.stateAt,260,VOID_WARDEN.collapseMs)):1;
+    group.scale.setScalar(Math.min(size,1e20)*collapse);
     this.destination.set(boss.x,boss.y+(boss.air??0),boss.z);
     if(!this.initialized||intro){
       group.position.copy(this.destination);
@@ -163,6 +171,7 @@ export class WardenEntrance {
       group.rotation.y+=Math.atan2(Math.sin(boss.yaw-group.rotation.y),Math.cos(boss.yaw-group.rotation.y))*blend;
     }
     this.ownerRing.position.set(group.position.x,boss.y+.07,group.position.z);
+    this.ownerRing.scale.setScalar(Math.min(size,420));
     this.ownerRing.material.color.setHex(boss.ownerId===this.localId?0x52ffe0:0x7fafff);
     if(intro){
       const release=fade(elapsed,cue.breakChains,cue.land);
@@ -173,7 +182,7 @@ export class WardenEntrance {
     }
     this.motionTime+=dt;
     const stateElapsed=Math.max(0,serverNow-boss.stateAt);
-    const moving=boss.state==='CHASE'||group.position.distanceToSquared(this.destination)>.012;
+    const moving=boss.state==='CHASE'||boss.state==='PATROL'||group.position.distanceToSquared(this.destination)>.012;
     const strike=boss.attack?Math.max(0,(serverNow-boss.attack.startedAt)*boss.attack.rate):0;
     if(boss.attack&&(boss.state==='ATTACK'||boss.state==='STAGGER'&&strike<WARDEN_ATTACKS[boss.attack.kind].duration+150))
       this.model.combatPose(boss.attack.kind,strike,boss.enraged);
@@ -186,8 +195,6 @@ export class WardenEntrance {
     if(boss.state==='ATTACK'&&boss.attack?.kind==='burst'&&strike>=WARDEN_ATTACKS.burst.launch)
       infection=(strike-WARDEN_ATTACKS.burst.launch)/1000;
     this.model.updateParticles(this.motionTime,infection,this.sparkCount<50);
-    const scale=boss.state==='DESPAWN'?Math.max(.001,1-fade(stateElapsed,260,VOID_WARDEN.collapseMs)):1;
-    this.model.group.scale.setScalar(scale);
     this.model.bladeBase.getWorldPosition(this.left);
     this.model.bladeTip.getWorldPosition(this.right);
     this.combat.update(boss.attack,serverNow,boss.enraged,this.left,this.right);
@@ -264,7 +271,7 @@ export class WardenEntrance {
   target(boss:WardenSnapshot,playerId:string):Combatant|null {
     if(!wardenCanBeHit(boss,playerId))return null;
     const {position,rotation}=this.model.group;
-    return {id:WARDEN_ID,x:position.x,y:position.y+PLAYER_EYE_HEIGHT,z:position.z,yaw:rotation.y,alive:true,kind:'warden'};
+    return {id:WARDEN_ID,x:position.x,y:position.y+PLAYER_EYE_HEIGHT,z:position.z,yaw:rotation.y,alive:true,kind:'warden',scale:boss.scale};
   }
 
   dispose() {
