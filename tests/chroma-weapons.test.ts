@@ -223,7 +223,9 @@ test('network: empty AR auto reloads without input; snapshots and reconnect reta
     assert.ok(snapshot.pickups.some((p:any)=>p.id==='ar'));
     const player=(s:any)=>s.players.find((p:any)=>p.id===seat.playerId);
     for(let i=0;i<30;i++){
-      const shot=event(a,'match:shot',s=>s.id===seat.playerId);a.emit('match:fire',{roundId:snapshot.roundId,clientTime:Date.now()});await shot;
+      const shot=event(a,'match:shot',s=>s.id===seat.playerId);
+      a.emit('match:input',{roundId:snapshot.roundId,seq:i+1,clientTime:Date.now(),moveX:0,moveY:0,yaw:0,pitch:0});
+      a.emit('match:fire',{roundId:snapshot.roundId,seq:i+1});await shot;
       if(i<29)await new Promise(resolve=>setTimeout(resolve,120));
     }
     const emptySnapshot=await event(a,'match:snapshot',s=>player(s).weapons.ar.ammo===0);

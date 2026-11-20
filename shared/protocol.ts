@@ -1,4 +1,4 @@
-export const MULTIPLAYER_PROTOCOL_VERSION = 13;
+export const MULTIPLAYER_PROTOCOL_VERSION = 15;
 import type { KillEvent } from './combat.js';
 export type MultiplayerKillEvent = KillEvent & { scoreAwarded:number; attackerBounty:number; victimBounty:number };
 export type RoundEvent<T> = T & { roundId:number };

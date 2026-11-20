@@ -1,7 +1,7 @@
 import { ARENA_BOXES, terrainHeight, PLAYER_EYE_HEIGHT, rayBoxDistance, rayWallDistance, type SimWorld } from './arena.js';
 import { WEAPON_SPECS, weaponRange, weaponDamageMultiplier, type WeaponLevel, type WeaponId } from './weapons.js';
 export type Vec3=[number,number,number];
-export type Combatant={id:string;x:number;y:number;z:number;yaw:number;alive:boolean};
+export type Combatant={id:string;x:number;y:number;z:number;yaw:number;alive:boolean;kind?:'warden'};
 export type ShotRay={dir:Vec3;end:Vec3;kind:'range'|'wall'|'body'|'head';targetId?:string};
 export type PlannedHit={targetId:string;damage:number;headshot:boolean;position:Vec3};
 export type ShotResult={rays:ShotRay[];hits:PlannedHit[]};
@@ -19,6 +19,7 @@ export const along=(origin:Vec3,dir:Vec3,t:number):Vec3=>[origin[0]+dir[0]*t,ori
 export const FLAME_CONE_ANGLE=12*Math.PI/180;
 export function flameTargetPoints(target:Combatant):Vec3[]{
   const feet=target.y-PLAYER_EYE_HEIGHT;
+  if(target.kind==='warden')return [[0,1,0],[0,2.35,0],[0,3.55,0],[-.49,2.6,0],[.49,2.6,0]].map(([x,y,z])=>[target.x+x,feet+y,target.z+z]);
   return [[0,1.22,0],[0,1.92,0],[-.28,1.22,0],[.28,1.22,0],[0,.46,0]].map(([x,y,z])=>[target.x+x,feet+y,target.z+z]);
 }
 export const aimDirection=(yaw:number,pitch:number):Vec3=>[-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
@@ -36,6 +37,10 @@ export function intersectCharacter(origin:Vec3,dir:Vec3,target:Combatant,max:num
   const c=Math.cos(target.yaw),s=Math.sin(target.yaw),dx=origin[0]-target.x,dz=origin[2]-target.z;
   const o={x:c*dx-s*dz,y:origin[1]-(target.y-PLAYER_EYE_HEIGHT),z:s*dx+c*dz};
   const d={x:c*dir[0]-s*dir[2],y:dir[1],z:s*dir[0]+c*dir[2]};
+  if(target.kind==='warden'){
+    const distance=rayBoxDistance(o,d,{minX:-.77,maxX:.77,minY:.12,maxY:4.7,minZ:-.63,maxZ:.59},max);
+    return distance===null?undefined:{distance,kind:'body' as const};
+  }
   // Rest-pose boxes match the actual head, torso, arms, and legs. Animation is cosmetic.
   const regions=[
     {kind:'head' as const,minX:-.26,maxX:.26,minY:1.66,maxY:2.18,minZ:-.26,maxZ:.26},
@@ -80,9 +85,15 @@ export function resolveShot(id:WeaponId,origin:Vec3,base:Vec3,targets:Combatant[
     if(id==='rocket'){
       const ray=rays[0];if(ray.kind!=='range'){
         const explosion=along(ray.end,ray.dir,-.06);
-        for(const target of targets){if(!target.alive)continue;const position:Vec3=[target.x,target.y-PLAYER_EYE_HEIGHT+1.22,target.z],delta=sub(position,explosion),distance=length(delta);
-          if(target.id===ray.targetId)add(target.id,Math.round(damage),false,ray.end);
-          else if(distance<(spec.splash??0)&&rayWallDistance(point(explosion),point(normalize(delta)),distance,simulationWorld)>=distance-.001)add(target.id,Math.max(1,Math.round(damage*(1-distance/spec.splash!))),false,position);
+        for(const target of targets){if(!target.alive)continue;
+          if(target.id===ray.targetId){add(target.id,Math.round(damage),false,ray.end);continue;}
+          const samples=target.kind==='warden'?flameTargetPoints(target):[[target.x,target.y-PLAYER_EYE_HEIGHT+1.22,target.z] as Vec3];
+          let nearest=spec.splash??0,position:Vec3|undefined;
+          for(const sample of samples){
+            const delta=sub(sample,explosion),distance=length(delta);
+            if(distance<nearest&&rayWallDistance(point(explosion),point(normalize(delta)),distance,simulationWorld)>=distance-.001){nearest=distance;position=sample;}
+          }
+          if(position)add(target.id,Math.max(1,Math.round(damage*(1-nearest/spec.splash!))),false,position);
         }
       }
     }

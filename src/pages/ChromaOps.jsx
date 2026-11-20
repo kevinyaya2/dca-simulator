@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Game } from '../chroma-ops/core/Game';
 import Multiplayer from './Multiplayer';
 import { readMultiplayerSession } from '../chroma-ops/settings/MultiplayerSession';
@@ -12,6 +12,9 @@ import './ChromaMenu.css';
 import './Armory.css';
 import './MobileControls.css';
 import '../chroma-ops/ui/SniperScope.css';
+import '../chroma-ops/boss/WardenEntrance.css';
+
+const WardenPreview = lazy(() => import('../chroma-ops/boss/WardenPreview'));
 
 function SoloGame({ onBack, fullscreenButton }) {
   const stage = useRef(null);
@@ -65,12 +68,18 @@ export default function ChromaOps() {
       : mode === 'multi' || mode === 'resume' ? <Multiplayer resumeOnMount={mode === 'resume'} onBack={back}
         enterFullscreen={enter} exitFullscreen={exit}
         enterOnFirstTouch={enterOnFirstTouch} fullscreenButton={fullscreenButton} />
+      : mode === 'warden' ? <Suspense fallback={<main className="co-menu" role="status">載入虛空騎士預覽…</main>}>
+        <WardenPreview onBack={back} />
+      </Suspense>
       : <main className="co-menu"><section className="co-menu-card">
     <p className="co-eyebrow">NEON CITY ARENA</p><h1>CHROMA OPS</h1><p>選擇你的戰場模式</p>
     <div className="co-mode-grid">
       <button onClick={() => { enter(); setMode('solo'); }}><span>◎</span><b>單機訓練</b><small>對戰 AI、熟悉地圖與武器</small></button>
       <button onClick={() => setMode('multi')}><span>◉</span><b>多人連線</b><small>建立房間、邀請朋友對戰</small></button>
     </div>
+    <button type="button" className="co-warden-entry" onClick={() => setMode('warden')}>
+      <span><strong>虛空騎士預覽</strong><small>檢視 3D 模型與招式動畫</small></span><span aria-hidden="true">→</span>
+    </button>
     {previousSession && <ResumeCard code={previousSession.code} onResume={() => { enter(); setMode('resume'); }} />}
     {showInstall && <details className="co-install">
       <summary>在 iPhone 隱藏瀏覽器工具列</summary>

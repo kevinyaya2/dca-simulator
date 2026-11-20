@@ -11,9 +11,13 @@ import { WEAPON_IDS, WEAPON_SPECS, weaponDamageMultiplier, createWeaponStates, c
 import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound, type RoomNotice } from '../../shared/protocol.js';
 import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyKill, finalStandings, type BountyState, type FinalStanding, type EndReason } from '../../shared/bounty.js';
 
+import { createWardenRound, damageWarden, stepWarden, suspendWarden, type WardenRound } from './voidWarden.js';
+import { VOID_WARDEN, VOID_BLESSING, WARDEN_ID, playerMoveScale, wardenCanBeHit, type WardenAttackKind, type WardenNotice, type WardenPoint, type WardenSnapshot } from '../../shared/voidWarden.js';
+
 type Input = SimInput & { roundId?:number; seq:number; clientTime:number; reload?:boolean; yaw:number; pitch:number };
 type BurnState = { attackerId:string; nextTick:number; expiresAt:number; damage:number } | null;
 type Player = BountyState & {
+  blessingUntil?:number; protectUntil?:number; lastFireSeq?:number;
   id:string; name:string; avatar:string; color:number;
   socketId?:string; resumeToken:string; disconnectedUntil?:number;
   x:number; y:number; z:number; yaw:number; pitch:number; velocityY:number; jumpsUsed:number; supportId:number|null; aiming:boolean; sprinting:boolean;
@@ -22,7 +26,7 @@ type Player = BountyState & {
   life:number; lastShot:number; lastReceivedSeq:number; lastProcessedSeq:number; input:Input; slowUntil:number; burn:BurnState;
 };
 type Pickup = { id:WeaponId; x:number; y:number; z:number; available:boolean; respawnAt:number };
-type History = { at:number; simulationTime:number; players:Map<string,{x:number;y:number;z:number;alive:boolean;yaw:number;life:number}> };
+type History = { at:number; simulationTime:number; warden?:WardenSnapshot|null; players:Map<string,{x:number;y:number;z:number;alive:boolean;yaw:number;life:number}> };
 type Room = {
   environmentTime:number; code:string; host:string; roundId:number; state:'LOBBY'|'PLAYING'|'GAME_OVER';
   players:Map<string,Player>; pickups:Pickup[]; history:History[];
@@ -31,6 +35,7 @@ type Room = {
   notices?:RoomNotice[];
   endsAt?:number; winnerIds?:string[]; endReason?:EndReason; finalStandings?:FinalStanding[];
   respawnTimers:Map<string,NodeJS.Timeout>; gameOverTimer?:NodeJS.Timeout;
+  warden?:WardenRound;
 };
 
 const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -44,17 +49,18 @@ function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];f
 
 function roomCode(rooms:Map<string,Room>):string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode(rooms):value;}
 function publicPlayer(p:Player){const {input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,consecutiveDeaths,...safe}=p;void resumeToken;void consecutiveDeaths;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
-function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups};}
+function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups,warden:room.warden?.boss??null};}
 function announceConnection(io:Server,room:Room,player:Player,kind:RoomNotice['kind']){
   const notice:RoomNotice={id:randomUUID(),code:room.code,playerId:player.id,name:player.name,kind,at:now()};
   room.notices=[...(room.notices??[]),notice].slice(-20);
   io.to(room.code).emit('room:notice',notice);
 }
 function emitRoom(io:Server,room:Room){io.to(room.code).emit('room:state',roomState(room));}
-function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups});}
+function emitSnapshot(io:Server,room:Room){io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq})),pickups:room.pickups,warden:room.warden?.boss??null});}
 function clearRespawns(room:Room){for(const timer of room.respawnTimers.values())clearTimeout(timer);room.respawnTimers.clear();}
 function clearGameOverTimer(room:Room){if(room.gameOverTimer)clearTimeout(room.gameOverTimer);room.gameOverTimer=undefined;room.returnAt=undefined;}
-function returnToLobby(io:Server,room:Room,reason?:string){room.lobbyReason=reason;clearGameOverTimer(room);clearRespawns(room);room.state='LOBBY';clearResult(room);emitRoom(io,room);}
+function clearWarden(room:Room){room.warden=undefined;for(const player of room.players.values())player.blessingUntil=0;}
+function returnToLobby(io:Server,room:Room,reason?:string){room.lobbyReason=reason;clearGameOverTimer(room);clearRespawns(room);clearWarden(room);room.state='LOBBY';clearResult(room);emitRoom(io,room);}
 function clearResult(room:Room){
   room.winner=undefined;room.winnerId=undefined;room.winnerTitle=undefined;
   room.winnerIds=undefined;room.endReason=undefined;room.finalStandings=undefined;room.endsAt=undefined;
@@ -62,6 +68,7 @@ function clearResult(room:Room){
 export function finishRound(io:Server,room:Room,reason:'target'|'timeout',title?:string){
   if(room.state!=='PLAYING')return;
   clearRespawns(room);clearGameOverTimer(room);
+  clearWarden(room);
   room.finalStandings=finalStandings([...room.players.values()]);
   const top=room.finalStandings[0]?.score??0;
   room.winnerIds=top>0?room.finalStandings.filter(p=>p.rank===1).map(p=>p.id):[];
@@ -76,27 +83,46 @@ function expireRound(io:Server,room:Room,at=now()){
   if(room.endsAt!==undefined&&at>=room.endsAt){finishRound(io,room,'timeout');return true;}
   return false;
 }
-export function beginRound(io:Server,room:Room){clearGameOverTimer(room);clearRespawns(room);room.state='PLAYING';clearResult(room);room.endsAt=now()+ROUND_DURATION_MS;room.lobbyReason=undefined;room.roundId++;room.tick=0;room.winner=undefined;room.winnerId=undefined;room.history=[];room.killTracker.reset();room.winnerTitle=undefined;room.lastStep=now();room.wheelEpoch=room.lastStep;for(const p of room.players.values())p.alive=false;for(const p of room.players.values())resetPlayer(p,room,true);room.pickups=createPickups([...room.players.values()]);emitRoom(io,room);}
+export function beginRound(io:Server,room:Room,wardenSpawnDelayMs?:number){clearGameOverTimer(room);clearRespawns(room);room.state='PLAYING';clearResult(room);room.endsAt=now()+ROUND_DURATION_MS;room.lobbyReason=undefined;room.roundId++;room.tick=0;room.winner=undefined;room.winnerId=undefined;room.history=[];room.killTracker.reset();room.winnerTitle=undefined;room.lastStep=now();room.wheelEpoch=room.lastStep;room.warden=createWardenRound(room.lastStep,wardenSpawnDelayMs);for(const p of room.players.values())p.alive=false;for(const p of room.players.values())resetPlayer(p,room,true);room.pickups=createPickups([...room.players.values()]);emitRoom(io,room);}
 
 function resetPlayer(p:Player,room:Room,newRound=false){
   const spawn=chooseRespawnPoint([...room.players.values()].filter(other=>other.id!==p.id),previousSpawns.get(p.id));
   previousSpawns.set(p.id,spawn);
   p.life=(p.life??0)+1;
-  Object.assign(p,{x:spawn[0],y:groundHeight(...spawn)+1.65,z:spawn[1],yaw:0,pitch:0,velocityY:0,jumpsUsed:0,hp:100,alive:true,supportId:null,aiming:false,sprinting:false,lastShot:0,slowUntil:0,burn:null,input:blankInput()});
+  Object.assign(p,{x:spawn[0],y:groundHeight(...spawn)+1.65,z:spawn[1],yaw:0,pitch:0,velocityY:0,jumpsUsed:0,hp:100,alive:true,supportId:null,aiming:false,sprinting:false,lastShot:0,blessingUntil:0,protectUntil:now()+VOID_WARDEN.respawnProtectionMs,slowUntil:0,burn:null,input:blankInput()});
   if(newRound)p.weapons=createWeapons();else refillWeapons(p.weapons);
-  if(newRound){p.lastReceivedSeq=0;p.lastProcessedSeq=0;p.activeWeapon='ar';p.ownedWeapons=['ar'];p.kills=0;p.deaths=0;Object.assign(p,initialBounty());}
+  if(newRound){p.lastReceivedSeq=0;p.lastProcessedSeq=0;p.lastFireSeq=0;p.activeWeapon='ar';p.ownedWeapons=['ar'];p.kills=0;p.deaths=0;Object.assign(p,initialBounty());}
 }
 function historicalPlayers(room:Room,clientTime:number){const target=now()-Math.max(0,Math.min(250,now()-clientTime));let frame=room.history[0];for(const sample of room.history)if(sample.at<=target)frame=sample;return frame;}
 export function kill(io:Server,room:Room,attacker:Player,victim:Player,weapon:WeaponId,headshot:boolean,at=now()){
   if(room.state!=='PLAYING'||attacker.id===victim.id||!victim.alive||expireRound(io,room,at))return;
   const settlement=settleBountyKill(attacker,victim);Object.assign(attacker,settlement.attacker);Object.assign(victim,settlement.victim);
-  clearWeaponBoosts(victim.weapons);victim.alive=false;victim.aiming=false;victim.sprinting=false;victim.supportId=null;victim.input=blankInput();victim.hp=0;victim.burn=null;victim.deaths++;attacker.kills++;
+  markDeath(victim);attacker.kills++;
   const event=room.killTracker.record(attacker,victim,weapon,headshot,at);
   io.to(room.code).emit('match:kill',{...event,roundId:room.roundId,scoreAwarded:settlement.scoreAwarded,attackerBounty:attacker.bounty,victimBounty:victim.bounty}); // Must precede the terminal room state.
   if(attacker.score>=SCORE_TARGET){finishRound(io,room,'target',event.title);return;}
+  scheduleRespawn(io,room,victim);
+}
+function markDeath(victim:Player){
+  clearWeaponBoosts(victim.weapons);victim.alive=false;victim.aiming=false;victim.sprinting=false;victim.supportId=null;victim.input=blankInput();victim.hp=0;victim.burn=null;victim.deaths++;victim.blessingUntil=0;
+}
+function scheduleRespawn(io:Server,room:Room,victim:Player){
   const previousTimer=room.respawnTimers.get(victim.id);if(previousTimer)clearTimeout(previousTimer);
   const timer=setTimeout(()=>{room.respawnTimers.delete(victim.id);if(room.state==='PLAYING'&&!victim.alive&&!expireRound(io,room)){resetPlayer(victim,room);emitRoom(io,room);}},3000);
   room.respawnTimers.set(victim.id,timer);
+}
+function wardenNotice(io:Server,room:Room,notice:WardenNotice){
+  io.to(room.code).emit('match:warden',{...notice,roundId:room.roundId});
+}
+export function applyWardenDamage(io:Server,room:Room,victim:Player,amount:number,from:WardenPoint,attack:WardenAttackKind){
+  const at=now();
+  if(room.state!=='PLAYING'||expireRound(io,room,at)||!victim.alive||!victim.socketId||(victim.protectUntil??0)>at||room.warden?.boss?.ownerId===victim.id)return;
+  const damage=Math.min(victim.hp,amount);
+  victim.hp-=damage;
+  io.to(victim.socketId).emit('match:damage',{roundId:room.roundId,from,hp:victim.hp,damage,name:VOID_WARDEN.name,wardenAttack:attack});
+  if(victim.hp>0)return;
+  markDeath(victim);room.killTracker.death(victim.id);scheduleRespawn(io,room,victim);
+  wardenNotice(io,room,{kind:'player-slain',name:victim.name});emitRoom(io,room);
 }
 function applyDamage(io:Server,room:Room,attacker:Player,victim:Player,hit:PlannedHit,weapon:WeaponId):ConfirmedHit|undefined{
   const at=now();
@@ -106,17 +132,31 @@ function applyDamage(io:Server,room:Room,attacker:Player,victim:Player,hit:Plann
   const killed=victim.hp===0;if(killed)kill(io,room,attacker,victim,weapon,hit.headshot,at);
   return{...hit,damage,killed};
 }
-function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
+export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   if(expireRound(io,room))return;
   const time=now(),id=shooter.activeWeapon,spec=WEAPON_SPECS[id],state=shooter.weapons[id];
   if(!shooter.alive||state.reloadUntil>time||state.ammo<=0||time-shooter.lastShot<spec.fireDelay*1000)return;
   shooter.lastShot=time;state.ammo--;const base=aimDirection(shooter.input.yaw,shooter.input.pitch),history=historicalPlayers(room,clientTime);
   const targets:Combatant[]=[...room.players.values()].filter(p=>p.id!==shooter.id&&p.alive).map(p=>{const old=history?.players.get(p.id);return old&&old.life===p.life?{...old,id:p.id}:p;});
+  const boss=room.warden?.boss,rewound=history?history.warden:boss;
+  if(boss&&rewound&&rewound.ownerId===boss.ownerId&&wardenCanBeHit(boss,shooter.id)&&wardenCanBeHit(rewound,shooter.id))
+    targets.push({id:WARDEN_ID,x:rewound.x,y:rewound.y+rewound.air+1.65,z:rewound.z,yaw:rewound.yaw,alive:true,kind:'warden'});
+  const multiplier=(shooter.blessingUntil??0)>time?VOID_BLESSING.damage:1;
   const pastShooter=history?.players.get(shooter.id),shotPosition=pastShooter?.life===shooter.life?pastShooter:shooter;
   const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000),shooter.aiming,state.level),eventId=`${room.code}:shot:${++room.shotSequence}`;
   io.to(room.code).emit('match:shot',{roundId:room.roundId,eventId,id:shooter.id,origin,dir:base,weapon:id,...result});
   const confirmed:ConfirmedHit[]=[];
-  for(const hit of result.hits){const victim=room.players.get(hit.targetId);if(!victim)continue;const actual=applyDamage(io,room,shooter,victim,hit,id);if(!actual)continue;confirmed.push(actual);
+  for(const raw of result.hits){
+    const hit={...raw,damage:Math.round(raw.damage*multiplier)};
+    if(hit.targetId===WARDEN_ID&&room.warden){
+      const hitBoss=damageWarden(room.warden,shooter,hit.damage,time);
+      if(!hitBoss)continue;
+      confirmed.push({...hit,damage:hitBoss.damage,killed:hitBoss.killed});
+      if(hitBoss.recruited){shooter.blessingUntil=time+VOID_BLESSING.durationMs;wardenNotice(io,room,{kind:'recruited',name:shooter.name});}
+      else if(hitBoss.killed)wardenNotice(io,room,{kind:'destroyed',name:shooter.name});
+      continue;
+    }
+    const victim=room.players.get(hit.targetId);if(!victim)continue;const actual=applyDamage(io,room,shooter,victim,hit,id);if(!actual)continue;confirmed.push(actual);
     if(victim.alive&&id==='ice')victim.slowUntil=time+(spec.slow??0)*1000;
     if(victim.alive&&id==='flame')victim.burn={damage:Math.round(4*weaponDamageMultiplier(state.level)),attackerId:shooter.id,nextTick:victim.burn?.nextTick??time+250,expiresAt:time+(spec.burn??0)*1000};
   }
@@ -135,7 +175,7 @@ export function step(io:Server,room:Room,dt:number){
     p.sprinting=!!p.input.sprint;
     if(p.input.reload||state.reloadUntil>time||p.activeWeapon!=='sniper')p.input.aim=false;
     p.aiming=!!p.input.aim;
-    stepPlayer(p,{...p.input,lookX:0,lookY:0},dt,undefined,p.slowUntil>time ? .65 : 1,(room.lastStep-room.wheelEpoch)/1000-dt);
+    stepPlayer(p,{...p.input,lookX:0,lookY:0},dt,undefined,playerMoveScale(p.slowUntil,p.blessingUntil??0,time),(room.lastStep-room.wheelEpoch)/1000-dt);
     p.lastProcessedSeq=p.lastReceivedSeq;
     for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(pickup.y+.9),p.z-pickup.z)<2){
       const result=collectWeapon(pickup.id,p.weapons[pickup.id],p.ownedWeapons.includes(pickup.id),time);
@@ -145,18 +185,21 @@ export function step(io:Server,room:Room,dt:number){
       if(p.socketId)io.to(p.socketId).emit('match:pickup',{...result,roundId:room.roundId,eventId:randomUUID()});
       emitRoom(io,room);
     }
-    if(p.burn){while(p.burn&&p.burn.nextTick<=time&&p.burn.nextTick<=p.burn.expiresAt){const attacker=room.players.get(p.burn.attackerId);p.burn.nextTick+=250;if(attacker){const hit=applyDamage(io,room,attacker,p,{targetId:p.id,damage:p.burn.damage??4,headshot:false,position:[p.x,p.y-.4,p.z]},'flame');if(hit)io.to(attacker.socketId??`offline:${attacker.id}`).emit('match:hit',{roundId:room.roundId,eventId:`${room.code}:burn:${++room.shotSequence}`,weapon:'flame',hits:[hit]});if(hit?.killed)emitRoom(io,room);if(room.state!=='PLAYING')return;}}if(p.burn&&time>=p.burn.expiresAt)p.burn=null;}
+    if(p.burn){while(p.burn&&p.burn.nextTick<=time&&p.burn.nextTick<=p.burn.expiresAt){const attacker=room.players.get(p.burn.attackerId);p.burn.nextTick+=250;if(attacker){const hit=applyDamage(io,room,attacker,p,{targetId:p.id,damage:Math.round((p.burn.damage??4)*((attacker.blessingUntil??0)>time?VOID_BLESSING.damage:1)),headshot:false,position:[p.x,p.y-.4,p.z]},'flame');if(hit)io.to(attacker.socketId??`offline:${attacker.id}`).emit('match:hit',{roundId:room.roundId,eventId:`${room.code}:burn:${++room.shotSequence}`,weapon:'flame',hits:[hit]});if(hit?.killed)emitRoom(io,room);if(room.state!=='PLAYING')return;}}if(p.burn&&time>=p.burn.expiresAt)p.burn=null;}
     p.input={...p.input,lookX:0,lookY:0,jump:false,reload:false};
   }
   for(const pickup of room.pickups)if(!pickup.available&&pickup.respawnAt<=time){const point=chooseWeaponPoint([...room.players.values()].map(p=>({...p,y:p.y-1.65})),room.pickups.filter(other=>other!==pickup&&other.available),pickup);if(!point){pickup.respawnAt=time+100;continue;}Object.assign(pickup,point);pickup.available=true;emitRoom(io,room);}
-  room.history.push({at:room.lastStep,simulationTime:(room.lastStep-room.wheelEpoch)/1000,players:new Map([...room.players].map(([id,p])=>[id,{x:p.x,y:p.y,z:p.z,alive:p.alive,yaw:p.yaw,life:p.life}]))});while(room.history[0]?.at<time-300)room.history.shift();
+  if(room.warden)stepWarden(room.warden,room.lastStep,dt,(room.lastStep-room.wheelEpoch)/1000,room.players.values(),(victim,damage,from,attack)=>{
+    const player=room.players.get(victim.id);if(player)applyWardenDamage(io,room,player,damage,from,attack);
+  });
+  room.history.push({at:room.lastStep,simulationTime:(room.lastStep-room.wheelEpoch)/1000,warden:room.warden?.boss?{...room.warden.boss}:null,players:new Map([...room.players].map(([id,p])=>[id,{x:p.x,y:p.y,z:p.z,alive:p.alive,yaw:p.yaw,life:p.life}]))});while(room.history[0]?.at<time-300)room.history.shift();
   if(room.tick%3===0)emitSnapshot(io,room);
 }
-function clearRoom(room:Room){clearRespawns(room);clearGameOverTimer(room);for(const timer of room.reconnectTimers.values())clearTimeout(timer);room.reconnectTimers.clear();for(const id of room.players.keys())previousSpawns.delete(id);}
+function clearRoom(room:Room){clearRespawns(room);clearGameOverTimer(room);clearWarden(room);for(const timer of room.reconnectTimers.values())clearTimeout(timer);room.reconnectTimers.clear();for(const id of room.players.keys())previousSpawns.delete(id);}
 
 export const RECONNECT_GRACE_MS=60_000;
 
-export function createGameServer(options:{reconnectGraceMs?:number}={}){
+export function createGameServer(options:{reconnectGraceMs?:number;wardenSpawnDelayMs?:number}={}){
   const graceMs=options.reconnectGraceMs??RECONNECT_GRACE_MS;
   const rooms=new Map<string,Room>();
   let closing=false;
@@ -167,7 +210,7 @@ export function createGameServer(options:{reconnectGraceMs?:number}={}){
   const removePlayer=(room:Room,id:string)=>{
     const respawn=room.respawnTimers.get(id),reconnect=room.reconnectTimers.get(id);
     if(respawn)clearTimeout(respawn);if(reconnect)clearTimeout(reconnect);
-    room.respawnTimers.delete(id);room.reconnectTimers.delete(id);previousSpawns.delete(id);room.killTracker.remove(id);room.players.delete(id);
+    room.respawnTimers.delete(id);room.reconnectTimers.delete(id);previousSpawns.delete(id);room.killTracker.remove(id);suspendWarden(room.warden,id,now(),true);room.players.delete(id);
     if(!room.players.size){clearRoom(room);rooms.delete(room.code);}else{selectHost(room);emitRoom(io,room);}
   };
   app.get('/health',(_,res)=>res.json({ok:true,rooms:rooms.size,protocolVersion:MULTIPLAYER_PROTOCOL_VERSION}));
@@ -218,7 +261,7 @@ export function createGameServer(options:{reconnectGraceMs?:number}={}){
       if(!room||!currentPlayer()||room.host!==playerId)return reply(cb,{error:'HOST_ONLY'});
       if(action==='start'&&(room.state!=='LOBBY'||[...room.players.values()].filter(p=>p.socketId).length<2))return reply(cb,{error:'NOT_READY'});
       if((action==='again'||action==='lobby')&&room.state!=='GAME_OVER'||action==='end'&&room.state!=='PLAYING')return reply(cb,{error:'INVALID_STATE'});
-      if(action==='start'||action==='again')beginRound(io,room);else returnToLobby(io,room,action==='end'?'房主已提前結束本局':undefined);
+      if(action==='start'||action==='again')beginRound(io,room,options.wardenSpawnDelayMs);else returnToLobby(io,room,action==='end'?'房主已提前結束本局':undefined);
       reply(cb,{ok:true});
     };
     socket.on('game:start',(cb:unknown)=>hostAction('start',cb));
@@ -227,12 +270,16 @@ export function createGameServer(options:{reconnectGraceMs?:number}={}){
     socket.on('game:end',(cb:unknown)=>hostAction('end',cb));
     socket.on('match:input',(input:Input)=>{const p=currentPlayer();if(!p||!p.alive||room?.state!=='PLAYING'||!isCurrentRound(input,room.roundId)||!Number.isSafeInteger(input?.seq)||input.seq<=p.lastReceivedSeq||!Number.isFinite(input.yaw)||!Number.isFinite(input.pitch))return;p.lastReceivedSeq=input.seq;p.input={...p.input,seq:input.seq,clientTime:Math.max(now()-250,Math.min(now(),input.clientTime||now())),moveX:Math.max(-1,Math.min(1,input.moveX||0)),moveY:Math.max(-1,Math.min(1,input.moveY||0)),lookX:0,lookY:0,jump:p.input.jump||!!input.jump,reload:p.input.reload||!!input.reload,sprint:input.sprint===true,aim:input.aim===true&&p.activeWeapon==='sniper'&&!p.input.reload&&!input.reload&&p.weapons[p.activeWeapon].reloadUntil<=now(),yaw:Math.atan2(Math.sin(input.yaw),Math.cos(input.yaw)),pitch:Math.max(-1.35,Math.min(1.35,input.pitch))};p.sprinting=!!p.input.sprint;p.aiming=!!p.input.aim;});
     socket.on('match:weapon',(message:{id:WeaponId;roundId:number})=>{const p=currentPlayer();if(!room||!p?.alive||room.state!=='PLAYING'||!isCurrentRound(message,room.roundId))return;const id=message.id;if(WEAPON_IDS.includes(id)&&p.ownedWeapons.includes(id)){p.activeWeapon=id;p.aiming=false;p.input.aim=false;}});
-    socket.on('match:fire',(fire:{clientTime:number;roundId:number})=>{const p=currentPlayer();if(!p||room?.state!=='PLAYING'||!isCurrentRound(fire,room.roundId))return;shoot(io,room,p,Math.max(now()-250,Math.min(now(),fire?.clientTime||now())));});
+    socket.on('match:fire',(fire:{roundId:number;seq:number})=>{
+      const p=currentPlayer();if(!p?.alive||room?.state!=='PLAYING'||!isCurrentRound(fire,room.roundId)||!Number.isSafeInteger(fire.seq)||fire.seq<=0||fire.seq!==p.input.seq||fire.seq<=(p.lastFireSeq??0))return;
+      p.lastFireSeq=fire.seq;
+      shoot(io,room,p,Number.isFinite(p.input.clientTime)?p.input.clientTime:now());
+    });
     socket.on('net:ping',(cb:unknown)=>{if(typeof cb==='function')cb(now());});
     socket.on('disconnect',()=>{
       if(closing)return;
       const p=currentPlayer();if(!room||!p)return;
-      const target=room;p.socketId=undefined;p.disconnectedUntil=now()+graceMs;
+      const target=room;p.socketId=undefined;p.disconnectedUntil=now()+graceMs;suspendWarden(target.warden,p.id,now());
       p.input={...blankInput(),yaw:p.yaw,pitch:p.pitch};p.aiming=false;p.sprinting=false;
       target.reconnectTimers.set(p.id,setTimeout(()=>removePlayer(target,p.id),graceMs));
       selectHost(target);announceConnection(io,target,p,'disconnected');emitRoom(io,target);

@@ -40,20 +40,20 @@ export function navigationGraph():Node[]{
   }
   graph=nodes;return nodes;
 }
-function closest(p:NavPoint,nodes:Node[]){
+function closest(p:NavPoint,nodes:Node[],canWalk:typeof walkSegment,nearest=false){
   const sorted=nodes.map((n,id)=>({id,d:Math.hypot(n.x-p.x,n.z-p.z)+Math.abs(n.y-p.y)*4})).sort((a,b)=>a.d-b.d);
-  return sorted.find(({id,d})=>d<30&&walkSegment(p,nodes[id]))?.id;
+  return sorted.find(({id,d})=>d<30&&canWalk(nearest?nodes[id]:p,nodes[id]))?.id;
 }
-export function navigationPath(from:NavPoint,to:NavPoint):NavPoint[]{
-  const nodes=navigationGraph(),start=closest(from,nodes),goal=closest(to,nodes);
+export function navigationPath(from:NavPoint,to:NavPoint,canWalk=walkSegment,nearestGoal=false):NavPoint[]{
+  const nodes=navigationGraph(),start=closest(from,nodes,canWalk),goal=closest(to,nodes,canWalk,nearestGoal);
   if(start===undefined||goal===undefined)return [];
   const open=new Set([start]),cost=new Map([[start,0]]),previous=new Map<number,number>();
   while(open.size){
     let current=-1,best=Infinity;
     for(const id of open){const n=nodes[id],g=nodes[goal],score=cost.get(id)!+Math.hypot(n.x-g.x,n.y-g.y,n.z-g.z);if(score<best){current=id;best=score;}}
-    if(current===goal){const path:number[]=[goal];while(previous.has(path[0]))path.unshift(previous.get(path[0])!);while(path.length>1&&walkSegment(from,nodes[path[1]]))path.shift();return [...path.map(id=>nodes[id]),...(walkSegment(nodes[goal],to)?[to]:[])];}
+    if(current===goal){const path:number[]=[goal];while(previous.has(path[0]))path.unshift(previous.get(path[0])!);while(path.length>1&&canWalk(from,nodes[path[1]]))path.shift();return [...path.map(id=>nodes[id]),...(canWalk(nodes[goal],to)?[to]:[])];}
     open.delete(current);
-    for(const next of nodes[current].edges){const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);if(nextCost<(cost.get(next)??Infinity)){cost.set(next,nextCost);previous.set(next,current);open.add(next);}}
+    for(const next of nodes[current].edges){const a=nodes[current],b=nodes[next],nextCost=cost.get(current)!+Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);if(nextCost<(cost.get(next)??Infinity)&&(canWalk===walkSegment||canWalk(a,b))){cost.set(next,nextCost);previous.set(next,current);open.add(next);}}
   }
   return [];
 }

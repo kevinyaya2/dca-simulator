@@ -69,7 +69,7 @@ test('fixed identity resumes across sockets, transfers host, and preserves state
     const processed=event(a,'match:snapshot',s=>s.players.find((p:any)=>p.id===seat.playerId)?.ack===25000);
     a.emit('match:input',input(first.roundId,25000));await processed;
     const fired=event(a,'match:snapshot',s=>s.players.find((p:any)=>p.id===seat.playerId)?.weapons.ar.ammo===29);
-    a.emit('match:fire',{roundId:first.roundId,clientTime:Date.now()});const before=await fired;
+    a.emit('match:fire',{roundId:first.roundId,seq:25000});const before=await fired;
     const offline=event(b,'room:state',r=>r.players.some((p:any)=>p.id===seat.playerId&&!p.connected));
     a.disconnect();const room=await offline;
     assert.equal(room.host,guest.playerId);assert.equal(room.state,'PLAYING');

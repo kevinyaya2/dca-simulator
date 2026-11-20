@@ -63,7 +63,7 @@ test('two clients agree on wheel time, sprint speed, action resets and the new w
     const ammo=end.players.find(p=>p.id===playerId).weapons.ar.ammo;
     // A late, high-sequence command from a prior round must not poison this round's sequence counter.
     a.emit('match:input',{...command,roundId:first.roundId-1,seq:90000});
-    a.emit('match:fire',{roundId:first.roundId-1,clientTime:Date.now()});
+    a.emit('match:fire',{roundId:first.roundId-1,seq:3});
     const afterStale=await event<Snapshot>(a,'match:snapshot',s=>s.tick>=end.tick+6);
     const stoppedPlayer=afterStale.players.find(p=>p.id===playerId);
     assert.equal(stoppedPlayer.ack,3);assert.equal(stoppedPlayer.weapons.ar.ammo,ammo);
