@@ -51,7 +51,7 @@ test('Warden spawns once at 90 seconds, stays bound through the entrance, and th
   const boss=round.boss!;
   assert.equal(boss.state,'SPAWN');
   assert.equal(boss.stateAt,100_000);
-  assert.equal(boss.hp,2000);
+  assert.equal(boss.hp,6000);
   assert.equal(boss.ownerId,null);
   stepWarden(round,100_000+WARDEN_ENTRANCE.finish-1,dt,95,[target]);
   assert.equal(round.boss,boss);
@@ -96,7 +96,7 @@ test('each configured move has a wind-up and unique valid hits, with separate hi
     const position={...target,x:12,z:kind==='slash'?13:kind==='burst'?19:17};
     const hits:WardenAttackKind[]=[];
     round.nextAttack=index;
-    if(kind==='burst')damageWarden(round,target,1100,at);
+    if(kind==='burst')damageWarden(round,target,VOID_WARDEN.maxHp*.55,at);
     stepWarden(round,at+dt*1000,dt,0,[position],(...args)=>hits.push(args[3]));
     assert.equal(boss.attack?.kind,kind);
     assert.deepEqual(hits,[]);
@@ -170,7 +170,7 @@ test('a grown slash locks the larger reach when it starts',()=>{
 test('an allied Warden seeks attackers only within 120 m of its owner',()=>{
   const {round,boss,at}=nextBoss();
   const owner={...target,id:'owner',x:0,z:-50};
-  damageWarden(round,owner,2000,at);
+  damageWarden(round,owner,VOID_WARDEN.maxHp,at);
   const joined=at+VOID_WARDEN.surrenderMs;
   stepWarden(round,joined,dt,0,[owner]);
   const outside={...target,id:'outside',x:0,z:71};
@@ -185,11 +185,11 @@ test('an allied Warden seeks attackers only within 120 m of its owner',()=>{
 
 test('the Warden unlocks infection below 50% and performs one self-stab below 25%',()=>{
   const {round,boss,at}=nextBoss();
-  assert.equal(damageWarden(round,target,1000,at)?.killed,false);
+  assert.equal(damageWarden(round,target,VOID_WARDEN.maxHp*.5,at)?.killed,false);
   assert.equal(boss.phaseTwo,false);
   damageWarden(round,target,1,at);
   assert.equal(boss.phaseTwo,true);
-  damageWarden(round,target,500,at);
+  damageWarden(round,target,VOID_WARDEN.maxHp*.25,at);
   stepWarden(round,at+17,dt,0,[]);
   assert.equal(boss.state,'ENRAGED');
   const when=boss.stateAt;
@@ -204,8 +204,8 @@ test('the Warden unlocks infection below 50% and performs one self-stab below 25
 test('an allied Warden follows into B1, guards a dead owner, waits when offline, and despawns permanently',()=>{
   const {round,boss,at}=nextBoss();
   const owner={...target,id:'owner',name:'Owner',x:12,y:1.65,z:8};
-  assert.equal(damageWarden(round,owner,2000,at)?.recruited,true);
-  assert.equal(damageWarden(round,target,2000,at+1),undefined);
+  assert.equal(damageWarden(round,owner,VOID_WARDEN.maxHp,at)?.recruited,true);
+  assert.equal(damageWarden(round,target,VOID_WARDEN.maxHp,at+1),undefined);
   stepWarden(round,at+VOID_WARDEN.surrenderMs,dt,0,[owner]);
   assert.equal(boss.hp,VOID_WARDEN.alliedHp);
   assert.equal(damageWarden(round,owner,10000,at+1400),undefined);

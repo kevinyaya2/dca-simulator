@@ -19,7 +19,7 @@ async function run(){
   scene.add(arena.group,new T.HemisphereLight(0xffffff,0x16b9dc,2));
   const view=new WardenEntrance(scene,root,false,'owner');
   let disposed=false;
-  const boss:WardenSnapshot={...VOID_WARDEN.location,spawnAt:0,state:'SPAWN',stateAt:0,yaw:0,hp:2000,maxHp:2000,
+  const boss:WardenSnapshot={...VOID_WARDEN.location,spawnAt:0,state:'SPAWN',stateAt:0,yaw:0,hp:VOID_WARDEN.maxHp,maxHp:VOID_WARDEN.maxHp,
     targetId:null,ownerId:null,ownerName:null,phaseTwo:false,enraged:false,air:0,attack:null,kills:0,scale:1,heldBounty:0};
   const gl=renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
   const result:Record<string,unknown>={renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),size:[960,540]};
