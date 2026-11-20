@@ -19,6 +19,7 @@ export type WardenRound = {
   guard:WardenPoint|null; nextActionAt:number; nextAttack:number; hits:Set<string>;
   destroyed:ReadonlySet<string>; patrol:number; retaliator:string|null; lostAt:number; stuckAt:number;
   lastSeen:WardenPoint|null; lastFittingScale:number; retreat:WardenPoint|null;
+  routeGoal?:WardenPoint; routeScale?:number;
 };
 
 export function createWardenRound(startAt:number,delay:number=rules.spawnDelayMs):WardenRound {
@@ -91,6 +92,23 @@ function retreatToSurface(boss:WardenPoint,terrain:Terrain) {
   return null;
 }
 
+function escapeSurfaceOverlap(boss:WardenPoint,terrain:Terrain,previousScale:number) {
+  const smaller={...terrain,scale:previousScale};
+  const radius=rules.radius*terrain.scale;
+  if(radius*2>=Math.min(ARENA_BOUNDS.width,ARENA_BOUNDS.depth))return null;
+  const inset={x:Math.max(ARENA_BOUNDS.minX+radius+.2,Math.min(ARENA_BOUNDS.maxX-radius-.2,boss.x)),
+    y:boss.y,z:Math.max(ARENA_BOUNDS.minZ+radius+.2,Math.min(ARENA_BOUNDS.maxZ-radius-.2,boss.z))};
+  const candidates=[inset];
+  for(const distance of [2,4,8,16,32])for(let i=0;i<8;i++){
+    const angle=i*Math.PI/4;
+    candidates.push({x:inset.x+Math.cos(angle)*distance,y:inset.y,z:inset.z+Math.sin(angle)*distance});
+  }
+  for(const exit of candidates){
+    if(canStand(exit,terrain,true)&&gap(traceWalk(boss,exit,smaller,0,true),exit)<.015)return exit;
+  }
+  return null;
+}
+
 function limitAdvance(boss:WardenSnapshot,yaw:number,length:number) {
   if(boss.ownerId)return length;
   const dx=boss.x-rules.location.x,dz=boss.z-rules.location.z;
@@ -116,6 +134,7 @@ function cancel(round:WardenRound,boss:WardenSnapshot) {
   boss.targetId=null;
   boss.air=0;
   round.route=[];
+  round.routeGoal=undefined;
   round.repathAt=0;
 }
 
@@ -195,6 +214,7 @@ function startAttack(round:WardenRound,boss:WardenSnapshot,target:WardenPlayer,a
     }).filter(p=>planar(from,p)>1.4);
   }
   round.nextAttack=(next+1)%options.length;
+  round.route=[];
   round.hits.clear();
   boss.yaw=yaw;
   boss.attack={kind,startedAt:at,rate,scale,from,to,yaw,jumpHeight,rays};
@@ -325,13 +345,29 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
   }
   const dynamic=movingBoxes(simulationTime);
   const roomGround=(p:WardenPlayer)=>groundPoint(p,round.destroyed);
-  const terrain:Terrain={dynamic,round,scale:boss.scale,breakable:boss.kills>0&&boss.y>=-.05};
+  const scale=boss.state==='ATTACK'&&boss.attack?boss.attack.scale:boss.scale;
+  const terrain:Terrain={dynamic,round,scale,breakable:boss.kills>0&&boss.y>=-.05};
   if(boss.y>=-.05){
-    if(round.retreat){round.retreat=null;round.repathAt=0;round.route=[];}
-    round.lastFittingScale=boss.scale;
-  }else if(round.retreat||(!canStand(boss,terrain)&&round.lastFittingScale<boss.scale)){
+    if(canStand(boss,terrain,true)){
+      if(round.retreat){round.retreat=null;round.repathAt=0;round.route=[];}
+      round.lastFittingScale=scale;
+    }else if(round.lastFittingScale<scale&&boss.state!=='ATTACK'){
+      if(!round.route.length||!round.retreat){
+        if(at>=round.repathAt){
+          round.retreat=escapeSurfaceOverlap(boss,terrain,round.lastFittingScale);
+          round.route=round.retreat?[round.retreat]:[];
+          round.repathAt=at+620;
+        }
+      }
+      if(round.retreat){
+        terrain.scale=round.lastFittingScale;
+        advance(round,boss,terrain,at,dt,'CHASE',rules.speed);
+      }else setState(boss,'IDLE',at);
+      return;
+    }
+  }else if(round.retreat||(!canStand(boss,terrain)&&round.lastFittingScale<scale)){
     terrain.scale=round.lastFittingScale;
-    if(!round.retreat&&at>=round.repathAt){
+    if((!round.retreat||!round.route.length)&&at>=round.repathAt){
       const escape=retreatToSurface(boss,terrain);
       round.repathAt=at+620;
       round.retreat=escape?.exit??null;
@@ -343,7 +379,7 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
       return;
     }
   }else if(!round.retreat){
-    round.lastFittingScale=boss.scale;
+    round.lastFittingScale=scale;
   }
   const anchor=round.guard??(owner?roomGround(owner):rules.location);
   const leash=round.guard?rules.guardRadius:owner?rules.alliedRange:rules.leash;
@@ -364,13 +400,24 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
   if(!retaliator){round.retaliator=null;round.stuckAt=0;}
   if(at>=round.repathAt||boss.targetId!==null&&!previous){
     round.repathAt=at+620;
+    const previousRoute=round.route,previousGoal=round.routeGoal;
     boss.targetId=null;
     round.route=[];
+    round.routeGoal=undefined;
+    const plan=(goal:WardenPoint,near:boolean,sameTarget:boolean)=>{
+      const route=sameTarget&&previousRoute.length&&previousGoal&&round.routeScale===terrain.scale&&gap(goal,previousGoal)<1.5
+        ?previousRoute:routeTo(boss,goal,terrain,near,!owner);
+      if(route.length){
+        round.routeGoal=route===previousRoute?previousGoal:goal;
+        round.routeScale=terrain.scale;
+      }
+      return route;
+    };
     const sight=world();
     const sees=(p:WardenPlayer)=>visible({...boss,y:boss.y+Math.min(2.6*boss.scale,12)},p,sight);
     if(retaliator){
       const goal=roomGround(retaliator);
-      const route=routeTo(boss,goal,terrain,true,!owner);
+      const route=plan(goal,true,previous?.id===retaliator.id);
       const stalled=!route.length||gap(boss,route[route.length-1])<.18;
       if(stalled)round.stuckAt ||= at;
       else round.stuckAt=0;
@@ -385,8 +432,9 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
       for(const enemy of sorted){
         if(!sees(enemy))continue;
         const goal=roomGround(enemy);
-        const route=routeTo(boss,goal,terrain,false,!owner);
-        if(!route.length)continue;
+        const near=boss.scale>1;
+        const route=plan(goal,near,previous?.id===enemy.id);
+        if(!route.length||near&&gap(boss,route[route.length-1])<.18&&planar(boss,enemy)>moves.slash.range*boss.scale)continue;
         boss.targetId=enemy.id;round.route=route;round.lastSeen=goal;round.lostAt=0;
         break;
       }
@@ -395,18 +443,19 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
       round.lostAt ||= at;
       if(at-round.lostAt<rules.searchMs){
         boss.targetId=previous.id;
-        if(gap(boss,round.lastSeen)>.25)round.route=routeTo(boss,round.lastSeen,terrain,false,true);
+        if(gap(boss,round.lastSeen)>.25)round.route=plan(round.lastSeen,false,true);
       }
     }
     if(!boss.targetId){
       round.lastSeen=null;round.lostAt=0;
       if(owner){
         if(gap(boss,anchor)>(owner.alive?rules.followDistance:.25))
-          round.route=routeTo(boss,anchor,terrain,true);
+          round.route=plan(anchor,true,!previous);
       }else{
         for(let i=0;i<WARDEN_PATROL.length;i++){
           const destination=WARDEN_PATROL[round.patrol];
-          if(gap(boss,destination)>.4)round.route=routeTo(boss,destination,terrain,false,true);
+          if(gap(boss,destination)>.4)round.route=plan(destination,boss.scale>1,!previous);
+          if(round.route.length&&gap(boss,round.route[round.route.length-1])<.18)round.route=[];
           if(round.route.length)break;
           round.patrol=(round.patrol+1)%WARDEN_PATROL.length;
         }
@@ -418,7 +467,7 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
   const resting=owner?(round.guard?'GUARD':'FOLLOW'):'PATROL';
   if(target&&gap(boss,roomGround(target))<=rules.stopDistance&&
     gap(traceWalk(boss,roomGround(target),terrain),roomGround(target))<.015){
-    boss.yaw=look(boss,target);setState(boss,'CHASE',at);return;
+    boss.yaw=look(boss,target);setState(boss,'IDLE',at);return;
   }
   if(!target&&owner?.alive&&gap(boss,anchor)<=rules.followDistance){
     setState(boss,resting,at);return;
@@ -431,7 +480,7 @@ function advance(round:WardenRound,boss:WardenSnapshot,terrain:Terrain,at:number
   setState(boss,state,at);
   while(round.route.length&&gap(boss,round.route[0])<.08)round.route.shift();
   const next=round.route[0];
-  if(!next)return;
+  if(!next){if(state==='CHASE'||state==='PATROL')setState(boss,'IDLE',at);return;}
   const p=mix(boss,next,Math.min(1,speed*dt/gap(boss,next)));
   const reached=traceWalk(boss,p,terrain,0,true,true);
   if(gap(reached,boss)>.005){
@@ -440,5 +489,6 @@ function advance(round:WardenRound,boss:WardenSnapshot,terrain:Terrain,at:number
   }else{
     round.route=[];
     if(state==='PATROL')round.patrol=(round.patrol+1)%WARDEN_PATROL.length;
+    if(state==='CHASE'||state==='PATROL')setState(boss,'IDLE',at);
   }
 }

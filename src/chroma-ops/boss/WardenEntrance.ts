@@ -158,6 +158,7 @@ export class WardenEntrance {
     this.effects.visible=intro;
     this.model.group.visible=!intro||elapsed>=cue.reveal;
     const group=this.model.group;
+    const previousX=group.position.x,previousZ=group.position.z;
     const collapse=boss.state==='DESPAWN'?Math.max(.001,1-fade(serverNow-boss.stateAt,260,VOID_WARDEN.collapseMs)):1;
     group.scale.setScalar(Math.min(size,1e20)*collapse);
     this.destination.set(boss.x,boss.y+(boss.air??0),boss.z);
@@ -182,7 +183,7 @@ export class WardenEntrance {
     }
     this.motionTime+=dt;
     const stateElapsed=Math.max(0,serverNow-boss.stateAt);
-    const moving=boss.state==='CHASE'||boss.state==='PATROL'||group.position.distanceToSquared(this.destination)>.012;
+    const moving=dt>0&&Math.hypot(group.position.x-previousX,group.position.z-previousZ)>dt*.12;
     const strike=boss.attack?Math.max(0,(serverNow-boss.attack.startedAt)*boss.attack.rate):0;
     if(boss.attack&&(boss.state==='ATTACK'||boss.state==='STAGGER'&&strike<WARDEN_ATTACKS[boss.attack.kind].duration+150))
       this.model.combatPose(boss.attack.kind,strike,boss.enraged);

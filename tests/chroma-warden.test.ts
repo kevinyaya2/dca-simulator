@@ -328,6 +328,19 @@ test('a grown Warden opens cover on contact, and removed slabs no longer support
   assert.ok(player.y<7.65);
 });
 
+test('the Warden walks back inside the arena when growth overlaps the edge',()=>{
+  const {round,boss,at}=nextBoss();
+  Object.assign(boss,{x:149,y:0,z:-48,kills:8,scale:wardenGrowth(8)});
+  round.repathAt=0;
+  const initialX=boss.x;
+  stepWarden(round,at+17,dt,0,[]);
+  assert.ok(boss.x<initialX);
+  assert.ok(boss.x>initialX-.2,'leaves the boundary by walking');
+  for(let i=2;i<=55;i++)stepWarden(round,at+i*dt*1000,dt,0,[]);
+  assert.ok(boss.x<150-VOID_WARDEN.radius*boss.scale);
+  assert.equal(round.lastFittingScale,boss.scale);
+});
+
 test('weapon traces hit the larger Warden hurtbox but respect nearby cover',()=>{
   const warden={id:WARDEN_ID,x:0,y:1.65,z:-8,yaw:0,alive:true,kind:'warden' as const};
   assert.equal(resolveShot('ar',[0,3.4,-3],[0,0,-1],[warden],()=>.5).hits[0]?.targetId,WARDEN_ID);
