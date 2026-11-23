@@ -132,7 +132,7 @@ export function applyWardenDamage(io:Server,room:Room,victim:Player,amount:numbe
   if(!boss||boss.state==='DEFEATED'||boss.state==='DESPAWN')return;
   const damage=Math.min(victim.hp,amount);
   victim.hp-=damage;
-  io.to(victim.socketId).emit('match:damage',{roundId:room.roundId,from,hp:victim.hp,damage,name:VOID_WARDEN.name,wardenAttack:attack});
+  io.to(victim.socketId).emit('match:damage',{roundId:room.roundId,life:victim.life,serverTime:at,from,hp:victim.hp,damage,name:VOID_WARDEN.name,wardenAttack:attack});
   if(victim.hp>0)return;
   const award=victim.bounty;
   Object.assign(victim,settleBountyDeath(victim));
@@ -149,11 +149,13 @@ function applyDamage(io:Server,room:Room,attacker:Player,victim:Player,hit:Plann
   const at=now();
   if(!victim.alive||hit.damage<=0||room.state!=='PLAYING'||expireRound(io,room,at))return;
   const damage=Math.min(victim.hp,hit.damage);victim.hp-=damage;
-  io.to(victim.socketId??`offline:${victim.id}`).emit('match:damage',{roundId:room.roundId,from:{x:attacker.x,z:attacker.z},hp:victim.hp,damage,name:attacker.name,weapon});
+  io.to(victim.socketId??`offline:${victim.id}`).emit('match:damage',{roundId:room.roundId,life:victim.life,serverTime:at,from:{x:attacker.x,z:attacker.z},hp:victim.hp,damage,name:attacker.name,weapon});
   const killed=victim.hp===0;if(killed)kill(io,room,attacker,victim,weapon,hit.headshot,at);
   return{...hit,damage,killed};
 }
 export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
+  const started=room.metrics?performance.now():0;
+  try{
   if(expireRound(io,room))return;
   const time=now(),id=shooter.activeWeapon,spec=WEAPON_SPECS[id],state=shooter.weapons[id];
   if(!shooter.alive||state.reloadUntil>time||state.ammo<=0||time-shooter.lastShot<spec.fireDelay*1000)return;
@@ -193,6 +195,7 @@ export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   if(confirmed.length)io.to(shooter.socketId??`offline:${shooter.id}`).emit('match:hit',{roundId:room.roundId,eventId,weapon:id,hits:confirmed});
   if(wardenVictory)finishRound(io,room,'target');
   else if(confirmed.some(h=>h.killed)&&room.state==='PLAYING')emitRoom(io,room);
+  }finally{room.metrics?.record('shotCPU_ms',performance.now()-started);}
 }
 export function step(io:Server,room:Room,dt:number,navigationBudget?:NavigationBudget){
   if(room.state!=='PLAYING'||expireRound(io,room))return;const time=now(),tickStarted=performance.now();room.tick++;room.environmentTime=advanceEnvironment(room.environmentTime,dt,true);

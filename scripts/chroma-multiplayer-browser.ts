@@ -10,6 +10,8 @@ import '../src/chroma-ops/ui/SniperScope.css';
 const params=new URLSearchParams(location.search),metrics=new PerformanceMetrics(1200);
 const { MultiplayerGame }=await import(/* @vite-ignore */ (params.get('clientModule')??'/dca-simulator/src/chroma-ops/core/MultiplayerGame.ts'));
 const socket=io(params.get('server')!,{transports:['websocket'],autoConnect:false});
+const flame=params.has("flame");
+const deaths:any[]=[];let fireCount=0;
 const rtt=Number(params.get('rtt')??0);
 // Reliable ordered transport fixture. Delay delivery as well as transmission;
 // each message is broadcast once so before/game/after listeners stay adjacent.
@@ -52,7 +54,9 @@ class DelayedTransport {
     handlers.add(handler);return this;
   }
   off(name:string,handler:(...args:any[])=>void){this.listeners.get(name)?.delete(handler);return this;}
+  inject(name:string,...args:any[]){for(const callback of this.listeners.get(name)??[])callback(...args);}
   emit(name:string,...args:any[]){
+    if(name==="match:input"&&args[0]?.fire)fireCount++;
     if(name==='net:ping'){
       const callback=args[0];args[0]=(...reply:any[])=>this.schedule(()=>callback(...reply),true);
     }
@@ -78,7 +82,8 @@ socket.on('room:state',(room:any)=>{
   game=new MultiplayerGame(root,transport,code,room.roundId,(reason:string)=>errors.push(reason),playerId);
   // This is an input fixture, leaving actual game networking, prediction,
   // reconciliation and WebGL rendering running in both browser tabs.
-  game.desktop.update=()=>game.input.set({moveX:1,moveY:0,sprint:false,shoot:false});
+  game.desktop.update=()=>{game.input.set({moveX:flame?0:1,moveY:0,sprint:false,shoot:flame});if(flame){game.player.yaw=Math.PI;game.player.pitch=0;}};
+  transport.on('match:damage',(event:any)=>{if(event.hp===0){const death={life:game.life,at:performance.now(),immediateDead:!game.player.alive,pending:game.pending.length,fireCount,deadStateFrameMs:null as number|null};deaths.push(death);}});
   game.start();
   transport.on('match:snapshot',()=>{
     if(!sampling||!before)return;
@@ -86,6 +91,7 @@ socket.on('room:state',(room:any)=>{
   });
 });
 function sample(at:number){
+  const death=deaths.at(-1);if(death&&death.deadStateFrameMs===null&&game?.dead)death.deadStateFrameMs=performance.now()-death.at;
   if(sampling&&game?.ready){
     if(lastFrame)metrics.record('frame_ms',at-lastFrame);
     const x=game.cam.position.x;if(lastCameraX!==undefined&&x<lastCameraX-.001)backwardFrames++;
@@ -97,8 +103,10 @@ requestAnimationFrame(sample);
 const probe={
   get code(){return code;},get ready(){return !!game?.ready;},
   start:()=>socket.emitWithAck('game:start'),
-  reset(){metrics.reset();sampling=true;lastFrame=0;lastCameraX=undefined;backwardFrames=0;frames=0;},
-  summary(){return {metrics:metrics.summary(),backwardFrames,frames,pending:game?.pending.length,rtt:game?.ping,inputResets:game?.resyncCount??null,errors,
+  reset(){game?.diagnostics.metrics.reset();metrics.reset();sampling=true;lastFrame=0;lastCameraX=undefined;backwardFrames=0;frames=0;},
+  get alive(){return !!game?.player.alive;},get life(){return game?.life;},
+  staleDamage(){const hp=game.player.hp;transport.inject('match:damage',{roundId:game.roundId,life:game.life-1,serverTime:Date.now()+1000,hp:0,damage:100,from:{x:0,y:0,z:0},name:'fixture'});return {ignored:game.player.hp===hp&&game.player.alive,hp:game.player.hp};},
+  summary(){return {combat:game?.diagnostics.metrics.summary(),deaths,life:game?.life,alive:game?.player.alive,fireCount,metrics:metrics.summary(),backwardFrames,frames,pending:game?.pending.length,rtt:game?.ping,inputResets:game?.resyncCount??null,errors,
     connected:socket.connected,renderer:game?.renderer.getContext().getParameter(game.renderer.getContext().RENDERER)};},
   dispose(){sampling=false;game?.dispose();transport.dispose();socket.disconnect();},
 };

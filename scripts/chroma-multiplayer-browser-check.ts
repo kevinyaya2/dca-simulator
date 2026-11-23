@@ -11,6 +11,8 @@ import { MovementQueue } from '../server/src/MovementQueue.ts';
 import * as current from '../server/src/index.ts';
 import { VOID_WARDEN, WARDEN_ENTRANCE } from '../shared/voidWarden.ts';
 
+import { flameBaseline } from './chroma-flame-baseline.ts';
+const flame=process.argv.includes('--flame');let baseline:Awaited<ReturnType<typeof flameBaseline>>|undefined;
 const repo=fileURLToPath(new URL('../',import.meta.url)),temporary:string[]=[];
 const profile=await mkdtemp(path.join(tmpdir(),'chroma-multiplayer-'));
 const vite=spawn(process.execPath,[path.join(repo,'node_modules/vite/bin/vite.js'),'--configLoader','native','--host','127.0.0.1','--port','5178','--strictPort'],
@@ -55,7 +57,8 @@ try{
     const deadline=performance.now()+20000;function check(){if(window.multiplayerProbe&&(${condition}))resolve(true);
     else if(performance.now()>deadline)reject(new Error('Harness not ready'));else setTimeout(check,50);}check();})`);
   const variants:[string,typeof current,string?][]=[];
-  if(process.argv.includes('--compare')){
+  if(flame&&process.argv.includes('--compare')){baseline=await flameBaseline();variants.push(['HEAD',baseline.server,baseline.clientModule]);}
+  if(!flame&&process.argv.includes('--compare')){
     const suffix=`.browser-${randomUUID()}.local`;
     for(const relative of ['shared/navigation','server/src/voidWarden','server/src/SimulationClock','server/src/index',
       'src/chroma-ops/core/GameLoop','src/chroma-ops/core/MultiplayerGame']){
@@ -68,7 +71,7 @@ try{
     variants.push(['HEAD',await import(pathToFileURL(temporary[3]).href),`/dca-simulator/src/chroma-ops/core/MultiplayerGame${suffix}.ts`]);
   }
   if(!process.argv.includes('--rematch-only'))variants.push(['working-tree',current]);const results=[];
-  for(const [variant,implementation,clientModule] of variants)for(const scenario of ['none','grown'])for(const rtt of [0,100,250]){
+  for(const [variant,implementation,clientModule] of variants)for(const scenario of (flame?['none','normal','grown']:['none','grown']))for(const rtt of [0,100,250]){
     gameServer=implementation.createGameServer({wardenSpawnDelayMs:60000});
     await new Promise<void>(resolve=>gameServer!.http.listen(0,'127.0.0.1',resolve));
     const address=gameServer.http.address();if(!address||typeof address==='string')throw new Error('No server address');
@@ -79,18 +82,19 @@ try{
       const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});sessions.push(sessionId);
       await send('Runtime.enable',{},sessionId);
       const query=new URLSearchParams({server:`http://127.0.0.1:${address.port}`,chromaDiagnostics:'1',rtt:String(rtt)});
-      if(i)query.set('room',roomCode);if(clientModule)query.set('clientModule',clientModule);
+      if(flame)query.set('flame','1');if(i)query.set('room',roomCode);if(clientModule)query.set('clientModule',clientModule);
       await send('Page.navigate',{url:`http://127.0.0.1:5178/dca-simulator/scripts/chroma-multiplayer-browser.html?${query}`},sessionId);
       await waitProbe(sessionId,'window.multiplayerProbe.code');roomCode=await evaluate(sessionId,'window.multiplayerProbe.code');
     }
     await evaluate(sessions[0],'window.multiplayerProbe.start()');
     await Promise.all(sessions.map(session=>waitProbe(session,'window.multiplayerProbe.ready')));
     const room=gameServer.rooms.get(roomCode)!;
+    if(flame){for(const p of room.players.values()) {p.activeWeapon='flame';p.ownedWeapons.push('flame');}}
     for(const [i,p] of [...room.players.values()].entries())Object.assign(p,{x:-130,y:1.65,z:-120+i*5,yaw:0,pitch:0,hp:1e9,protectUntil:0});
     if(scenario==='none')room.warden=undefined;
     else {
       const template=[...room.players.values()][0];
-      for(let i=2;i<8;i++){
+      for(let i=2;i<(flame?2:8);i++){
         const p=structuredClone({...template,movement:undefined});
         if(template.movement)p.movement=new MovementQueue();
         Object.assign(p,{id:`fixture${i}`,socketId:`fixture${i}`,x:-77.5+(i%3-1)*4,y:i>3?7.65:1.65,z:45+(i<4?4:12)});
@@ -100,10 +104,27 @@ try{
         hp:VOID_WARDEN.alliedHp,maxHp:VOID_WARDEN.maxHp,ownerId:template.id,ownerName:template.name,targetId:null,
         phaseTwo:false,enraged:false,attack:null,air:0,kills:12,scale:8,heldBounty:0};
     }
+    if(flame){
+      for(const [i,p] of [...room.players.values()].entries())Object.assign(p,{x:12+i*2,y:1.65,z:-10,yaw:Math.PI,pitch:0,hp:1e9});
+      if(room.warden?.boss)Object.assign(room.warden.boss,{x:12,z:8,y:0,state:'PATROL',ownerId:null,hp:1e9,maxHp:1e9,scale:scenario==='grown'?8:1,kills:scenario==='grown'?12:0});
+    }
     await pause(2000);await Promise.all(sessions.map(session=>evaluate(session,'window.multiplayerProbe.reset()')));
     await pause(4000);
     const clients=await Promise.all(sessions.map(session=>evaluate(session,'window.multiplayerProbe.summary()')));
-    results.push({variant,scenario,rtt,clients});console.log(JSON.stringify({progress:variant,scenario,rtt,clients}));
+    let lifecycle:any;
+    if(flame&&scenario!=='none'){
+      const victim=[...room.players.values()][0];
+      Object.assign(victim,{x:12,y:1.65,z:4,hp:22,protectUntil:0});
+      const boss=room.warden!.boss!;room.warden!.hits.clear();
+      Object.assign(boss,{x:12,y:0,z:8,state:'ATTACK',targetId:victim.id,attack:{kind:'slash',startedAt:Date.now()-450,rate:1,scale:boss.scale,from:{x:12,y:0,z:8},to:{x:12,y:0,z:8},yaw:Math.PI,jumpHeight:0}});
+      try{await waitProbe(sessions[0],'window.multiplayerProbe.summary().deaths.length>0');}
+      catch(error){console.error(JSON.stringify({variant,scenario,rtt,victim:{hp:victim.hp,alive:victim.alive,x:victim.x,y:victim.y,z:victim.z},boss,client:await evaluate(sessions[0],'window.multiplayerProbe.summary()')}));throw error;}
+      await pause(100);const killed=await evaluate(sessions[0],'window.multiplayerProbe.summary()');
+      await waitProbe(sessions[0],'window.multiplayerProbe.alive');
+      lifecycle={killed,stale:await evaluate(sessions[0],'window.multiplayerProbe.staleDamage()')};
+      if(variant==='working-tree'&&(!killed.deaths[0].immediateDead||killed.deaths[0].pending!==0||killed.fireCount!==killed.deaths[0].fireCount||!lifecycle.stale.ignored))throw new Error('Death lifecycle regression');
+    }
+    results.push({variant,scenario,rtt,clients,lifecycle});console.log(JSON.stringify({progress:variant,scenario,rtt,clients}));
     for(const session of sessions)await evaluate(session,'window.multiplayerProbe.dispose()');
     for(const targetId of targets)await send('Target.closeTarget',{targetId});
     gameServer.close();gameServer=undefined;
@@ -120,7 +141,7 @@ try{
   await send('Target.closeTarget',{targetId:rematchTarget});
   console.log(JSON.stringify({results,browserErrors,rematch,notes:[
     'Two real headless Chrome tabs with full game renderers on a local Socket.IO server; four measured seconds after two warmup seconds.',
-    'The grown scenario includes six additional server-side fixture players. Browser input is a constant rightward run.',
+    flame?'Flame mode: two stationary players hold fire towards a normal/grown Warden (or empty lane). Lethal counterattack starts a real slash just before its contact window, followed by real respawn and a stale-life event fixture.':'The grown scenario includes six additional server-side fixture players. Browser input is a constant rightward run.',
     'Local CPU/GPU contention from two renderers affects frame timing; results do not represent Render or Internet latency.',
     'Transport fixture applies 0/100/250ms RTT with reliable ordered 35ms jitter bursts on both directions (no jitter at RTT zero).',
     'correction measures authoritative reconciliation displacement; backwardFrames counts camera x decreases exceeding 0.001 units.'
@@ -128,6 +149,7 @@ try{
   if(browserErrors.length||results.some(result=>result.clients.some(client=>client.errors.length||!client.connected||!client.frames)))process.exitCode=1;
   await send('Browser.close');
 }finally{
+  await baseline?.dispose();
   gameServer?.close();socket?.close();if(browser.exitCode===null)browser.kill();if(vite.exitCode===null)vite.kill();
   for(const filename of temporary)await unlink(filename);
   if(path.dirname(path.resolve(profile))===path.resolve(tmpdir())&&path.basename(profile).startsWith('chroma-multiplayer-'))

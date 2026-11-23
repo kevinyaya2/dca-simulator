@@ -7,7 +7,9 @@ import { breakableSections, intactBox } from './destruction.js';
 export type ArenaBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number; color: number;breakKey?:string };
 export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: number; jump: boolean; sprint?: boolean; aim?: boolean };
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
-export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number;destroyed?:ReadonlySet<string> };
+export type RayPoint={x:number;y:number;z:number};
+export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number;destroyed?:ReadonlySet<string>;
+  rayCandidates?:(origin:RayPoint,direction:RayPoint,max:number)=>Iterable<ArenaBox> };
 export const ARENA_BOUNDS = { minX: -154, maxX: 154, minZ: -140, maxZ: 140, width: 308, depth: 280 } as const;
 export const ARENA_CAMERA_FAR = 560;
 export const PLAYER_MOVE_SPEED = 8;
@@ -37,7 +39,8 @@ export const ARENA_BOXES: ArenaBox[] = [
   ].flatMap((box,index)=>breakableSections(box,`cover:${index}`)),
 ];
 export function staticArenaWorld(destroyed?:ReadonlySet<string>):SimWorld {
-  return {boxes:ARENA_BOXES,heightAt:terrainHeight,destroyed};
+  return {boxes:ARENA_BOXES,heightAt:terrainHeight,destroyed,
+    rayCandidates:(origin,direction,max)=>arenaRayCandidates(origin,direction,max,destroyed)};
 }
 const filteredArenas=new WeakMap<ReadonlySet<string>,ArenaBox[]>();
 export function arenaWorld(seconds:number,destroyed?:ReadonlySet<string>):SimWorld {
@@ -47,7 +50,9 @@ export function arenaWorld(seconds:number,destroyed?:ReadonlySet<string>):SimWor
     boxes=cached??ARENA_BOXES.filter(box=>intactBox(box,destroyed));
     if(!cached)filteredArenas.set(destroyed,boxes);
   }
-  return {boxes:[...boxes,...movingBoxes(seconds)],heightAt:terrainHeight};
+  const dynamic=movingBoxes(seconds);
+  return {boxes:[...boxes,...dynamic],heightAt:terrainHeight,
+    rayCandidates:(origin,direction,max)=>arenaRayCandidates(origin,direction,max,destroyed,dynamic)};
 }
 export function groundHeight(x: number, z: number) {
   const ramp=cityRampHeight(x,z);if(ramp!==null)return ramp;
@@ -60,8 +65,46 @@ export function groundHeight(x: number, z: number) {
 // Ground surface remains available for ground-only spawns; physics can also support floors below it.
 export function terrainHeight(x:number,z:number){return undergroundHeight(x,z)??groundHeight(x,z);}
 const spatialCells=new Map<string,ArenaBox[]>();
+let minCellX=Infinity,maxCellX=-Infinity,minCellZ=Infinity,maxCellZ=-Infinity;
 for(const box of ARENA_BOXES)for(let x=Math.floor(box.minX/16);x<=Math.floor(box.maxX/16);x++)for(let z=Math.floor(box.minZ/16);z<=Math.floor(box.maxZ/16);z++){
   const key=`${x},${z}`,cell=spatialCells.get(key)||[];cell.push(box);spatialCells.set(key,cell);
+  minCellX=Math.min(minCellX,x);maxCellX=Math.max(maxCellX,x);minCellZ=Math.min(minCellZ,z);maxCellZ=Math.max(maxCellZ,z);
+}
+// Supercover DDA over the same immutable cells used by player collision.
+// No ray results are cached: terrain versions and moving platforms belong to
+// the world which supplied the query, including historical shooting worlds.
+export function arenaRayCandidates(origin:RayPoint,direction:RayPoint,max:number,destroyed?:ReadonlySet<string>,dynamic:readonly ArenaBox[]=[]):ArenaBox[]{
+  if(![origin.x,origin.y,origin.z,direction.x,direction.y,direction.z,max].every(Number.isFinite)||max<0)
+    return [...ARENA_BOXES.filter(box=>intactBox(box,destroyed)),...dynamic];
+  let start=0,end=max;
+  for(const [o,d,min,maxBound] of [[origin.x,direction.x,minCellX*16,(maxCellX+1)*16],
+    [origin.z,direction.z,minCellZ*16,(maxCellZ+1)*16]]){
+    if(Math.abs(d)<1e-9){if(o<min||o>maxBound)return [...dynamic];continue;}
+    const a=(min-o)/d,b=(maxBound-o)/d;start=Math.max(start,Math.min(a,b));end=Math.min(end,Math.max(a,b));
+    if(start>end)return [...dynamic];
+  }
+  const found=new Set<ArenaBox>();
+  const visit=(x:number,z:number)=>{for(const box of spatialCells.get(`${x},${z}`)??[])if(intactBox(box,destroyed))found.add(box);};
+  const x=origin.x+direction.x*start,z=origin.z+direction.z*start;
+  let ix=Math.floor(x/16),iz=Math.floor(z/16);
+  const sx=Math.abs(direction.x)<1e-9?0:Math.sign(direction.x),sz=Math.abs(direction.z)<1e-9?0:Math.sign(direction.z);
+  let tx=sx?((sx>0?(ix+1)*16:ix*16)-origin.x)/direction.x:Infinity;
+  let tz=sz?((sz>0?(iz+1)*16:iz*16)-origin.z)/direction.z:Infinity;
+  const dx=sx?16/Math.abs(direction.x):Infinity,dz=sz?16/Math.abs(direction.z):Infinity;
+  // Include neighbours at the entry point; a ray can touch a box at t=0.
+  const boundaryX=Math.abs(x/16-Math.round(x/16))<1e-9,boundaryZ=Math.abs(z/16-Math.round(z/16))<1e-9;
+  if(boundaryX)visit(Math.round(x/16)-1,iz);
+  if(boundaryZ)visit(ix,Math.round(z/16)-1);
+  if(boundaryX&&boundaryZ)visit(Math.round(x/16)-1,Math.round(z/16)-1);
+  const limit=(maxCellX-minCellX+maxCellZ-minCellZ+8)*2;
+  for(let steps=0;steps<limit;steps++){
+    visit(ix,iz);
+    if(Math.min(tx,tz)>end||!sx&&!sz)break;
+    if(Math.abs(tx-tz)<1e-9){visit(ix+sx,iz);visit(ix,iz+sz);ix+=sx;iz+=sz;tx+=dx;tz+=dz;}
+    else if(tx<tz){ix+=sx;tx+=dx;}else{iz+=sz;tz+=dz;}
+  }
+  for(const box of dynamic)found.add(box);
+  return [...found];
 }
 export function arenaBoxesNear(x:number,z:number,radius=1){
   const found=new Set<ArenaBox>();
@@ -83,19 +126,23 @@ export function pointBlocked(x: number, y: number, z: number, radius = .04, boxe
 export function rayBoxDistance(origin:{x:number;y:number;z:number}, direction:{x:number;y:number;z:number},
   box:{minX:number;maxX:number;minY:number;maxY:number;minZ:number;maxZ:number}, max:number):number|null {
   let near=0,far=max;
-  for(const axis of ['X','Y','Z'] as const){
-    const key=axis.toLowerCase() as 'x'|'y'|'z', d=direction[key],o=origin[key];
-    if(Math.abs(d)<1e-9){if(o<box[`min${axis}`]||o>box[`max${axis}`])return null;continue;}
-    const a=(box[`min${axis}`]-o)/d,b=(box[`max${axis}`]-o)/d;
-    near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));
-    if(near>far)return null;
-  }
+  // Keep the original X/Y/Z slab order without dynamic property names in this hot path.
+  if(Math.abs(direction.x)<1e-9){if(origin.x<box.minX||origin.x>box.maxX)return null;}
+  else {const a=(box.minX-origin.x)/direction.x,b=(box.maxX-origin.x)/direction.x;
+    near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));if(near>far)return null;}
+  if(Math.abs(direction.y)<1e-9){if(origin.y<box.minY||origin.y>box.maxY)return null;}
+  else {const a=(box.minY-origin.y)/direction.y,b=(box.maxY-origin.y)/direction.y;
+    near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));if(near>far)return null;}
+  if(Math.abs(direction.z)<1e-9){if(origin.z<box.minZ||origin.z>box.maxZ)return null;}
+  else {const a=(box.minZ-origin.z)/direction.z,b=(box.maxZ-origin.z)/direction.z;
+    near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));if(near>far)return null;}
   return near<=max?near:null;
 }
 export function rayWallDistance(origin: {x:number;y:number;z:number}, direction: {x:number;y:number;z:number}, max: number,
   world: SimWorld = { boxes: ARENA_BOXES, heightAt: terrainHeight }) {
   let nearest=max;
-  for(const box of world.boxes){const hit=rayBoxDistance(origin,direction,box,nearest);if(hit!==null)nearest=hit;}
+  const candidates=world.rayCandidates?.(origin,direction,max)??(world.boxes===ARENA_BOXES?arenaRayCandidates(origin,direction,max,world.destroyed):world.boxes);
+  for(const box of candidates){const hit=rayBoxDistance(origin,direction,box,nearest);if(hit!==null)nearest=hit;}
   // Only the height field is sampled; boxes are intersected once regardless of range.
   for(let distance=0;distance<=nearest;distance+=.1){
     if(origin.y+direction.y*distance<world.heightAt(origin.x+direction.x*distance,origin.z+direction.z*distance))return distance;

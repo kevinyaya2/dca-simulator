@@ -13,6 +13,16 @@ npm run deploy
 
 Deploy the server separately with `npm run server:build` then `npm run server:start`, and configure Render with `PORT` plus `CORS_ORIGIN=https://kevinyaya2.github.io`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
 
+### Flame gun queries and death feedback (protocol 18)
+
+Weapon occlusion uses supercover ray traversal over the existing 16-unit static collision grid, followed by the original exact box intersections and terrain sampling. Each world supplies its own destroyed-building state and moving-platform positions, including historical shooting worlds. Custom worlds without `rayCandidates` retain a full scan. Flame ray count, damage, cadence and effects are unchanged.
+
+Damage events add optional `life` and `serverTime` fields without changing protocol 18. The updated server always sends both. The client stops shooting immediately on authoritative zero HP, ignores events from previous lives, and prevents an older living snapshot from restoring the dead player. A new life clears that terminal state. Deploy the paired server and client after local review to enable the complete behavior.
+
+The opt-in client overlay also measures `shotCPU_ms`, `flameCPU_ms`, `aimCPU_ms`, their per-frame sum `combatCPU_ms`, and `deathFeedback_ms` (damage receipt through the next render submission, excluding GPU presentation). The server records `shotCPU_ms` in its existing bounded 10-second summaries.
+
+`npm run bench:flame -- --compare` compares CPU work against HEAD; `--ref=<commit>` selects another reference. It includes real persistent flame effects and a sustained-fire matrix with 2/8 players, 1/4 rooms and absent/normal/grown Wardens. `npx tsx scripts/chroma-multiplayer-browser-check.ts --flame --compare` runs two Chrome renderers at 0/100/250 ms simulated RTT with ordered jitter, plus authoritative Warden damage, death, respawn and stale-life event checks. The counterattack fixture starts a real slash just before its contact window; hit detection, damage and respawn run through production code. Results are local measurements, not Render telemetry; timing goals are reported separately from correctness assertions. Dedicated results: [scripts/chroma-flame-results.json](scripts/chroma-flame-results.json).
+
 ### Multiplayer movement and performance (protocol 18)
 
 Movement commands now represent one 1/60-second simulation step. The server processes at most one command per player per tick; snapshots acknowledge executed commands with `ack`. Commands discarded by a reset or a queue older than 250 ms are reported separately as `inputReset` and `discardedThrough`. `life` isolates respawns; `roundId` isolates rematches. Fire and weapon hotkeys travel with their command and prediction replay only runs movement. Render and look updates remain at display refresh rate, with interpolation between movement steps.

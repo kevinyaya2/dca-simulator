@@ -1,3 +1,4 @@
+import { DamageTimeline } from '../../../shared/damageTimeline';
 import { MOVEMENT_STEP, MAX_INPUT_BACKLOG_MS, MovementClock, replayMovement, simulateMovement, type MovementCommand, type MovementAcknowledgement } from '../../../shared/movement';
 import { NetworkDiagnostics } from '../ui/NetworkDiagnostics';
 import { observeArenaSize } from '../ui/ArenaSize';
@@ -30,7 +31,7 @@ import { Bot } from '../enemies/Bot';
 import { WeaponEffects } from '../systems/WeaponEffects';
 import { BattleFeedback } from '../ui/BattleFeedback';
 import { resolveShot, type ShotEvent as LocalShotEvent } from '../../../shared/combat';
-import { isCurrentRound, type RoundEvent, type ShotEvent, type HitConfirmation, type MultiplayerKillEvent } from '../../../shared/protocol';
+import { isCurrentRound, type DamageEvent, type RoundEvent, type ShotEvent, type HitConfirmation, type MultiplayerKillEvent } from '../../../shared/protocol';
 import { DamageFeedbackSystem } from '../systems/DamageFeedbackSystem';
 import { PerformanceManager, CAMERA_NEAR } from '../systems/PerformanceManager';
 import { ARENA_CAMERA_FAR, stepPlayer, type SimPlayer } from '../../../shared/arena';
@@ -38,7 +39,7 @@ import { WEAPON_IDS, WEAPON_SPECS, createWeaponStates, magazineCapacity, type We
 
 type Net=MovementAcknowledgement&{id:string;name:string;color:number;x:number;y:number;z:number;yaw:number;pitch:number;velocityY:number;jumpsUsed:number;hp:number;alive:boolean;score:number;bounty:number;kills:number;deaths:number;activeWeapon:WeaponId;ownedWeapons:WeaponId[];weapons:WeaponState;slowUntil:number;burnUntil:number;blessingUntil?:number;ack:number;supportId:number|null;aiming:boolean;sprinting:boolean};
 import { WardenEntrance } from '../boss/WardenEntrance';
-import { WARDEN_ATTACKS, wardenOwner, type WardenAttackKind, type WardenNotice, type WardenSnapshot, type WardenSpawnWarning } from '../../../shared/voidWarden';
+import { WARDEN_ATTACKS, wardenOwner, type WardenNotice, type WardenSnapshot, type WardenSpawnWarning } from '../../../shared/voidWarden';
 import { WardenBlessingView } from '../boss/WardenBlessingView';
 import { projectRadarPoint, wardenRadarMarker } from '../ui/WardenRadar';
 
@@ -62,7 +63,7 @@ export class MultiplayerGame{
   private movementClock=new MovementClock();private previousPosition=new T.Vector3();
   private jumpQueued=false;private reloadQueued=false;private requestedWeapon?:WeaponId;
   private life=0;private inputReset=0;private resyncCount=0;private predictionAt=0;
-  private diagnostics:NetworkDiagnostics;
+  private diagnostics:NetworkDiagnostics;private damageTimeline=new DamageTimeline();private deathReceivedAt?:number;
   private cameraOffset=new T.Vector3();private visualPosition=new T.Vector3();private remoteTarget=new T.Vector3();
   private pickupPreview:PickupPreview;private pickupFeedback:PickupFeedback;private appearance:WeaponAppearance;
   private tacticalBoard:TacticalBoard;private scope:SniperScope;private physicsTime=0;private awaitingWeapon=false;
@@ -133,7 +134,7 @@ export class MultiplayerGame{
     if(parts.length!==this.destroyedParts.size||parts.some(part=>!this.destroyedParts.has(part))){
       this.destroyedParts=new Set(parts);this.arena.setDestroyed(this.destroyedParts);
     }
-    const me=snapshot.byId.get(this.playerId);if(!me)return;if(firstSnapshot)this.seq=Math.max(this.seq,me.ack);const wasAlive=this.player.alive,respawned=!wasAlive&&me.alive;this.slowUntil=me.slowUntil;this.blessingUntil=me.alive?(me.blessingUntil??0):0;
+    const rawMe=snapshot.byId.get(this.playerId);if(!rawMe)return;const me=this.damageTimeline.reconcile({...rawMe,life:rawMe.life??0},snapshot.serverTime);if(firstSnapshot)this.seq=Math.max(this.seq,me.ack);const wasAlive=this.player.alive,respawned=!wasAlive&&me.alive;this.slowUntil=me.slowUntil;this.blessingUntil=me.alive?(me.blessingUntil??0):0;
     const lifeChanged=this.life!==(me.life??0),reset=firstSnapshot||lifeChanged||this.inputReset!==(me.inputReset??0);
     this.life=me.life??0;this.inputReset=me.inputReset??0;
     this.pending=this.pending.filter(command=>command.seq>Math.max(me.ack,me.discardedThrough??0));
@@ -263,9 +264,15 @@ export class MultiplayerGame{
   };
   private onHit=(event:RoundEvent<HitConfirmation>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.hit(event);};
   private onKill=(event:RoundEvent<MultiplayerKillEvent>)=>{if(!this.disposed&&!this.paused&&this.ready&&isCurrentRound(event,this.roundId))this.battle.kill(event);};
-  private onDamage=(damage:{roundId:number;from:{x:number;z:number};hp:number;damage:number;name:string;weapon?:WeaponId;wardenAttack?:WardenAttackKind})=>{
-    if(this.disposed||this.paused||!this.ready||!isCurrentRound(damage,this.roundId))return;
+  private onDamage=(damage:DamageEvent)=>{
+    if(this.disposed||this.paused||!this.ready||!isCurrentRound(damage,this.roundId)||!this.damageTimeline.accept(damage,this.life))return;
     this.player.hp=damage.hp;
+    if(damage.hp===0){
+      this.deathReceivedAt=performance.now();this.player.alive=false;this.dead=true;
+      this.pending=[];this.jumpQueued=false;this.reloadQueued=false;this.requestedWeapon=undefined;this.awaitingWeapon=false;
+      this.movementClock.reset();this.previousPosition.copy(this.player.position);
+      this.input.clearCombat();this.input.set({moveX:0,moveY:0,sprint:false});
+    }
     this.killer=damage.name;
     const attack=damage.wardenAttack?WARDEN_ATTACKS[damage.wardenAttack].name:damage.weapon?WEAPON_SPECS[damage.weapon].label:'';
     this.notice=attack?`遭 ${damage.name} 的 ${attack} 擊中`:`遭 ${damage.name} 擊中`;
@@ -294,6 +301,7 @@ export class MultiplayerGame{
     this.diagnostics.record('frame_ms',elapsed*1000);
     this.measurePing(dt);
     if(!this.ready)return;
+    this.diagnostics.beginCombatFrame();
     this.desktop?.update();const input=this.input.getState();
     const blocked=this.tacticalBoard.isOpen||this.armory.isOpen||!!this.settings?.isOpen||this.paused;
     const reloadingNow=this.weapons[this.active].reloadUntil>this.serverNow();
@@ -333,12 +341,14 @@ export class MultiplayerGame{
     const muzzle=weaponMuzzle(this.gunFlash,this.active);
     if(firedLocal){
       const origin=this.cam.position.toArray() as [number,number,number],direction=this.cam.getWorldDirection(new T.Vector3()).toArray() as [number,number,number];
-      const result=resolveShot(this.active,origin,direction,targets,Math.random,effectWorld,aiming,state.level);
+      const result=this.diagnostics.measure('shotCPU_ms',()=>resolveShot(this.active,origin,direction,targets,Math.random,effectWorld,aiming,state.level));
       const visual:LocalShotEvent={...result,eventId:'local:'+this.seq,id:this.playerId,weapon:this.active,origin,dir:direction};
       this.effects.play(visual,muzzle,true,true,true,false);
     }
     this.pickupPreview.update([...this.pickupMeshes].map(([id,mesh])=>({id,position:mesh.position,available:mesh.visible,owned:this.owned.has(id),state:this.weapons[id]})),this.cam.position,effectWorld,this.player.alive&&!blocked);this.effects.updateLocalMuzzle(muzzle,this.active,this.cam.position,effectWorld);
-    this.effects.localFlame(this.player.alive&&!blocked&&!this.awaitingWeapon&&input.shoot&&this.active==='flame'&&!reloading&&state.ammo>0,weaponMuzzle(this.gunFlash,this.active),this.cam.position,this.cam.getWorldDirection(new T.Vector3()),effectWorld,dt,targets,state.level);this.aimFeedback.update(blocked||!this.player.alive?'neutral':queryAim(this.active,aim.origin,aim.direction,targets,effectWorld,state.level),this.player.alive&&!blocked);this.scope.render(this.renderer,this.scene,this.cam);
+    this.diagnostics.measure('flameCPU_ms',()=>this.effects.localFlame(this.player.alive&&!blocked&&!this.awaitingWeapon&&input.shoot&&this.active==='flame'&&!reloading&&state.ammo>0,weaponMuzzle(this.gunFlash,this.active),this.cam.position,this.cam.getWorldDirection(new T.Vector3()),effectWorld,dt,targets,state.level));this.aimFeedback.update(blocked||!this.player.alive?'neutral':this.diagnostics.measure('aimCPU_ms',()=>queryAim(this.active,aim.origin,aim.direction,targets,effectWorld,state.level)),this.player.alive&&!blocked);this.scope.render(this.renderer,this.scene,this.cam);
+    this.diagnostics.endCombatFrame();
+    if(this.deathReceivedAt!==undefined){this.diagnostics.record('deathFeedback_ms',performance.now()-this.deathReceivedAt);this.deathReceivedAt=undefined;}
     this.diagnostics.update(dt,{rtt:this.ping,pending:this.pending.length,camera:this.cameraOffset.length(),resets:this.resyncCount});
   }
 
