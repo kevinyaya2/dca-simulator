@@ -25,12 +25,16 @@ test('server preserves sniper aim during sprinting, while reload and non-sniper 
   room.pickups=[]; // Isolate aim from randomized loot that can auto-switch the weapon.
   const p=room.players.get('host')!;
   p.x=-140;p.z=-114;p.y=1.65;p.activeWeapon='sniper';p.ownedWeapons.push('sniper');
-  Object.assign(p.input,{seq:1,moveX:0,moveY:0,sprint:true,aim:true});
-  stepRoom(io,room,1/60);assert.equal(p.sprinting,true);assert.equal(p.aiming,true);
-  p.input.sprint=false;stepRoom(io,room,1/60);assert.equal(p.aiming,true);
-  p.input.sprint=true;stepRoom(io,room,1/60);assert.equal(p.aiming,true);
-  p.weapons.sniper.ammo=0;p.input.reload=true;stepRoom(io,room,1/60);assert.equal(p.aiming,false);
-  p.activeWeapon='ar';p.input.aim=true;p.input.reload=false;stepRoom(io,room,1/60);assert.equal(p.aiming,false);
+  let seq=0;
+  const advance=(input:Partial<typeof p.input>)=>{
+    const command={...p.input,...input,roundId:room.roundId,seq:++seq,clientTime:Date.now()};
+    p.movement!.enqueue(command,Date.now());stepRoom(io,room,1/60);
+  };
+  advance({moveX:0,moveY:0,sprint:true,aim:true});assert.equal(p.sprinting,true);assert.equal(p.aiming,true);
+  advance({sprint:false});assert.equal(p.aiming,true);
+  advance({sprint:true});assert.equal(p.aiming,true);
+  p.weapons.sniper.ammo=0;advance({reload:true});assert.equal(p.aiming,false);
+  p.activeWeapon='ar';advance({aim:true,reload:false});assert.equal(p.aiming,false);
 });
 
 test('a new round accepts freshly numbered client commands after a long first round',()=>{

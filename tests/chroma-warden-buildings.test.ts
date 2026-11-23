@@ -1,3 +1,4 @@
+import { MovementQueue } from '../server/src/MovementQueue.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { io as connect, type Socket } from 'socket.io-client';
@@ -147,7 +148,7 @@ test('two clients can move, fire and switch weapons beside an eightfold Warden w
     }
     const base=room.players.get(guest.playerId)!;
     for(let i=2;i<8;i++){
-      const p=structuredClone(base);Object.assign(p,{id:`enemy${i}`,socketId:`fixture${i}`,x:-77.5+(i%3-1)*4,y:i>3?7.65:1.65,z:45+(i<4?4:12)});
+      const p=structuredClone({...base,movement:undefined});p.movement=new MovementQueue();Object.assign(p,{id:`enemy${i}`,socketId:`fixture${i}`,x:-77.5+(i%3-1)*4,y:i>3?7.65:1.65,z:45+(i<4?4:12)});
       room.players.set(p.id,p);
     }
     const round=room.warden!;
@@ -162,7 +163,7 @@ test('two clients can move, fire and switch weapons beside an eightfold Warden w
       await Promise.all(clients.map(async(socket,i)=>{
         const ack=event<Snapshot>(socket,'match:snapshot',s=>s.players.some(p=>p.id===ids[i]&&p.ack===iteration&&p.activeWeapon===weapon));
         const shot=event<{id:string;weapon:string}>(socket,'match:shot',s=>s.id===ids[i]&&s.weapon===weapon);
-        socket.emit('match:input',{roundId:room.roundId,seq:iteration,clientTime:Date.now(),moveX:-1,moveY:0,yaw:0,pitch:0});
+        socket.emit('match:input',{roundId:room.roundId,seq:iteration,clientTime:Date.now(),moveX:-1,moveY:0,yaw:0,pitch:0,sprint:true});
         socket.emit('match:weapon',{roundId:room.roundId,id:weapon});
         socket.emit('match:fire',{roundId:room.roundId,seq:iteration});
         await Promise.all([ack,shot]);
@@ -171,7 +172,7 @@ test('two clients can move, fire and switch weapons beside an eightfold Warden w
     }
     for(const [i,id] of ids.entries()){
       const p=room.players.get(id)!;
-      assert.ok(p.x<initial[i]-2,'authoritative movement continues away from the building');
+      assert.ok(p.x<initial[i]-.9,'authoritative movement continues away from the building');
       assert.equal(p.weapons.ar.ammo,ammo[i].ar-4);assert.equal(p.weapons.smg.ammo,ammo[i].smg-4);
       assert.ok(arrivals[i].length>=12);
       for(let j=1;j<arrivals[i].length;j++)assert.ok(arrivals[i][j]-arrivals[i][j-1]<500,'snapshots do not stall for seconds');

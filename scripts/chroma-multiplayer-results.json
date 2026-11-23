@@ -1,0 +1,1447 @@
+{
+  "date": "2026-11-23",
+  "baselineCommit": "bf5217c2f643878637b1f796762fe45b79bb6a0f",
+  "units": {
+    "timing": "milliseconds",
+    "correction": "world units"
+  },
+  "cpu": {
+    "baselineReference": "HEAD",
+    "notes": [
+      "Three rounds per scenario; 120 warmup ticks then 600 measured ticks per round.",
+      "Players are held at ground/roof stress positions; inputs are neutral. Includes room physics, boss, history and JSON snapshot serialization.",
+      "No live sockets, browser/GPU, Internet, event-loop latency, or camera corrections are measured.",
+      "P99 below 16.7ms is a local target, not a bound on Render Free."
+    ],
+    "results": [
+      {
+        "variant": "HEAD",
+        "players": 2,
+        "rooms": 1,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.05110000000001946,
+          "p95": 0.08330000000000837,
+          "p99": 0.23500000000001364,
+          "max": 0.6992000000000189
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 2,
+        "rooms": 1,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.07049999999992451,
+          "p95": 0.16560000000004038,
+          "p99": 1.2980000000000018,
+          "max": 2.1248999999999114
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 2,
+        "rooms": 1,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.0989999999999327,
+          "p95": 0.8223000000000411,
+          "p99": 1.3894999999999982,
+          "max": 3.845299999999952
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 2,
+        "rooms": 4,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.18899999999985084,
+          "p95": 0.3865000000000691,
+          "p99": 0.592200000000048,
+          "max": 1.7262000000000626
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 2,
+        "rooms": 4,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.27009999999972933,
+          "p95": 0.5753999999997177,
+          "p99": 5.210000000000036,
+          "max": 6.916600000000017
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 2,
+        "rooms": 4,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.3540000000002692,
+          "p95": 3.070299999999861,
+          "p99": 4.446100000000115,
+          "max": 13.019200000000637
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 8,
+        "rooms": 1,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.173200000000179,
+          "p95": 0.2632000000003245,
+          "p99": 0.47929999999996653,
+          "max": 2.0125000000007276
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 8,
+        "rooms": 1,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.2103000000006432,
+          "p95": 0.37510000000020227,
+          "p99": 1.4395999999997002,
+          "max": 1.9201999999995678
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 8,
+        "rooms": 1,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.2290000000002692,
+          "p95": 0.8876000000000204,
+          "p99": 1.6752999999998792,
+          "max": 4.652000000000044
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 8,
+        "rooms": 4,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.689700000000812,
+          "p95": 1.0322999999998501,
+          "p99": 1.3584000000000742,
+          "max": 2.284299999999348
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 8,
+        "rooms": 4,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.8612999999986641,
+          "p95": 1.4340999999985797,
+          "p99": 5.508199999998396,
+          "max": 6.498999999999796
+        }
+      },
+      {
+        "variant": "HEAD",
+        "players": 8,
+        "rooms": 4,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.9361000000008062,
+          "p95": 3.52599999999984,
+          "p99": 6.118399999999383,
+          "max": 13.62119999999959
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 2,
+        "rooms": 1,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.0488999999997759,
+          "p95": 0.06999999999970896,
+          "p99": 0.14979999999923166,
+          "max": 0.5592999999989843
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 2,
+        "rooms": 1,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.0694999999996071,
+          "p95": 0.13990000000012515,
+          "p99": 1.2999999999992724,
+          "max": 2.4233000000003813
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 2,
+        "rooms": 1,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.09109999999964202,
+          "p95": 0.7644000000000233,
+          "p99": 1.3914999999997235,
+          "max": 3.6268999999992957
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 2,
+        "rooms": 4,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.18299999999908323,
+          "p95": 0.2794000000012602,
+          "p99": 0.5637000000006083,
+          "max": 0.8258999999998196
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 2,
+        "rooms": 4,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.2680000000000291,
+          "p95": 1.4184000000004744,
+          "p99": 2.633299999999508,
+          "max": 3.4340999999985797
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 2,
+        "rooms": 4,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.36969999999928405,
+          "p95": 3.1543000000001484,
+          "p99": 3.8356999999996333,
+          "max": 5.042100000000573
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 8,
+        "rooms": 1,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.16990000000077998,
+          "p95": 0.23210000000108266,
+          "p99": 0.48519999999916763,
+          "max": 0.9861000000018976
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 8,
+        "rooms": 1,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.21119999999791617,
+          "p95": 0.3967999999986205,
+          "p99": 1.4192000000002736,
+          "max": 2.0407999999988533
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 8,
+        "rooms": 1,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.23209999999744468,
+          "p95": 0.8810000000012224,
+          "p99": 1.6293000000005122,
+          "max": 3.6447000000007392
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 8,
+        "rooms": 4,
+        "scenario": "none",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.6926000000021304,
+          "p95": 1.0465999999978521,
+          "p99": 1.3932000000022526,
+          "max": 1.7008000000023458
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 8,
+        "rooms": 4,
+        "scenario": "normal",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.8712000000014086,
+          "p95": 2.0455000000001746,
+          "p99": 3.286599999999453,
+          "max": 4.4517999999989115
+        }
+      },
+      {
+        "variant": "working-tree",
+        "players": 8,
+        "rooms": 4,
+        "scenario": "grown",
+        "samples": 1800,
+        "allRoomsTick_ms": {
+          "p50": 0.9896999999982654,
+          "p95": 3.2603999999992084,
+          "p99": 4.304500000002008,
+          "max": 5.536500000001979
+        }
+      }
+    ]
+  },
+  "browser": {
+    "notes": [
+      "Two independent headless Chrome windows with real MultiplayerGame renderers and a local Socket.IO server.",
+      "Each scenario warms for two seconds then samples four seconds of a scripted unobstructed rightward run.",
+      "RTT fixture delays both directions by half the requested RTT and adds ordered 35ms jitter bursts (no jitter at RTT zero).",
+      "Grown scenarios have two browser clients plus six server-side fixture players.",
+      "No Render, Internet, mobile device or GPU timing claims; frame_ms is animation frame interval.",
+      "Before and after both had zero backwardFrames in these runs; a zero correction result does not establish all rubber-banding is fixed.",
+      "Rematch and touch assertions were updated for the current protocol and radar label, then verified in an independent run."
+    ],
+    "results": [
+      {
+        "variant": "HEAD",
+        "scenario": "none",
+        "rtt": 0,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 20.123169385779143,
+                "mean": 0.03961253816098256,
+                "p50": 0.032144739481682484,
+                "p95": 0.08955110670311228,
+                "p99": 0.11312238926566899,
+                "max": 0.1300937058275764,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 3998.2,
+                "mean": 7.8859960552268245,
+                "p50": 8,
+                "p95": 8.400000000000546,
+                "p99": 8.600000000000364,
+                "max": 9,
+                "samples": 507
+              },
+              "correction": {
+                "count": 79,
+                "sum": 4.952799999999641,
+                "mean": 0.0626936708860714,
+                "p50": 0.04560000000002162,
+                "p95": 0.15360000000003993,
+                "p99": 0.20639999999998793,
+                "max": 0.20639999999998793,
+                "samples": 79
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 8,
+            "rtt": 3,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 507,
+                "sum": 24.701951101659702,
+                "mean": 0.04872179704469369,
+                "p50": 0.04480738249294705,
+                "p95": 0.10164784437380436,
+                "p99": 0.11534159800227997,
+                "max": 0.13092528369629974,
+                "samples": 507
+              },
+              "frame_ms": {
+                "count": 506,
+                "sum": 3998.2999999999997,
+                "mean": 7.901778656126481,
+                "p50": 8,
+                "p95": 8.5,
+                "p99": 8.699999999999818,
+                "max": 10.699999999999818,
+                "samples": 506
+              },
+              "correction": {
+                "count": 79,
+                "sum": 6.4639999999997855,
+                "mean": 0.08182278481012387,
+                "p50": 0.08079999999999643,
+                "p95": 0.16640000000003852,
+                "p99": 0.20639999999998793,
+                "max": 0.20639999999998793,
+                "samples": 79
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 507,
+            "pending": 9,
+            "rtt": 2,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "HEAD",
+        "scenario": "none",
+        "rtt": 100,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 54.940198826857056,
+                "mean": 0.10793752225315728,
+                "p50": 0.10284928009077357,
+                "p95": 0.22468687680269914,
+                "p99": 0.2592288784078788,
+                "max": 0.29174932351824623,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 3994.4,
+                "mean": 7.862992125984253,
+                "p50": 8,
+                "p95": 8.200000000000728,
+                "p99": 8.5,
+                "max": 8.599999999999454,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 14.764799999999823,
+                "mean": 0.18455999999999778,
+                "p50": 0.20719999999998606,
+                "p95": 0.3359999999999843,
+                "p99": 0.42240000000002453,
+                "max": 0.42240000000002453,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 23,
+            "rtt": 102,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 51.37873278457223,
+                "mean": 0.10094053592253877,
+                "p50": 0.09781503556153845,
+                "p95": 0.22673390725810805,
+                "p99": 0.2721681545291119,
+                "max": 0.2990424881373599,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 3994.4000000000005,
+                "mean": 7.8629921259842535,
+                "p50": 8,
+                "p95": 8.200000000000273,
+                "p99": 8.5,
+                "max": 8.699999999999818,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 14.64399999999982,
+                "mean": 0.18304999999999777,
+                "p50": 0.15840000000002874,
+                "p95": 0.3440000000000367,
+                "p99": 0.39999999999997726,
+                "max": 0.39999999999997726,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 19,
+            "rtt": 102,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "HEAD",
+        "scenario": "none",
+        "rtt": 250,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 506,
+                "sum": 52.92021112387009,
+                "mean": 0.10458539747800413,
+                "p50": 0.09147026175920847,
+                "p95": 0.23403251362702804,
+                "p99": 0.26342675728137976,
+                "max": 0.29409801780357725,
+                "samples": 506
+              },
+              "correction": {
+                "count": 80,
+                "sum": 15.256799999999629,
+                "mean": 0.19070999999999536,
+                "p50": 0.20239999999996883,
+                "p95": 0.3584000000000316,
+                "p99": 0.42480000000001894,
+                "max": 0.42480000000001894,
+                "samples": 80
+              },
+              "frame_ms": {
+                "count": 505,
+                "sum": 3997.7000000000003,
+                "mean": 7.916237623762377,
+                "p50": 8,
+                "p95": 8.400000000000091,
+                "p99": 8.599999999999909,
+                "max": 9,
+                "samples": 505
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 506,
+            "pending": 38,
+            "rtt": 254,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 506,
+                "sum": 48.09355693432551,
+                "mean": 0.0950465552061769,
+                "p50": 0.08100984502222926,
+                "p95": 0.22404449949406055,
+                "p99": 0.25612106003970886,
+                "max": 0.286432609462949,
+                "samples": 506
+              },
+              "correction": {
+                "count": 80,
+                "sum": 14.357599999999834,
+                "mean": 0.17946999999999794,
+                "p50": 0.19999999999997442,
+                "p95": 0.3375999999999806,
+                "p99": 0.39999999999997726,
+                "max": 0.39999999999997726,
+                "samples": 80
+              },
+              "frame_ms": {
+                "count": 505,
+                "sum": 3997.7,
+                "mean": 7.916237623762376,
+                "p50": 8,
+                "p95": 8.400000000000091,
+                "p99": 8.5,
+                "max": 9,
+                "samples": 505
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 506,
+            "pending": 39,
+            "rtt": 261,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "HEAD",
+        "scenario": "grown",
+        "rtt": 0,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 510,
+                "sum": 19.845997078278558,
+                "mean": 0.038913719761330505,
+                "p50": 0.03437429774073559,
+                "p95": 0.09162609207143983,
+                "p99": 0.11208958017497085,
+                "max": 0.1376409350247485,
+                "samples": 510
+              },
+              "frame_ms": {
+                "count": 509,
+                "sum": 3993.5,
+                "mean": 7.845776031434185,
+                "p50": 7.899999999999636,
+                "p95": 8.400000000000546,
+                "p99": 8.700000000000273,
+                "max": 9,
+                "samples": 509
+              },
+              "correction": {
+                "count": 80,
+                "sum": 5.041599999999789,
+                "mean": 0.06301999999999737,
+                "p50": 0.04800000000003024,
+                "p95": 0.14639999999997144,
+                "p99": 0.1680000000000348,
+                "max": 0.1680000000000348,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 510,
+            "pending": 3,
+            "rtt": 3,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 510,
+                "sum": 23.05579987651923,
+                "mean": 0.045207450738273,
+                "p50": 0.03484620900721325,
+                "p95": 0.10483201344136817,
+                "p99": 0.12878203059077384,
+                "max": 0.13728532650634406,
+                "samples": 510
+              },
+              "frame_ms": {
+                "count": 509,
+                "sum": 3993.4000000000005,
+                "mean": 7.845579567779962,
+                "p50": 7.900000000000091,
+                "p95": 8.400000000000091,
+                "p99": 8.699999999999818,
+                "max": 9,
+                "samples": 509
+              },
+              "correction": {
+                "count": 80,
+                "sum": 5.759200000000064,
+                "mean": 0.0719900000000008,
+                "p50": 0.049600000000054933,
+                "p95": 0.16480000000002804,
+                "p99": 0.212799999999973,
+                "max": 0.212799999999973,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 510,
+            "pending": 4,
+            "rtt": 3,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "HEAD",
+        "scenario": "grown",
+        "rtt": 100,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 60.02966596621278,
+                "mean": 0.11816863379175745,
+                "p50": 0.1170274902679539,
+                "p95": 0.22951774846318312,
+                "p99": 0.27164937155465907,
+                "max": 0.3212889822347904,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 3995.4,
+                "mean": 7.880473372781065,
+                "p50": 7.900000000000546,
+                "p95": 8.400000000000091,
+                "p99": 8.600000000000364,
+                "max": 9,
+                "samples": 507
+              },
+              "correction": {
+                "count": 80,
+                "sum": 16.535999999999802,
+                "mean": 0.20669999999999752,
+                "p50": 0.20719999999998606,
+                "p95": 0.3528000000000162,
+                "p99": 0.39999999999997726,
+                "max": 0.39999999999997726,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 19,
+            "rtt": 104,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 55.831731818044865,
+                "mean": 0.10990498389378911,
+                "p50": 0.10894210091766436,
+                "p95": 0.21319644625214937,
+                "p99": 0.24100602170109653,
+                "max": 0.26630585188419786,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 3995.2999999999997,
+                "mean": 7.880276134122288,
+                "p50": 7.900000000000546,
+                "p95": 8.399999999999636,
+                "p99": 8.699999999999818,
+                "max": 9,
+                "samples": 507
+              },
+              "correction": {
+                "count": 80,
+                "sum": 15.607199999999622,
+                "mean": 0.19508999999999527,
+                "p50": 0.20879999999996812,
+                "p95": 0.3504000000000218,
+                "p99": 0.36319999999997776,
+                "max": 0.36319999999997776,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 19,
+            "rtt": 105,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "HEAD",
+        "scenario": "grown",
+        "rtt": 250,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 511,
+                "sum": 64.30827578654947,
+                "mean": 0.12584789782103614,
+                "p50": 0.12713616067564715,
+                "p95": 0.23478567237408754,
+                "p99": 0.2826748642217609,
+                "max": 0.32621521157649624,
+                "samples": 511
+              },
+              "frame_ms": {
+                "count": 510,
+                "sum": 4000.2000000000003,
+                "mean": 7.843529411764706,
+                "p50": 7.900000000000091,
+                "p95": 8.399999999999636,
+                "p99": 8.5,
+                "max": 8.600000000000364,
+                "samples": 510
+              },
+              "correction": {
+                "count": 80,
+                "sum": 17.276799999999824,
+                "mean": 0.2159599999999978,
+                "p50": 0.21919999999998652,
+                "p95": 0.3760000000000474,
+                "p99": 0.4824000000000126,
+                "max": 0.4824000000000126,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 511,
+            "pending": 37,
+            "rtt": 260,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 511,
+                "sum": 59.8359989451508,
+                "mean": 0.11709588834667475,
+                "p50": 0.11547427133379592,
+                "p95": 0.23062362333995234,
+                "p99": 0.2910715093721876,
+                "max": 0.35254244399654056,
+                "samples": 511
+              },
+              "frame_ms": {
+                "count": 510,
+                "sum": 4000,
+                "mean": 7.8431372549019605,
+                "p50": 7.900000000000091,
+                "p95": 8.300000000000182,
+                "p99": 8.5,
+                "max": 8.699999999999818,
+                "samples": 510
+              },
+              "correction": {
+                "count": 80,
+                "sum": 15.995999999999881,
+                "mean": 0.19994999999999852,
+                "p50": 0.20879999999998233,
+                "p95": 0.35439999999999827,
+                "p99": 0.5448000000000093,
+                "max": 0.5448000000000093,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 511,
+            "pending": 38,
+            "rtt": 259,
+            "inputResets": null,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "working-tree",
+        "scenario": "none",
+        "rtt": 0,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 4004.2,
+                "mean": 7.882283464566929,
+                "p50": 7.900000000000091,
+                "p95": 8.400000000000546,
+                "p99": 8.600000000000364,
+                "max": 8.900000000000091,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 14,
+            "rtt": 3,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 4004.1,
+                "mean": 7.882086614173228,
+                "p50": 7.900000000000091,
+                "p95": 8.400000000000091,
+                "p99": 8.600000000000364,
+                "max": 8.900000000000091,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 14,
+            "rtt": 3,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "working-tree",
+        "scenario": "none",
+        "rtt": 100,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 4004.1,
+                "mean": 7.897633136094674,
+                "p50": 8,
+                "p95": 8.5,
+                "p99": 8.599999999999909,
+                "max": 9,
+                "samples": 507
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 16,
+            "rtt": 114,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 4004.2,
+                "mean": 7.897830374753451,
+                "p50": 8,
+                "p95": 8.5,
+                "p99": 8.599999999999909,
+                "max": 9,
+                "samples": 507
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 18,
+            "rtt": 116,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "working-tree",
+        "scenario": "none",
+        "rtt": 250,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 4000.7,
+                "mean": 7.890927021696252,
+                "p50": 8,
+                "p95": 8.400000000000546,
+                "p99": 8.600000000000364,
+                "max": 8.699999999999818,
+                "samples": 507
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 28,
+            "rtt": 253,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 508,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 508
+              },
+              "frame_ms": {
+                "count": 507,
+                "sum": 4000.6,
+                "mean": 7.890729783037475,
+                "p50": 8,
+                "p95": 8.400000000000546,
+                "p99": 8.599999999999909,
+                "max": 8.800000000000182,
+                "samples": 507
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 508,
+            "pending": 29,
+            "rtt": 255,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "working-tree",
+        "scenario": "grown",
+        "rtt": 0,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 4000,
+                "mean": 7.874015748031496,
+                "p50": 8,
+                "p95": 8.400000000000091,
+                "p99": 8.599999999999454,
+                "max": 8.699999999999818,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 11,
+            "rtt": 3,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 3999.9999999999995,
+                "mean": 7.874015748031495,
+                "p50": 8,
+                "p95": 8.399999999999636,
+                "p99": 8.5,
+                "max": 8.700000000000728,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 11,
+            "rtt": 3,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "working-tree",
+        "scenario": "grown",
+        "rtt": 100,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "correction": {
+                "count": 81,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 81
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 4007.2,
+                "mean": 7.888188976377952,
+                "p50": 8,
+                "p95": 8.300000000000182,
+                "p99": 8.5,
+                "max": 8.800000000000182,
+                "samples": 508
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 16,
+            "rtt": 117,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 4007.1,
+                "mean": 7.887992125984252,
+                "p50": 8,
+                "p95": 8.300000000000182,
+                "p99": 8.5,
+                "max": 8.700000000000273,
+                "samples": 508
+              },
+              "correction": {
+                "count": 81,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 81
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 15,
+            "rtt": 107,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      },
+      {
+        "variant": "working-tree",
+        "scenario": "grown",
+        "rtt": 250,
+        "clients": [
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 3991.5999999999995,
+                "mean": 7.857480314960629,
+                "p50": 7.900000000000546,
+                "p95": 8.399999999999636,
+                "p99": 8.5,
+                "max": 8.899999999999636,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 26,
+            "rtt": 256,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          },
+          {
+            "metrics": {
+              "cameraOffset": {
+                "count": 509,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 509
+              },
+              "frame_ms": {
+                "count": 508,
+                "sum": 3991.6000000000004,
+                "mean": 7.857480314960631,
+                "p50": 7.900000000000091,
+                "p95": 8.400000000000091,
+                "p99": 8.5,
+                "max": 8.800000000000182,
+                "samples": 508
+              },
+              "correction": {
+                "count": 80,
+                "sum": 0,
+                "mean": 0,
+                "p50": 0,
+                "p95": 0,
+                "p99": 0,
+                "max": 0,
+                "samples": 80
+              }
+            },
+            "backwardFrames": 0,
+            "frames": 509,
+            "pending": 22,
+            "rtt": 256,
+            "inputResets": 1,
+            "errors": [],
+            "connected": true,
+            "renderer": "WebKit WebGL"
+          }
+        ]
+      }
+    ],
+    "rematch": "PASS: 10 rounds and reconnect; touch weapon selection and cleanup verified"
+  },
+  "validation": {
+    "fullSuite": 261,
+    "additionalMovementTests": 2,
+    "movementSuite": 26,
+    "serverBuild": true,
+    "clientTypecheck": true,
+    "clientBuild": "vite build --configLoader native (restricted environment config resolution)",
+    "rematch": "PASS: 10 rounds and reconnect; touch weapon selection and cleanup verified"
+  },
+  "deployment": "Not deployed. Protocol 18 requires paired client and server deployment; Render hosting settings were not changed."
+}

@@ -10,11 +10,14 @@ export class SimulationClock {
   advance(time:number,update:(dt:number,at:number)=>void) {
     const elapsed=Math.max(0,(time-this.last)/1000);
     this.last=time;
+    const droppedSeconds=Math.max(0,this.accumulator+elapsed-maxCatchUpSeconds);
     this.accumulator=Math.min(maxCatchUpSeconds,this.accumulator+elapsed);
+    let steps=0;
     while(this.accumulator+1e-10>=stepSeconds){
       this.accumulator=Math.max(0,this.accumulator-stepSeconds);
-      update(stepSeconds,time-this.accumulator*1000);
+      update(stepSeconds,time-this.accumulator*1000);steps++;
     }
+    return {steps,droppedSeconds};
   }
 }
 

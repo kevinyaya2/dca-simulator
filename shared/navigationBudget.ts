@@ -3,9 +3,10 @@ export class NavigationBudget {
   readonly stats:NavigationStats={samples:0,nodes:0,routes:0,exhausted:false};
   private deadline:number|undefined;
   constructor(private readonly now=()=>performance.now(),private readonly milliseconds=3,
-    private readonly maxSamples=2048,private readonly maxNodes=512){}
+    private readonly maxSamples=2048,private readonly maxNodes=512,private readonly shared?:NavigationBudget){}
   check(){
     if(this.stats.exhausted)return false;
+    if(this.shared&&!this.shared.check()){this.stats.exhausted=true;return false;}
     const time=this.now();
     this.deadline??=time+this.milliseconds;
     if(time>=this.deadline){this.stats.exhausted=true;return false;}
@@ -14,11 +15,13 @@ export class NavigationBudget {
   sample(){
     if(!this.check())return false;
     if(this.stats.samples>=this.maxSamples){this.stats.exhausted=true;return false;}
+    if(this.shared&&!this.shared.sample()){this.stats.exhausted=true;return false;}
     this.stats.samples++;return true;
   }
   node(){
     if(!this.check())return false;
     if(this.stats.nodes>=this.maxNodes){this.stats.exhausted=true;return false;}
+    if(this.shared&&!this.shared.node()){this.stats.exhausted=true;return false;}
     this.stats.nodes++;return true;
   }
   route(){

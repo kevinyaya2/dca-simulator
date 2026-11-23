@@ -44,7 +44,9 @@ run.onclick=async()=>{
     assert(card.contains(document.elementFromPoint(init.clientX,init.clientY)),'weapon card is not hittable');
     card.dispatchEvent(new PointerEvent('pointerdown',init));
     card.dispatchEvent(new PointerEvent('pointerup',init));
-    assert(socket.weapons.length===1&&socket.weapons[0].id==='smg'&&socket.weapons[0].roundId===roundId,'touch release did not request a weapon for the current round');
+    for(let n=0;n<20&&!socket.inputs.some(command=>command.weapon==='smg');n++)await frame();
+    const switches=socket.inputs.filter(command=>command.weapon==='smg');
+    assert(switches.length===1&&switches[0].roundId===roundId,'touch release did not queue one weapon command for the current round');
     assert(root.querySelector('.co-armory').hidden,'armory did not close after the touch');
   };
   let baseline;let active;
@@ -58,7 +60,7 @@ run.onclick=async()=>{
       const riders=[player('self',67.5),player('peer',68.5)].map(p=>({...p,y:7.65,z:28,supportId:8}));
       const snapshot={scoreTarget:1500,endsAt:Date.now()+480000,environmentTime:105,roundId,tick:3,simulationTime:8,serverTime:Date.now(),players:riders,pickups:[]};
       socket.push('match:snapshot',{...snapshot,roundId:roundId-1});await frame();assert(socket.inputs.length===0,'stale round snapshot accepted');
-      socket.push('match:snapshot',snapshot);await frame();await frame();
+      socket.push('match:snapshot',snapshot);for(let n=0;n<20&&!socket.inputs.length;n++)await frame();
       assert(socket.inputs[0]?.seq===1&&socket.inputs[0]?.roundId===roundId,'new round did not start input sequence at 1');
       assert(Math.abs(game.player.yaw-.4)<1e-8,'initial facing not hydrated from server');
       assert(game.player.supportId===8&&Math.abs(game.player.position.y-7.65)<.01,'local lift passenger not supported');
@@ -68,14 +70,15 @@ run.onclick=async()=>{
       socket.push('match:snapshot',delayed);await frame();
       const expected=dayNightAt(environmentAtSnapshot(delayed,game.serverNow())).night;
       assert(Math.abs(game.arena.lastNight-expected)<.01,'environment uses local round age instead of server timestamp');
-      assert(socket.count===8,'unexpected number of match socket listeners');
+      assert(socket.count===9,'unexpected number of match socket listeners');
       await selectWeapon(roundId);
       const basement={...delayed,tick:5,players:[{...player('self',10),activeWeapon:'smg',y:-4.35,z:18},{...player('peer',10),z:18}],pickups:[{id:'smg',x:-64,y:-6,z:18,available:true,respawnAt:0}]};
       socket.push('match:snapshot',basement);await frame();await frame();await frame();
       assert(root.querySelector('[data-armory=smg]').classList.contains('active'),'equipped weapon was not confirmed by the server snapshot');
       assert(Math.abs(game.player.position.y+4.35)<.01,'B1 reconciliation snapped player to surface');
       assert(Math.abs(game.pickupMeshes.get('smg').position.y+5.1)<.01,'B1 pickup rendered on surface');
-      assert(game.radarCanvas.getAttribute('aria-label')==='Radar B1','radar did not identify current floor');
+      for(let n=0;n<30&&!game.radarCanvas.getAttribute('aria-label')?.endsWith(' B1');n++)await frame();
+      assert(game.radarCanvas.getAttribute('aria-label')?.endsWith(' B1'),'radar did not identify current floor');
       const memory={...game.renderer.info.memory};
       if(!baseline)baseline=memory;
       assert(memory.geometries===baseline.geometries&&memory.textures===baseline.textures,'GPU resource count grows between rounds');
@@ -99,7 +102,7 @@ run.onclick=async()=>{
       results.textContent+=`Round ${roundId}: PASS | geometries ${memory.geometries}, textures ${memory.textures} | released ${released}/${resources.size} | listeners 0, RAF 0, old DOM 0\n`;
       await frame();
       if(roundId===10){
-        socket.weapons=[];
+        socket.weapons=[];socket.inputs=[];
         const restored=new MultiplayerGame(root,socket,'QA',roundId,message=>{throw new Error(message);},'self');
         active=restored;
         restored.start();

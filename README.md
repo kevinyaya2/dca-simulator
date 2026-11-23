@@ -13,6 +13,31 @@ npm run deploy
 
 Deploy the server separately with `npm run server:build` then `npm run server:start`, and configure Render with `PORT` plus `CORS_ORIGIN=https://kevinyaya2.github.io`. Free WebSocket hosts may sleep when idle; the first connection can take longer.
 
+### Multiplayer movement and performance (protocol 18)
+
+Movement commands now represent one 1/60-second simulation step. The server processes at most one command per player per tick; snapshots acknowledge executed commands with `ack`. Commands discarded by a reset or a queue older than 250 ms are reported separately as `inputReset` and `discardedThrough`. `life` isolates respawns; `roundId` isolates rematches. Fire and weapon hotkeys travel with their command and prediction replay only runs movement. Render and look updates remain at display refresh rate, with interpolation between movement steps.
+
+Deploy the server and production client together for protocol 18. During the transition the existing version check rejects mismatched clients; reload clients after both deployments. `/health` reports the protocol and Render commit revision. Roll back both builds together if needed. This change does not alter hosting region, plan, boss growth, damage rules, or visual effects.
+
+Diagnostics are opt-in:
+
+- Add `chromaDiagnostics=1` to the client URL query to show local frame times, RTT, snapshot intervals, reconciliation distances, pending inputs, camera offsets and reset count. No client telemetry is uploaded.
+- Start the server with `CHROMA_DIAGNOSTICS=1` for a JSON summary every 10 seconds: callback/all-room/room ticks, player physics, boss search and clearance/contact destruction, snapshot emission, input discards/resets, catch-up steps, dropped time and event-loop delay. Quantiles use the last 600 samples per metric; counts, sums, means and maxima cover the reporting interval. Search time includes collision work done during search; do not add the nested timings together. Snapshot emission measures synchronous submission/encoding, not network delivery.
+- A cooperative 3 ms search deadline is shared by rooms and catch-up steps in each server timer callback. Room priority rotates. Physics, attacks and collision validation continue when searching is deferred. The deadline is not a hard bound on an entire tick, GC or OS scheduling.
+
+Validation commands:
+
+```bash
+npm run test:chroma
+npm run server:build
+npx tsc --noEmit
+npm run build
+npm run bench:multiplayer -- --compare
+npx tsx scripts/chroma-multiplayer-browser-check.ts --compare
+```
+
+The CPU comparison covers 2/8 players, 1/4 rooms and absent/normal/grown bosses, including JSON snapshot serialization. The browser comparison launches a private temporary Chrome profile, two separate browser windows, a local Vite server on port 5178 and a local Socket.IO server; `BROWSER` can select the Chrome executable. Both benchmarks compare against `HEAD` and clean up their temporary baseline modules. These are local comparisons, not Render or Internet measurements. Browser movement is scripted for an unobstructed rightward run; a zero correction result is not a guarantee for collisions, buffs, latency or arbitrary gameplay. The test suite runs files serially so CPU contention does not invalidate the boss's cooperative deadlines.
+
 ### CHROMA OPS 多人賞金競速（協定 10）
 
 多人 FFA 改為先達 1500 分獲勝，每局最多 8 分鐘；超時最高分獲勝，同分並列，全員零分則平手。2～8 人使用同一組規則。積分與擊殺／死亡數分開，尾刀取得對方死亡前全額賞金，不給助攻分，死亡不扣積分。

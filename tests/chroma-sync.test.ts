@@ -83,6 +83,7 @@ test('both network clients receive current timestamps and new movement acknowled
   const clients=Array.from({length:2},()=>connect(`http://127.0.0.1:${address.port}`,{transports:['websocket'],forceNew:true,autoConnect:false}));
   const realNow=Date.now;
   type Snapshot={serverTime:number;roundId:number;tick:number;players:{id:string;ack:number;x:number;y:number;z:number}[]};
+  const movementTimers:ReturnType<typeof setInterval>[]=[];
   try{
     await Promise.all(clients.map(socket=>{const ready=event(socket,'connect');socket.connect();return ready;}));
     const host=await clients[0].emitWithAck('room:create','Clock Host');
@@ -110,11 +111,13 @@ test('both network clients receive current timestamps and new movement acknowled
     });
     const accepted=await Promise.all(moved);
     for(const snapshot of accepted)assert.ok(Date.now()-snapshot.serverTime<100,'clock stays current while processing new movement');
+    clients.forEach((socket,i)=>{let seq=100;movementTimers.push(setInterval(()=>socket.emit('match:input',{
+      roundId:before.roundId,seq:++seq,clientTime:Date.now(),moveX:0,moveY:1,yaw:headings[i],pitch:0}),1000/60));});
     const advanced=await Promise.all(clients.map((socket,i)=>event<Snapshot>(socket,'match:snapshot',s=>s.tick>=accepted[i].tick+12)));
     for(const [i,snapshot] of advanced.entries()){
       const id=i===0?host.playerId:guest.playerId,old=accepted[i].players.find(p=>p.id===id)!,next=snapshot.players.find(p=>p.id===id)!;
       const forward=-(next.x-old.x)*Math.sin(headings[i])-(next.z-old.z)*Math.cos(headings[i]);
       assert.ok(forward>.5,'forward input continues to advance on the authoritative server');
     }
-  }finally{Date.now=realNow;clients.forEach(socket=>socket.disconnect());server.close();}
+  }finally{movementTimers.forEach(clearInterval);Date.now=realNow;clients.forEach(socket=>socket.disconnect());server.close();}
 });

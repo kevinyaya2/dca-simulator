@@ -24,6 +24,7 @@ export type WardenRound = {
   searchRetryAt?:number; searchRetryTarget?:string; searchScale?:number; searchStats?:NavigationStats;
   searchJob?:{from:WardenPoint;to:WardenPoint;scale:number;destroyed:ReadonlySet<string>;near:boolean;neutral:boolean;work:NavigationSearch;approach?:WardenPoint};
   contact?:WardenPoint&{air:number;scale:number};
+  timings?:{search:number;collision:number};
 };
 
 export function createWardenRound(startAt:number,delay:number=rules.spawnDelayMs):WardenRound {
@@ -60,17 +61,20 @@ function clearContact(boss:WardenSnapshot,terrain:Terrain){
 }
 
 function hasClearance(p:WardenPoint,terrain:Terrain,breakable=false,commit=false) {
+  const started=terrain.round.timings?performance.now():0;
+  try {
   const radius=rules.radius*terrain.scale,height=rules.height*terrain.scale;
   const {dynamic,round}=terrain;
-  const candidates=[...arenaBoxesNear(p.x,p.z,Math.min(radius,Math.hypot(ARENA_BOUNDS.width,ARENA_BOUNDS.depth))),...dynamic];
+  const candidates=arenaBoxesNear(p.x,p.z,Math.min(radius,Math.hypot(ARENA_BOUNDS.width,ARENA_BOUNDS.depth)));
   const hits:string[]=[];
-  for(const box of candidates){
+  for(const boxes of [candidates,dynamic])for(const box of boxes){
     if(box.maxY<=p.y+.025||box.minY>=p.y+height||!intactBox(box,round.destroyed)||!overlapsBox(p.x,p.z,box,radius))continue;
     if(!breakable||!terrain.breakable||p.y<0||!box.breakKey)return false;
     if(commit)hits.push(box.breakKey);
   }
   if(hits.length)round.destroyed=new Set([...round.destroyed,...hits]);
   return true;
+  } finally {if(terrain.round.timings)terrain.round.timings.collision+=performance.now()-started;}
 }
 
 function canStand(p:WardenPoint,terrain:Terrain,breakable=false,commit=false) {
@@ -96,6 +100,8 @@ function traceWalk(from:WardenPoint,to:WardenPoint,terrain:Terrain,air=0,breakab
 
 function routeTo(from:WardenPoint,to:WardenPoint,terrain:Terrain,near=false,neutral=false) {
   if(!terrain.search.route())return [];
+  const started=terrain.round.timings?performance.now():0;
+  try {
   const {round}=terrain;
   let job=round.searchJob;
   if(!job||gap(job.from,from)>1||gap(job.to,to)>=1.5||job.scale!==terrain.scale||job.destroyed!==round.destroyed||job.near!==near||job.neutral!==neutral){
@@ -126,6 +132,7 @@ function routeTo(from:WardenPoint,to:WardenPoint,terrain:Terrain,near=false,neut
   const result=job.work.advance(terrain.search);
   if(result!==undefined)round.searchJob=undefined;
   return result??(near&&job.approach&&gap(from,job.approach)>.1?[job.approach]:[]);
+  } finally {if(terrain.round.timings)terrain.round.timings.search+=performance.now()-started;}
 }
 
 function retreatToSurface(boss:WardenPoint,terrain:Terrain) {
@@ -248,6 +255,7 @@ function startAttack(round:WardenRound,boss:WardenSnapshot,target:WardenPlayer,a
     const length=limitAdvance(boss,yaw,Math.min(moves[kind].range*scale,distance+(kind==='dash'?2:.3)));
     const end={x:from.x+Math.sin(yaw)*length,y:from.y,z:from.z+Math.cos(yaw)*length};
     to=traceWalk(from,end,terrain,0,kind==='dash',false,terrain.search);
+    if(terrain.search.stats.exhausted)return false;
     if(planar(from,to)<1.5)return false;
     if(kind==='leap'){
       for(const height of [2.45,1.3,.65,.3]){
@@ -316,7 +324,7 @@ function runAttack(round:WardenRound,boss:WardenSnapshot,at:number,dt:number,tar
           const length=limitAdvance(boss,angle,Math.min(moves.leap.range*scale,planar(from,player)));
           const desired={x:from.x+Math.sin(angle)*length,y:from.y,z:from.z+Math.cos(angle)*length};
           const reached=traceWalk(from,desired,terrain,attack.jumpHeight,false,false,terrain.search);
-          if(planar(reached,from)>1){
+          if(!terrain.search.stats.exhausted&&planar(reached,from)>1){
             landing=reached;boss.yaw=angle;boss.attack={...attack,to:landing,yaw:angle};
           }
         }
@@ -354,7 +362,8 @@ function runAttack(round:WardenRound,boss:WardenSnapshot,at:number,dt:number,tar
   }
 }
 
-export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:number,players:Iterable<WardenPlayer>,deal:Damage=()=>{}) {
+export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:number,players:Iterable<WardenPlayer>,deal:Damage=()=>{},sharedBudget?:NavigationBudget,diagnostics=false) {
+  round.timings=diagnostics?{search:0,collision:0}:undefined;
   if(round.finished)return;
   if(!round.boss){
     if(at<round.spawnAt)return;
@@ -408,10 +417,12 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
     return ground;
   };
   const scale=boss.scale;
-  const search=new NavigationBudget();
+  const search=new NavigationBudget(undefined,3,2048,512,sharedBudget);
   round.searchStats=search.stats;
   const terrain:Terrain={dynamic,round,scale,breakable:boss.kills>0&&boss.y>=-.05,search};
+  const contactStarted=diagnostics?performance.now():0;
   clearContact(boss,terrain);
+  if(round.timings)round.timings.collision+=performance.now()-contactStarted;
   if(round.searchScale!==scale){round.searchRetryAt=0;round.repathAt=0;round.searchScale=scale;}
   if(round.routeScale!==undefined&&round.routeScale!==scale){round.route=[];round.routeGoal=undefined;}
   if(boss.y>=-.05){
@@ -475,14 +486,14 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
   if(!legal.length&&owner?.alive&&!round.guard&&gap(boss,anchor)<=rules.followDistance+rules.radius*scale){
     const close=gap(boss,anchor)<=rules.followDistance;
     const waiting=at<round.repathAt&&!round.route.length;
-    const blocked=!close&&!waiting&&gap(traceWalk(boss,anchor,terrain,0,true,false,search),anchor)>.015;
+    const blocked=!close&&!waiting&&search.check()&&gap(traceWalk(boss,anchor,terrain,0,true,false,search),anchor)>.015&&!search.stats.exhausted;
     if(close||waiting||blocked){
       round.route=[];round.routeGoal=undefined;
       if(blocked)round.repathAt=at+620;
       setState(boss,'FOLLOW',at);return;
     }
   }
-  if(at>=Math.max(round.repathAt,round.searchRetryAt??0)){
+  if(at>=Math.max(round.repathAt,round.searchRetryAt??0)&&search.check()){
     round.repathAt=at+620;
     const previousRoute=round.route,previousGoal=round.routeGoal;
     boss.targetId=null;
@@ -547,6 +558,16 @@ export function stepWarden(round:WardenRound,at:number,dt:number,simulationTime:
         if(round.route.length&&gap(boss,round.route[round.route.length-1])<.18)round.route=[];
         if(!round.route.length&&!round.searchJob)round.patrol=(round.patrol+1)%WARDEN_PATROL.length;
       }
+    }
+    if(search.stats.exhausted){
+      // A deferred search is not a failed path. Keep moving along the last
+      // validated route (advance still checks current collisions), and retry
+      // next tick when shared room priority rotates. Local failures retain their
+      // normal 620ms backoff.
+      if(!round.route.length&&previousRoute.length&&previousGoal&&round.routeScale===terrain.scale){
+        round.route=previousRoute;round.routeGoal=previousGoal;boss.targetId=previous?.id??null;
+      }
+      if(sharedBudget?.stats.exhausted){round.repathAt=at;round.searchRetryAt=at;}
     }
   }
   const target=legal.find(p=>p.id===boss.targetId);
