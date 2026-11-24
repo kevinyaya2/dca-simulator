@@ -10,6 +10,7 @@ const APPS = [
   { id: "jump", name: "跳躍遊戲", subtitle: "Jump Game", icon: "jump", color: "linear-gradient(145deg, #ffbf88, #ff9868)", route: "/jump" },
   { id: "autobattle", name: "自動戰鬥", subtitle: "Auto Battle", icon: "bot", color: "linear-gradient(145deg, #aad5ff, #f2a9d8)", route: "/autobattle" },
   { id: "toeic", name: "多益單字", subtitle: "TOEIC Vocab", icon: "book", color: "linear-gradient(145deg, #89d5ff, #5ba7ff)", route: "/toeic" },
+  { id: "japanese-study", name: "日文自習室", subtitle: "JLPT N5", icon: "book", color: "linear-gradient(145deg, #7dd0aa, #2b7963)", route: "/japanese-study" },
   { id: "flappy", name: "薪水小鳥", subtitle: "Flappy Salary", icon: "bird", color: "linear-gradient(145deg, #7086ea, #8155b8)", route: "/flappy" },
   { id: "spicy", name: "麻辣遊戲", subtitle: "Spicy Game", icon: "pepper", color: "linear-gradient(145deg, #ff7c7c, #ffad62)", route: "/spicy" },
   { id: "md-calc", name: "MD 計算機", subtitle: "Rank Calculator", icon: "chart", color: "linear-gradient(145deg, #2fd3a7, #2f8dff)", route: "/md-calc" },

@@ -11,6 +11,7 @@ const FightGame = lazy(() => import("./FightGame"));
 const JumpGame = lazy(() => import("./JumpGame"));
 const AutoBattle = lazy(() => import("./AutoBattle"));
 const ToeicVocab = lazy(() => import("./ToeicVocab"));
+const JapaneseStudy = lazy(() => import("./JapaneseStudy"));
 const FlappySalaryGame = lazy(() => import("./FlappySalaryGame"));
 const SpicyGame = lazy(() => import("./SpicyGame"));
 const BombGame = lazy(() => import("./BombGame"));
@@ -31,6 +32,7 @@ const routes = [
   { path: "/jump", element: <JumpGame />, title: "Jump Game" },
   { path: "/autobattle", element: <AutoBattle />, title: "Auto Battle" },
   { path: "/toeic", element: <ToeicVocab />, title: "TOEIC Vocab" },
+  { path: "/japanese-study", element: <JapaneseStudy />, title: "日文自習室" },
   { path: "/flappy", element: <FlappySalaryGame />, title: "Flappy Salary" },
   { path: "/spicy", element: <SpicyGame />, title: "Spicy Game" },
   { path: "/md-calc", element: <MDCalculator />, title: "MD Calculator" },
