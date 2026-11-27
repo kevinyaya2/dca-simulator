@@ -18,13 +18,14 @@ export class DesktopInput {
     const movement=['w','a','s','d','shift'].includes(key);
     if(!this.canPlay||(event.target instanceof HTMLElement&&event.target.closest(movement?'input, textarea, select, [contenteditable]':'input, button, textarea, select, [contenteditable]')))return;
     if(this.armoryOpen&&!movement)return;
-    if (!['w', 'a', 's', 'd', ' ', 'r', 'q', '1', '2', '3', '4', '5', '6', '7', 'shift'].includes(key)) return;
+    const weaponKey=/^[1-8]$/.test(key);
+    if (!weaponKey&&!['w', 'a', 's', 'd', ' ', 'r', 'q', 'shift'].includes(key)) return;
     event.preventDefault();
     const firstPress=!event.repeat&&!this.keys.has(key);
     this.keys.add(key);
     if (key === ' ' && firstPress) this.input.set({ jump: true });
     if (key === 'r') this.input.set({ reload: true });
-    if (/^[1-7]$/.test(key)) this.input.set({ switchWeapon: +key });
+    if (weaponKey) this.input.set({ switchWeapon: +key });
   };
   private onMove = (event: MouseEvent) => {
     if (this.canPlay&&!this.armoryOpen) {

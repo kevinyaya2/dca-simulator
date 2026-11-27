@@ -25,6 +25,3 @@
 .co-touch-ui .co-tactical-columns{position:sticky;top:0;background:#142139;z-index:1}
 .co-tactical-trigger:focus-visible,.co-tactical-close:focus-visible{outline:2px solid #55f1ae;outline-offset:3px}
 .co-touch-ui .co-lock-hint{display:none}
-.co-minimap{position:absolute;z-index:6;top:max(18px,env(safe-area-inset-top));left:max(18px,env(safe-area-inset-left));right:auto;width:142px;height:128px;border:1px solid #ffffff77;border-radius:14px;background:linear-gradient(135deg,#10254bf2,#163c5bf2);box-shadow:0 10px 28px #0005,inset 0 0 0 8px #ffffff0b;pointer-events:none;overflow:hidden}
-.co-minimap canvas{display:block;width:100%;height:100%}
-@media(pointer:coarse){.co-minimap{top:max(14px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));width:116px;height:104px}}

@@ -1,4 +1,4 @@
-export const MULTIPLAYER_PROTOCOL_VERSION = 18;
+export const MULTIPLAYER_PROTOCOL_VERSION = 19;
 import type { KillEvent } from './combat.js';
 import type { WeaponId } from './weapons.js';
 import type { WardenAttackKind } from './voidWarden.js';

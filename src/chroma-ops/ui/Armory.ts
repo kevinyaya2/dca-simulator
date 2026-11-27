@@ -1,4 +1,4 @@
-import { WEAPON_IDS, WEAPON_SPECS, magazineCapacity, weaponRange, weaponDamageMultiplier, type WeaponId, type WeaponLevel } from '../../../shared/weapons';
+import { ARMORY_WEAPON_IDS, WEAPON_SPECS, magazineCapacity, weaponRange, weaponDamageMultiplier, type WeaponId, type WeaponLevel } from '../../../shared/weapons';
 
 type Gesture={x:number;y:number;inside:boolean;moved:boolean;touch:boolean;card:HTMLElement|null};
 export class Armory {
@@ -21,7 +21,7 @@ export class Armory {
     this.close();
   }
   private selectCard(card:HTMLElement){
-    const id=card.dataset.armory as WeaponId,index=WEAPON_IDS.indexOf(id);
+    const id=card.dataset.armory as WeaponId,index=ARMORY_WEAPON_IDS.indexOf(id);
     if(index<0)return;
     this.selected=index;this.render();this.equip(id);
   }
@@ -77,7 +77,7 @@ export class Armory {
     }
     if(!this.open||!(event.target instanceof HTMLElement))return;
     this.consume(event);
-    if(this.pointerLocked){this.equip(WEAPON_IDS[this.selected]);return;}
+    if(this.pointerLocked){this.equip(ARMORY_WEAPON_IDS[this.selected]);return;}
     if(!this.box.contains(event.target)){this.close();return;}
     const card=event.target.closest<HTMLElement>('[data-armory]');
     if(card)this.selectCard(card);
@@ -95,7 +95,7 @@ export class Armory {
     root.insertAdjacentHTML('beforeend',`<div class="co-armory" hidden><div class="co-armory-head">武器庫<small>${hint}</small></div><div class="co-armory-track"></div></div>`);
     this.box=root.querySelector('.co-armory')!;this.track=this.box.querySelector('.co-armory-track')!;
     this.trigger=root.querySelector('[data-weapon]');
-    this.track.innerHTML=WEAPON_IDS.map(id=>{const w=WEAPON_SPECS[id];return `<button type="button" class="co-weapon-card" data-armory="${id}" style="--weapon:#${w.color.toString(16).padStart(6,'0')}"><span>${w.icon}</span><b>${w.label}</b><strong class="co-level"></strong><small></small><em></em><div class="co-weapon-stats"></div></button>`;}).join('');
+    this.track.innerHTML=ARMORY_WEAPON_IDS.map(id=>{const w=WEAPON_SPECS[id];return `<button type="button"${id==='prism'?' hidden':''} class="co-weapon-card" data-armory="${id}" style="--weapon:#${w.color.toString(16).padStart(6,'0')}"><span>${w.icon}</span><b>${w.label}</b><strong class="co-level"></strong><small></small><em></em><div class="co-weapon-stats"></div></button>`;}).join('');
     root.addEventListener('pointerdown',this.onPointerDown,true);
     window.addEventListener('pointermove',this.onPointerMove,true);window.addEventListener('pointerup',this.onPointerUp,true);window.addEventListener('pointercancel',this.onPointerCancel,true);
     if(!window.PointerEvent){root.addEventListener('touchstart',this.onTouchStart,{capture:true,passive:false});window.addEventListener('touchmove',this.onTouchMove,true);window.addEventListener('touchend',this.onTouchEnd,{capture:true,passive:false});window.addEventListener('touchcancel',this.onTouchEnd,true);}
@@ -113,18 +113,19 @@ export class Armory {
     this.trigger?.setAttribute('aria-expanded','false');
     if(restorePointerLock)this.afterClose?.();
   }
-  toggle(){if(!this.enabled)return;if(this.open){this.close();return;}this.root.dispatchEvent(new Event('armory:open'));this.open=true;this.box.hidden=false;this.trigger?.setAttribute('aria-expanded','true');const index=WEAPON_IDS.indexOf(this.active);if(index>=0)this.selected=index;this.render();this.scrollSelected(false);}
-  move(delta:number){this.selected=(this.selected+delta+WEAPON_IDS.length)%WEAPON_IDS.length;this.render();this.scrollSelected();}
+  toggle(){if(!this.enabled)return;if(this.open){this.close();return;}this.root.dispatchEvent(new Event('armory:open'));this.open=true;this.box.hidden=false;this.trigger?.setAttribute('aria-expanded','true');const index=ARMORY_WEAPON_IDS.indexOf(this.active);if(index>=0)this.selected=index;this.render();this.scrollSelected(false);}
+  move(delta:number){const count=ARMORY_WEAPON_IDS.length-(this.owned().has('prism')?0:1);this.selected=(this.selected+delta+count)%count;this.render();this.scrollSelected();}
   render(active:WeaponId=this.active){
     this.active=active;this.box.hidden=!this.open;
-    const owned=this.owned(),signature=`${this.open}|${active}|${this.selected}|${WEAPON_IDS.map(id=>`${owned.has(id)}:${this.level(id)}`).join('|')}`;
+    const owned=this.owned(),signature=`${this.open}|${active}|${this.selected}|${ARMORY_WEAPON_IDS.map(id=>`${owned.has(id)}:${this.level(id)}`).join('|')}`;
     if(signature===this.signature)return;this.signature=signature;
-    WEAPON_IDS.forEach((id,index)=>{
+    ARMORY_WEAPON_IDS.forEach((id,index)=>{
       const card=this.track.children[index] as HTMLButtonElement,has=owned.has(id),spec=WEAPON_SPECS[id],level=this.level(id);
+      if(id==='prism')card.hidden=!has;
       card.classList.toggle('active',id===active);card.classList.toggle('focus',index===this.selected);card.classList.toggle('locked',!has);card.setAttribute('aria-disabled',String(!has));card.dataset.level=has?String(level):'0';
       (card.querySelector('small') as HTMLElement).textContent=has?spec.description:'尚未取得';
       const badge=card.querySelector('.co-level'),capacity=card.querySelector('em');
-      if(badge)badge.textContent=has?`Lv.${level}${level===3?' · 滿級':''}`:'未解鎖';
+      if(badge)badge.textContent=id==='prism'?'武器全收集':has?`Lv.${level}${level===3?' · 滿級':''}`:'未解鎖';
       if(capacity)capacity.textContent=`${magazineCapacity(id,level)} 發彈匣`;
       const stats=card.querySelector('.co-weapon-stats');
       if(stats)stats.textContent=`${spec.pellets?'每顆':'傷害'} ${Math.round(spec.damage*weaponDamageMultiplier(level))} · 射程 ${Number(weaponRange(id,level).toFixed(2))}`;

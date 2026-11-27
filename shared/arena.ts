@@ -9,7 +9,8 @@ export type SimInput = { moveX: number; moveY: number; lookX: number; lookY: num
 export type SimPlayer = { x: number; y: number; z: number; yaw: number; pitch: number; velocityY: number; jumpsUsed: number; alive: boolean; supportId?: number | null };
 export type RayPoint={x:number;y:number;z:number};
 export type SimWorld = { boxes: readonly ArenaBox[]; heightAt: (x: number, z: number) => number;destroyed?:ReadonlySet<string>;
-  rayCandidates?:(origin:RayPoint,direction:RayPoint,max:number)=>Iterable<ArenaBox> };
+  rayCandidates?:(origin:RayPoint,direction:RayPoint,max:number)=>Iterable<ArenaBox>;
+  boxesNear?:(x:number,z:number,radius:number)=>readonly ArenaBox[] };
 export const ARENA_BOUNDS = { minX: -154, maxX: 154, minZ: -140, maxZ: 140, width: 308, depth: 280 } as const;
 export const ARENA_CAMERA_FAR = 560;
 export const PLAYER_MOVE_SPEED = 8;
@@ -52,6 +53,7 @@ export function arenaWorld(seconds:number,destroyed?:ReadonlySet<string>):SimWor
   }
   const dynamic=movingBoxes(seconds);
   return {boxes:[...boxes,...dynamic],heightAt:terrainHeight,
+    boxesNear:(x,z,radius)=>[...arenaBoxesNear(x,z,radius).filter(box=>intactBox(box,destroyed)),...dynamic],
     rayCandidates:(origin,direction,max)=>arenaRayCandidates(origin,direction,max,destroyed,dynamic)};
 }
 export function groundHeight(x: number, z: number) {

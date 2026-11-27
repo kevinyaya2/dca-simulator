@@ -25,7 +25,7 @@ function SoloGame({ onBack, fullscreenButton }) {
   }, []);
   return <main className="chroma-ops">
     <div className="co-game-stage" ref={stage} />
-    <div className="co-start">CHROMA OPS <small>WASD 移動 · Shift 跑步 · 1–7 武器 · 狙擊槍右鍵開鏡</small></div>
+    <div className="co-start">CHROMA OPS <small>WASD 移動 · Shift 跑步 · 1–8 武器 · 狙擊槍右鍵開鏡</small></div>
     <button type="button" className="co-exit" onClick={onBack}>← 選擇模式</button>
     {fullscreenButton}
   </main>;

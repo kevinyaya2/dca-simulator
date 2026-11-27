@@ -7,7 +7,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { groundHeight, arenaWorld, staticArenaWorld, stepPlayer, type SimInput } from '../../shared/arena.js';
 import { chooseRespawnPoint, chooseWeaponPoint, initialWeaponPoints, type SpawnPoint } from '../../shared/spawns.js';
-import { WEAPON_IDS, WEAPON_SPECS, weaponDamageMultiplier, createWeaponStates, collectWeapon, clearWeaponBoosts, refillWeapons, advanceWeaponReload, type WeaponState, type WeaponId } from '../../shared/weapons.js';
+import { WEAPON_IDS, ARMORY_WEAPON_IDS, WEAPON_SPECS, weaponDamageMultiplier, createWeaponStates, collectWeapon, clearWeaponBoosts, refillWeapons, advanceWeaponReload, canUnlockPrism, type WeaponState, type WeaponId, type PickupWeaponId } from '../../shared/weapons.js';
+import { advancePrism, launchPrism, type PrismOrb, type PrismUnlock } from '../../shared/prism.js';
 import { MULTIPLAYER_PROTOCOL_VERSION, isCurrentRound, type RoomNotice } from '../../shared/protocol.js';
 import { SCORE_TARGET, ROUND_DURATION_MS, initialBounty, settleBountyDeath, settleBountyKill, finalStandings, type BountyState, type FinalStanding, type EndReason } from '../../shared/bounty.js';
 
@@ -33,7 +34,7 @@ type Player = BountyState & {
   life:number; lastShot:number; lastReceivedSeq:number; lastProcessedSeq:number; input:Input; slowUntil:number; burn:BurnState;
   movement?:MovementQueue;
 };
-type Pickup = { id:WeaponId; x:number; y:number; z:number; available:boolean; respawnAt:number };
+type Pickup = { id:PickupWeaponId; x:number; y:number; z:number; available:boolean; respawnAt:number };
 type History = { at:number; simulationTime:number; warden?:WardenSnapshot|null; destroyed?:ReadonlySet<string>; players:Map<string,{x:number;y:number;z:number;alive:boolean;yaw:number;life:number}> };
 type Room = {
   environmentTime:number; code:string; host:string; roundId:number; state:'LOBBY'|'PLAYING'|'GAME_OVER';
@@ -44,6 +45,7 @@ type Room = {
   endsAt?:number; winnerIds?:string[]; endReason?:EndReason; finalStandings?:FinalStanding[];
   respawnTimers:Map<string,NodeJS.Timeout>; gameOverTimer?:NodeJS.Timeout;
   warden?:WardenRound;
+  prismOrbs?:Map<string,{orb:PrismOrb;damageMultiplier:number}>;
   metrics?:PerformanceMetrics;
 };
 
@@ -58,18 +60,18 @@ function createPickups(players:Player[]=[]):Pickup[]{const pickups:Pickup[]=[];f
 
 function roomCode(rooms:Map<string,Room>):string{let value='';while(value.length<6)value+=chars[Math.floor(Math.random()*chars.length)];return rooms.has(value)?roomCode(rooms):value;}
 function publicPlayer(p:Player){const {movement,input,lastShot,burn,lastReceivedSeq,lastProcessedSeq,socketId,resumeToken,consecutiveDeaths,...safe}=p;void movement;void resumeToken;void consecutiveDeaths;return{...safe,connected:!!socketId,burnUntil:burn?.expiresAt??0};}
-function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups,warden:room.warden?.boss??null,wardenWarning:wardenSpawnWarning(room.warden,room.lastStep),destroyedBuildingParts:[...(room.warden?.destroyed??[])]};}
+function roomState(room:Room){return{protocolVersion:MULTIPLAYER_PROTOCOL_VERSION,code:room.code,host:room.host,roundId:room.roundId,state:room.state,lobbyReason:room.lobbyReason,winner:room.winner,winnerId:room.winnerId,winnerTitle:room.winnerTitle,winnerIds:room.winnerIds,endReason:room.endReason,finalStandings:room.finalStandings,scoreTarget:SCORE_TARGET,endsAt:room.endsAt,returnAt:room.returnAt,serverTime:now(),environmentTime:room.environmentTime,notices:room.notices??[],players:[...room.players.values()].map(publicPlayer),pickups:room.pickups,prismOrbs:[...(room.prismOrbs?.values()??[])].map(entry=>entry.orb),warden:room.warden?.boss??null,wardenWarning:wardenSpawnWarning(room.warden,room.lastStep),destroyedBuildingParts:[...(room.warden?.destroyed??[])]};}
 function announceConnection(io:Server,room:Room,player:Player,kind:RoomNotice['kind']){
   const notice:RoomNotice={id:randomUUID(),code:room.code,playerId:player.id,name:player.name,kind,at:now()};
   room.notices=[...(room.notices??[]),notice].slice(-20);
   io.to(room.code).emit('room:notice',notice);
 }
 function emitRoom(io:Server,room:Room){io.to(room.code).emit('room:state',roomState(room));}
-function emitSnapshot(io:Server,room:Room){const started=performance.now();io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq,inputReset:p.movement?.resetId??0,discardedThrough:p.movement?.discardedThrough??0})),pickups:room.pickups,warden:room.warden?.boss??null,wardenWarning:wardenSpawnWarning(room.warden,room.lastStep),destroyedBuildingParts:[...(room.warden?.destroyed??[])]});room.metrics?.record('snapshotEmit_ms',performance.now()-started);}
+function emitSnapshot(io:Server,room:Room){const started=performance.now();io.to(room.code).emit('match:snapshot',{scoreTarget:SCORE_TARGET,endsAt:room.endsAt,environmentTime:room.environmentTime,roundId:room.roundId,simulationTime:(room.lastStep-room.wheelEpoch)/1000,serverTime:room.lastStep,tick:room.tick,players:[...room.players.values()].map(p=>({...publicPlayer(p),ack:p.lastProcessedSeq,inputReset:p.movement?.resetId??0,discardedThrough:p.movement?.discardedThrough??0})),pickups:room.pickups,prismOrbs:[...(room.prismOrbs?.values()??[])].map(entry=>entry.orb),warden:room.warden?.boss??null,wardenWarning:wardenSpawnWarning(room.warden,room.lastStep),destroyedBuildingParts:[...(room.warden?.destroyed??[])]});room.metrics?.record('snapshotEmit_ms',performance.now()-started);}
 function clearRespawns(room:Room){for(const timer of room.respawnTimers.values())clearTimeout(timer);room.respawnTimers.clear();}
 function clearGameOverTimer(room:Room){if(room.gameOverTimer)clearTimeout(room.gameOverTimer);room.gameOverTimer=undefined;room.returnAt=undefined;}
 function clearWarden(room:Room){room.warden=undefined;for(const player of room.players.values())player.blessingUntil=0;}
-function returnToLobby(io:Server,room:Room,reason?:string){room.lobbyReason=reason;clearGameOverTimer(room);clearRespawns(room);clearWarden(room);room.state='LOBBY';clearResult(room);emitRoom(io,room);}
+function returnToLobby(io:Server,room:Room,reason?:string){room.lobbyReason=reason;clearGameOverTimer(room);clearRespawns(room);clearWarden(room);room.prismOrbs?.clear();room.state='LOBBY';clearResult(room);emitRoom(io,room);}
 function clearResult(room:Room){
   room.winner=undefined;room.winnerId=undefined;room.winnerTitle=undefined;
   room.winnerIds=undefined;room.endReason=undefined;room.finalStandings=undefined;room.endsAt=undefined;
@@ -78,6 +80,7 @@ export function finishRound(io:Server,room:Room,reason:'target'|'timeout',title?
   if(room.state!=='PLAYING')return;
   clearRespawns(room);clearGameOverTimer(room);
   clearWarden(room);
+  room.prismOrbs?.clear();
   room.finalStandings=finalStandings([...room.players.values()]);
   const top=room.finalStandings[0]?.score??0;
   room.winnerIds=top>0?room.finalStandings.filter(p=>p.rank===1).map(p=>p.id):[];
@@ -92,7 +95,7 @@ function expireRound(io:Server,room:Room,at=now()){
   if(room.endsAt!==undefined&&at>=room.endsAt){finishRound(io,room,'timeout');return true;}
   return false;
 }
-export function beginRound(io:Server,room:Room,wardenSpawnDelayMs?:number){clearGameOverTimer(room);clearRespawns(room);room.state='PLAYING';clearResult(room);room.endsAt=now()+ROUND_DURATION_MS;room.lobbyReason=undefined;room.roundId++;room.tick=0;room.winner=undefined;room.winnerId=undefined;room.history=[];room.killTracker.reset();room.winnerTitle=undefined;room.lastStep=now();room.wheelEpoch=room.lastStep;room.warden=createWardenRound(room.lastStep,wardenSpawnDelayMs);for(const p of room.players.values())p.alive=false;for(const p of room.players.values())resetPlayer(p,room,true);room.pickups=createPickups([...room.players.values()]);emitRoom(io,room);}
+export function beginRound(io:Server,room:Room,wardenSpawnDelayMs?:number){clearGameOverTimer(room);clearRespawns(room);room.state='PLAYING';clearResult(room);room.endsAt=now()+ROUND_DURATION_MS;room.lobbyReason=undefined;room.roundId++;room.prismOrbs?.clear();room.tick=0;room.winner=undefined;room.winnerId=undefined;room.history=[];room.killTracker.reset();room.winnerTitle=undefined;room.lastStep=now();room.wheelEpoch=room.lastStep;room.warden=createWardenRound(room.lastStep,wardenSpawnDelayMs);for(const p of room.players.values())p.alive=false;for(const p of room.players.values())resetPlayer(p,room,true);room.pickups=createPickups([...room.players.values()]);emitRoom(io,room);}
 
 function resetPlayer(p:Player,room:Room,newRound=false){
   const spawn=chooseRespawnPoint([...room.players.values()].filter(other=>other.id!==p.id),previousSpawns.get(p.id));
@@ -159,18 +162,37 @@ export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
   if(expireRound(io,room))return;
   const time=now(),id=shooter.activeWeapon,spec=WEAPON_SPECS[id],state=shooter.weapons[id];
   if(!shooter.alive||state.reloadUntil>time||state.ammo<=0||time-shooter.lastShot<spec.fireDelay*1000)return;
-  shooter.lastShot=time;state.ammo--;const base=aimDirection(shooter.input.yaw,shooter.input.pitch),history=historicalPlayers(room,clientTime);
+  shooter.lastShot=time;state.ammo--;const base=aimDirection(shooter.input.yaw,shooter.input.pitch);
+  const multiplier=(shooter.blessingUntil??0)>time?VOID_BLESSING.damage:1;
+  const eventId=`${room.code}:shot:${++room.shotSequence}`;
+  if(id==='prism'){
+    const origin:[number,number,number]=[shooter.x,shooter.y,shooter.z];
+    const orb=launchPrism(eventId,shooter.id,origin,base);
+    (room.prismOrbs??=new Map()).set(orb.id,{orb,damageMultiplier:multiplier});
+    io.to(room.code).emit('match:prismLaunch',{roundId:room.roundId,...orb});
+    advanceWeaponReload(id,state,time);
+    return;
+  }
+  const history=historicalPlayers(room,clientTime);
   const targets:Combatant[]=[...room.players.values()].filter(p=>p.id!==shooter.id&&p.alive).map(p=>{const old=history?.players.get(p.id);return old&&old.life===p.life?{...old,id:p.id}:p;});
   const boss=room.warden?.boss,rewound=history?history.warden:boss;
   if(boss&&rewound&&rewound.ownerId===boss.ownerId&&wardenCanBeHit(boss,shooter.id)&&wardenCanBeHit(rewound,shooter.id))
     targets.push({id:WARDEN_ID,x:rewound.x,y:rewound.y+rewound.air+1.65,z:rewound.z,yaw:rewound.yaw,alive:true,kind:'warden',scale:rewound.scale});
-  const multiplier=(shooter.blessingUntil??0)>time?VOID_BLESSING.damage:1;
   const pastShooter=history?.players.get(shooter.id),shotPosition=pastShooter?.life===shooter.life?pastShooter:shooter;
-  const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000,history?history.destroyed:room.warden?.destroyed),shooter.aiming,state.level),eventId=`${room.code}:shot:${++room.shotSequence}`;
+  const origin:[number,number,number]=[shotPosition.x,shotPosition.y,shotPosition.z],result=resolveShot(id,origin,base,targets,Math.random,arenaWorld(history?.simulationTime??(room.lastStep-room.wheelEpoch)/1000,history?history.destroyed:room.warden?.destroyed),shooter.aiming,state.level);
   io.to(room.code).emit('match:shot',{roundId:room.roundId,eventId,id:shooter.id,origin,dir:base,weapon:id,...result});
+  advanceWeaponReload(id,state,time);
+  if(state.reloadUntil){shooter.aiming=false;shooter.input.aim=false;}
+  settleShotHits(io,room,shooter,id,eventId,result.hits,multiplier,time);
+  }finally{room.metrics?.record('shotCPU_ms',performance.now()-started);}
+}
+
+function settleShotHits(io:Server,room:Room,shooter:Player,id:WeaponId,eventId:string,hits:PlannedHit[],multiplier:number,time:number){
+  const spec=WEAPON_SPECS[id],state=shooter.weapons[id];
   const confirmed:ConfirmedHit[]=[];
   let wardenVictory=false;
-  for(const raw of result.hits){
+  for(const raw of hits){
+    if(room.state!=='PLAYING')break;
     const hit={...raw,damage:Math.round(raw.damage*multiplier)};
     if(hit.targetId===WARDEN_ID&&room.warden){
       const hitBoss=damageWarden(room.warden,shooter,hit.damage,time);
@@ -190,12 +212,29 @@ export function shoot(io:Server,room:Room,shooter:Player,clientTime:number){
     if(victim.alive&&id==='ice')victim.slowUntil=time+(spec.slow??0)*1000;
     if(victim.alive&&id==='flame')victim.burn={damage:Math.round(4*weaponDamageMultiplier(state.level)),attackerId:shooter.id,nextTick:victim.burn?.nextTick??time+250,expiresAt:time+(spec.burn??0)*1000};
   }
-  advanceWeaponReload(id,state,time);
-  if(state.reloadUntil){shooter.aiming=false;shooter.input.aim=false;}
   if(confirmed.length)io.to(shooter.socketId??`offline:${shooter.id}`).emit('match:hit',{roundId:room.roundId,eventId,weapon:id,hits:confirmed});
   if(wardenVictory)finishRound(io,room,'target');
   else if(confirmed.some(h=>h.killed)&&room.state==='PLAYING')emitRoom(io,room);
-  }finally{room.metrics?.record('shotCPU_ms',performance.now()-started);}
+}
+
+function stepPrismOrbs(io:Server,room:Room,dt:number,time:number){
+  if(!room.prismOrbs?.size)return;
+  const world=arenaWorld((room.lastStep-room.wheelEpoch)/1000,room.warden?.destroyed);
+  const players=[...room.players.values()];
+  for(const [id,{orb,damageMultiplier}] of room.prismOrbs){
+    const owner=room.players.get(orb.ownerId);
+    if(!owner){room.prismOrbs.delete(id);continue;}
+    const targets:Combatant[]=[...players];
+    const boss=room.warden?.boss;
+    if(boss&&wardenCanBeHit(boss,owner.id))
+      targets.push({id:WARDEN_ID,x:boss.x,y:boss.y+boss.air+1.65,z:boss.z,yaw:boss.yaw,alive:true,kind:'warden',scale:boss.scale});
+    const result=advancePrism(orb,dt,targets,world);
+    if(!result)continue;
+    room.prismOrbs.delete(id);
+    io.to(room.code).emit('match:prismImpact',{roundId:room.roundId,...result.impact});
+    settleShotHits(io,room,owner,'prism',orb.id,result.hits,damageMultiplier,time);
+    if(room.state!=='PLAYING')return;
+  }
 }
 export function step(io:Server,room:Room,dt:number,navigationBudget?:NavigationBudget){
   if(room.state!=='PLAYING'||expireRound(io,room))return;const time=now(),tickStarted=performance.now();room.tick++;room.environmentTime=advanceEnvironment(room.environmentTime,dt,true);
@@ -211,7 +250,7 @@ export function step(io:Server,room:Room,dt:number,navigationBudget?:NavigationB
       p.activeWeapon=command.weapon;p.aiming=false;control.aim=false;
     }
     p.input=control;
-    for(const id of WEAPON_IDS)advanceWeaponReload(id,p.weapons[id],time,id===p.activeWeapon&&!!control.reload);
+    for(const id of ARMORY_WEAPON_IDS)advanceWeaponReload(id,p.weapons[id],time,id===p.activeWeapon&&!!control.reload);
     const state=p.weapons[p.activeWeapon];
     p.yaw=control.yaw;p.pitch=control.pitch;p.sprinting=!!control.sprint;
     if(control.reload||state.reloadUntil>time||p.activeWeapon!=='sniper')control.aim=false;
@@ -231,7 +270,14 @@ export function step(io:Server,room:Room,dt:number,navigationBudget?:NavigationB
     for(const pickup of room.pickups)if(pickup.available&&Math.hypot(p.x-pickup.x,p.y-(pickup.y+.9),p.z-pickup.z)<2){
       const result=collectWeapon(pickup.id,p.weapons[pickup.id],p.ownedWeapons.includes(pickup.id),time);
       if(!result)continue;
-      if(result.kind==='unlock')p.ownedWeapons.push(pickup.id);
+      if(result.kind==='unlock'){
+        p.ownedWeapons.push(pickup.id);
+        if(canUnlockPrism(new Set(p.ownedWeapons))){
+          p.ownedWeapons.push('prism');
+          const unlock:PrismUnlock={id:p.id,x:p.x,y:p.y-1.65,z:p.z};
+          io.to(room.code).emit('match:prismUnlock',{roundId:room.roundId,...unlock});
+        }
+      }
       pickup.available=false;pickup.respawnAt=time+30000;
       if(p.socketId)io.to(p.socketId).emit('match:pickup',{...result,roundId:room.roundId,eventId:randomUUID()});
       emitRoom(io,room);
@@ -239,6 +285,8 @@ export function step(io:Server,room:Room,dt:number,navigationBudget?:NavigationB
     if(p.burn){while(p.burn&&p.burn.nextTick<=time&&p.burn.nextTick<=p.burn.expiresAt){const attacker=room.players.get(p.burn.attackerId);p.burn.nextTick+=250;if(attacker){const hit=applyDamage(io,room,attacker,p,{targetId:p.id,damage:Math.round((p.burn.damage??4)*((attacker.blessingUntil??0)>time?VOID_BLESSING.damage:1)),headshot:false,position:[p.x,p.y-.4,p.z]},'flame');if(hit)io.to(attacker.socketId??`offline:${attacker.id}`).emit('match:hit',{roundId:room.roundId,eventId:`${room.code}:burn:${++room.shotSequence}`,weapon:'flame',hits:[hit]});if(hit?.killed)emitRoom(io,room);if(room.state!=='PLAYING')return;}}if(p.burn&&time>=p.burn.expiresAt)p.burn=null;}
     p.input={...p.input,lookX:0,lookY:0,jump:false,reload:false};
   }
+  stepPrismOrbs(io,room,dt,time);
+  if(room.state!=='PLAYING')return;
   for(const pickup of room.pickups)if(!pickup.available&&pickup.respawnAt<=time){const point=chooseWeaponPoint([...room.players.values()].map(p=>({...p,y:p.y-1.65})),room.pickups.filter(other=>other!==pickup&&other.available),pickup);if(!point){pickup.respawnAt=time+100;continue;}Object.assign(pickup,point);pickup.available=true;emitRoom(io,room);}
   const wardenStarted=performance.now();
   if(room.warden)stepWarden(room.warden,room.lastStep,dt,(room.lastStep-room.wheelEpoch)/1000,room.players.values(),(victim,damage,from,attack)=>{
@@ -355,14 +403,14 @@ export function createGameServer(options:{reconnectGraceMs?:number;wardenSpawnDe
         yaw:Math.atan2(Math.sin(input.yaw),Math.cos(input.yaw)),pitch:Math.max(-1.35,Math.min(1.35,input.pitch)),
         jump:input.jump===true,reload:input.reload===true,sprint:input.sprint===true,aim:input.aim===true,
         fire:input.fire===true,reset:input.reset===true,
-        weapon:input.weapon&&WEAPON_IDS.includes(input.weapon)?input.weapon:undefined};
+        weapon:input.weapon&&ARMORY_WEAPON_IDS.includes(input.weapon)?input.weapon:undefined};
       p.movement.enqueue(command,now());p.lastReceivedSeq=command.seq;
     });
     // Armory/tools can attach actions to an unprocessed command. Late fire is
     // accepted only for the current processed pose, once per sequence.
     socket.on('match:weapon',(message:{id:WeaponId;roundId:number})=>{
       const p=currentPlayer();if(!room||!p?.alive||room.state!=='PLAYING'||!isCurrentRound(message,room.roundId))return;
-      const id=message.id;if(!WEAPON_IDS.includes(id)||!p.ownedWeapons.includes(id))return;
+      const id=message.id;if(!ARMORY_WEAPON_IDS.includes(id)||!p.ownedWeapons.includes(id))return;
       const command=p.movement?.latest();
       if(command)command.weapon=id;
       else {p.activeWeapon=id;p.aiming=false;p.input.aim=false;}

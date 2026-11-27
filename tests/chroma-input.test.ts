@@ -30,7 +30,7 @@ function withDOM(run:(root:Element,win:EventTarget,doc:EventTarget&{pointerLockE
   try{run(root,win,doc);}finally{names.forEach((name,index)=>{if(previous[index])Object.defineProperty(globalThis,name,previous[index]!);else Reflect.deleteProperty(globalThis,name);});}
 }
 
-test('desktop Shift, held right click, hotkey 7 and focus loss do not leave sticky actions',()=>withDOM((root,win,doc)=>{
+test('desktop Shift, held right click, weapon hotkeys and focus loss do not leave sticky actions',()=>withDOM((root,win,doc)=>{
   let resets=0;const input=new InputManager(()=>resets++),desktop=new DesktopInput(root as unknown as HTMLElement,input);
   dispatch(win,'keydown',{key:'w'});desktop.update();assert.equal(input.getState().moveY,1);
   dispatch(root,'mousedown',{button:2});assert.equal(input.aiming,true);
@@ -38,6 +38,7 @@ test('desktop Shift, held right click, hotkey 7 and focus loss do not leave stic
   dispatch(win,'keyup',{key:'Shift'});desktop.update();assert.equal(input.sprinting,false);assert.equal(input.aiming,true);
   dispatch(root,'mouseup',{button:2});dispatch(root,'mousedown',{button:2});assert.equal(input.aiming,true);
   dispatch(win,'keydown',{key:'7'});assert.equal(input.getState().switchWeapon,7);assert.equal(input.aiming,false);
+  dispatch(win,'keydown',{key:'8'});assert.equal(input.getState().switchWeapon,8);
   assert.equal(dispatch(root,'contextmenu').defaultPrevented,true);
   dispatch(root,'mousedown',{button:0});dispatch(win,'blur');assert.equal(input.getState().shoot,false);assert.ok(resets>0);
   doc.pointerLockElement=null;dispatch(doc,'pointerlockchange');desktop.update();assert.equal(input.getState().moveY,0);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Armory } from '../src/chroma-ops/ui/Armory.ts';
-import { WEAPON_IDS, type WeaponId, type WeaponLevel } from '../shared/weapons.ts';
+import { ARMORY_WEAPON_IDS, type WeaponId, type WeaponLevel } from '../shared/weapons.ts';
 
 class UI extends EventTarget {
   dataset:Record<string,string>={};children:UI[]=[];parent:UI|null=null;hidden=false;textContent='';
@@ -13,14 +13,14 @@ class UI extends EventTarget {
   querySelector(selector:string):UI|null{return this.children.find(c=>c.kind===selector)??null;}
   setAttribute(key:string,value:string){this.attributes.set(key,value);}
   insertAdjacentHTML(){}
-  set innerHTML(_value:string){if(this.kind!=='.co-armory-track')return;this.children=[];for(const id of WEAPON_IDS){const card=new UI('button');card.dataset.armory=id;card.append(new UI('small'));card.append(new UI('.co-level'));card.append(new UI('em'));card.append(new UI('.co-weapon-stats'));this.append(card);}}
+  set innerHTML(_value:string){if(this.kind!=='.co-armory-track')return;this.children=[];for(const id of ARMORY_WEAPON_IDS){const card=new UI('button');card.dataset.armory=id;card.append(new UI('small'));card.append(new UI('.co-level'));card.append(new UI('em'));card.append(new UI('.co-weapon-stats'));this.append(card);}}
   scrollIntoView(){}
   remove(){}
 }
 function dispatch(target:EventTarget,type:string,properties:Record<string,unknown>={}){
   const event=new Event(type,{cancelable:true});for(const [key,value] of Object.entries(properties))Object.defineProperty(event,key,{value});target.dispatchEvent(event);return event;
 }
-function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;doc:EventTarget&{hidden:boolean};hit:(target:UI)=>void;chosen:WeaponId[];levels:Partial<Record<WeaponId,WeaponLevel>>})=>void,touch=false){
+function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;doc:EventTarget&{hidden:boolean};hit:(target:UI)=>void;chosen:WeaponId[];levels:Partial<Record<WeaponId,WeaponLevel>>;owned:Set<WeaponId>})=>void,touch=false){
   const names=['window','HTMLElement','matchMedia','navigator','requestAnimationFrame','cancelAnimationFrame','document'];
   const previous=names.map(n=>Object.getOwnPropertyDescriptor(globalThis,n));
   const win=Object.assign(new EventTarget(),{PointerEvent:touch?undefined:Event});
@@ -31,8 +31,9 @@ function fixture(run:(f:{armory:Armory;root:UI;box:UI;track:UI;win:EventTarget;d
   const root=new UI('root'),box=new UI('.co-armory'),track=new UI('.co-armory-track'),chosen:WeaponId[]=[];
   root.append(box);box.append(track);
   const levels:Partial<Record<WeaponId,WeaponLevel>>={};
-  const armory=new Armory(root as unknown as HTMLElement,id=>{chosen.push(id);},()=>new Set<WeaponId>(['ar','sniper']),undefined,id=>levels[id]??1);
-  try{armory.toggle();run({armory,root,box,track,win,doc,hit:element=>{target=element;},chosen,levels});}finally{armory.dispose();names.forEach((n,i)=>{if(previous[i])Object.defineProperty(globalThis,n,previous[i]!);else Reflect.deleteProperty(globalThis,n);});}
+  const owned=new Set<WeaponId>(['ar','sniper']);
+  const armory=new Armory(root as unknown as HTMLElement,id=>{chosen.push(id);},()=>owned,undefined,id=>levels[id]??1);
+  try{armory.toggle();run({armory,root,box,track,win,doc,hit:element=>{target=element;},chosen,levels,owned});}finally{armory.dispose();names.forEach((n,i)=>{if(previous[i])Object.defineProperty(globalThis,n,previous[i]!);else Reflect.deleteProperty(globalThis,n);});}
 }
 function pointer(root:UI,win:EventTarget,target:UI,move=0,cancel=false){
   dispatch(root,'pointerdown',{pointerId:2,button:0,clientX:100,clientY:100,target});
@@ -121,4 +122,16 @@ test('pointer locked desktop: clicking locked selection leaves armory open and a
   assert.equal(armory.isOpen,true);assert.deepEqual(chosen,[]);
   dispatch(root,'wheel',{deltaY:-100});pointer(root,win,root);
   assert.deepEqual(chosen,['ar']);assert.equal(armory.isOpen,false);
+}));
+
+test('Prism appears in the armory when unlocked and equips only when selected',()=>fixture(({armory,root,track,win,chosen,owned})=>{
+  const cannon=track.children[7];
+  assert.equal(cannon.hidden,true);
+  owned.add('prism');
+  armory.render('ar');
+  assert.equal(cannon.hidden,false);
+  assert.deepEqual(chosen,[]);
+  pointer(root,win,cannon);
+  assert.deepEqual(chosen,['prism']);
+  assert.equal(armory.isOpen,false);
 }));

@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import { io as connect, type Socket } from 'socket.io-client';
-import { WEAPON_IDS, WEAPON_SPECS, createWeaponStates, collectWeapon, magazineCapacity, advanceWeaponReload, weaponRange, weaponDamageMultiplier, type WeaponId } from '../shared/weapons.ts';
+import { WEAPON_IDS, WEAPON_SPECS, createWeaponStates, collectWeapon, magazineCapacity, advanceWeaponReload, weaponRange, weaponDamageMultiplier, type PickupWeaponId } from '../shared/weapons.ts';
+import { advancePrism, launchPrism } from '../shared/prism.ts';
 import { queryAim } from '../shared/aim.ts';
 import { resolveShot, KillTracker } from '../shared/combat.ts';
-import { beginRound, step, kill, createGameServer } from '../server/src/index.ts';
+import { beginRound, finishRound, step, kill, createGameServer } from '../server/src/index.ts';
 import { Weapon } from '../src/chroma-ops/weapons/Weapon.ts';
 import { WeaponAppearance } from '../src/chroma-ops/weapons/WeaponAppearance.ts';
 import { WeaponEffects } from '../src/chroma-ops/systems/WeaponEffects.ts';
@@ -14,8 +15,8 @@ import { weaponMuzzle } from '../src/chroma-ops/weapons/WeaponMuzzle.ts';
 import { nearbyPickupHint, type PreviewPickup } from '../src/chroma-ops/ui/PickupPreview.ts';
 
 const empty={boxes:[],heightAt:()=>-100};
-const capacities:Record<WeaponId,number[]>={ar:[30,38,45],smg:[36,45,54],flame:[80,100,120],ice:[24,30,36],shotgun:[8,10,12],rocket:[4,5,6],sniper:[5,6,8]};
-const ranges:Record<WeaponId,number>={ar:30,smg:45,flame:25,ice:55,shotgun:35,rocket:100,sniper:420};
+const capacities:Record<PickupWeaponId,number[]>={ar:[30,38,45],smg:[36,45,54],flame:[80,100,120],ice:[24,30,36],shotgun:[8,10,12],rocket:[4,5,6],sniper:[5,6,8]};
+const ranges:Record<PickupWeaponId,number>={ar:30,smg:45,flame:25,ice:55,shotgun:35,rocket:100,sniper:420};
 for(const id of WEAPON_IDS){
   test(`${id}: quick reload lasts eight seconds, refreshes without stacking and expires`,()=>{
     const state=createWeaponStates()[id];state.level=3;state.ammo=magazineCapacity(id,3);
@@ -78,6 +79,44 @@ for(const id of WEAPON_IDS){
     w.refill();assert.equal(w.level,2);assert.equal(w.ammo,capacities[id][1]);assert.equal(w.reloading,false);
   });
 }
+
+test('Prism travels across the arena, hits off-center and damages each target at most once',()=>{
+  const orb=launchPrism('long','owner',[0,1.65,0],[0,0,-1]);
+  assert.equal(advancePrism(orb,1,[],empty),null);
+  assert.deepEqual(orb.position,[0,1.65,-360]);
+  const actor=(id:string,x:number,z:number)=>({id,x,y:1.65,z,yaw:0,alive:true});
+  const targets=[actor('direct',2,-420),actor('splash',8,-422),actor('owner',1,-420),actor('outside',15,-420)];
+  const result=advancePrism(orb,.25,targets,empty);
+  assert.ok(result);
+  assert.equal(result.hits.length,2);
+  assert.equal(result.hits.find(h=>h.targetId==='direct')?.damage,160);
+  assert.ok((result.hits.find(h=>h.targetId==='splash')?.damage??0)>50);
+  const missed=launchPrism('range','owner',[0,1.65,0],[0,0,-1]);
+  assert.equal(advancePrism(missed,2,[],empty)?.impact.position[2],-450);
+});
+
+test('Prism collides with walls and floor while intact cover blocks splash',()=>{
+  const wall={minX:-20,maxX:20,minY:0,maxY:5,minZ:-11,maxZ:-10,color:0};
+  const world={boxes:[wall],heightAt:()=>0};
+  const orb=launchPrism('wall','owner',[0,1.65,0],[0,0,-1]);
+  const actor=(id:string,z:number)=>({id,x:5,y:1.65,z,yaw:0,alive:true});
+  const result=advancePrism(orb,.1,[actor('front',-7),actor('back',-12)],world);
+  assert.ok(result);
+  assert.equal(result.impact.position[2],-7.5);
+  assert.deepEqual(result.hits.map(h=>h.targetId),['front']);
+  const down=launchPrism('ground','owner',[0,1.65,0],[0,-1,0]);
+  assert.ok(Math.abs(advancePrism(down,.02,[],world)!.impact.position[1])<.11);
+});
+
+test('Prism uses manual reload, auto-reload and respawn refill',()=>{
+  const weapon=new Weapon(WEAPON_SPECS.prism);
+  assert.equal(weapon.update(0,true).fired,true);
+  assert.equal(weapon.update(1,true).fired,false);
+  weapon.reload();assert.equal(weapon.reloading,true);
+  weapon.update(2.6,false);assert.equal(weapon.ammo,2);
+  weapon.update(0,true);assert.equal(weapon.update(1.25,true).autoReload,true);
+  weapon.refill();assert.equal(weapon.ammo,2);assert.equal(weapon.reloading,false);
+});
 
 function fixture(){
   const room={environmentTime:0,code:'WEAPON',host:'a',roundId:0,state:'LOBBY',players:new Map(['a','b'].map(id=>[id,{id,name:id,socketId:`socket-${id}`,avatar:'',color:0xffffff,x:0,y:1.65,z:0,yaw:0,pitch:0,weapons:createWeaponStates(),lastReceivedSeq:0,lastProcessedSeq:0}])),pickups:[],history:[],tick:0,lastStep:Date.now(),wheelEpoch:0,shotSequence:0,killTracker:new KillTracker('weapons'),respawnTimers:new Map() } as unknown as Parameters<typeof beginRound>[1];
@@ -212,6 +251,64 @@ test('pickup feedback deduplicates, bounds its queue, uses device hints and rele
 function event(socket:Socket,name:string,predicate:(value:any)=>boolean=()=>true):Promise<any>{
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{socket.off(name,receive);reject(Error(`Timed out ${name}`));},5000);const receive=(value:any)=>{if(predicate(value)){clearTimeout(timer);socket.off(name,receive);resolve(value);}};socket.on(name,receive);});
 }
+test('network: full collection unlocks Prism once, syncs flight and survives reconnect until rematch',async()=>{
+  const server=createGameServer();
+  await new Promise<void>(resolve=>server.http.listen(0,'127.0.0.1',resolve));
+  const address=server.http.address();assert.ok(address&&typeof address!=='string');
+  const sockets:Socket[]=[];
+  const open=async()=>{
+    const socket=connect(`http://127.0.0.1:${address.port}`,{transports:['websocket'],autoConnect:false,reconnection:false});
+    sockets.push(socket);
+    const connected=event(socket,'connect');socket.connect();await connected;
+    return socket;
+  };
+  try{
+    const a=await open(),b=await open();
+    const seat=await a.emitWithAck('room:create','Prism A');
+    const other=await b.emitWithAck('room:join',{code:seat.code,name:'Prism B'});
+    const started=event(a,'match:snapshot');await a.emitWithAck('game:start');const {roundId}=await started;
+    const room=server.rooms.get(seat.code)!;
+    const first=room.players.get(seat.playerId)!;
+    const second=room.players.get(other.playerId)!;
+    const unlocks:string[]=[];
+    b.on('match:prismUnlock',value=>unlocks.push(value.id));
+    for(const pickup of room.pickups.filter(pickup=>pickup.id!=='ar')){
+      const picked=event(a,'match:pickup',value=>value.weapon===pickup.id);
+      Object.assign(first,{x:pickup.x,y:pickup.y+1.65,z:pickup.z,velocityY:0,supportId:null});
+      await picked;
+    }
+    const unlocked=await event(b,'match:snapshot',s=>s.players.find((p:any)=>p.id===first.id).ownedWeapons.includes('prism'));
+    assert.deepEqual(unlocks,[first.id]);
+    assert.equal(first.activeWeapon,'ar');
+    assert.equal(first.kills,0);
+    assert.equal(unlocked.pickups.length,7);
+    assert.equal(second.ownedWeapons.includes('prism'),false);
+
+    const launch=event(b,'match:prismLaunch'),impact=event(b,'match:prismImpact');
+    const inFlight=event(b,'match:snapshot',s=>s.prismOrbs.length>0);
+    Object.assign(first,{x:-140,y:1.65,z:-114,velocityY:0,supportId:null});
+    a.emit('match:input',{roundId,seq:1,clientTime:Date.now(),moveX:0,moveY:0,yaw:0,pitch:.65,weapon:'prism',fire:true});
+    const launched=await launch;
+    assert.equal(launched.ownerId,first.id);
+    assert.equal((await inFlight).prismOrbs[0].id,launched.id);
+    assert.equal((await impact).id,launched.id);
+    assert.equal(first.weapons.prism.ammo,1);
+    kill(server.io,room,first,second,'ar',false);
+    kill(server.io,room,second,first,'flame',false);
+    assert.equal(first.kills,1);assert.equal(second.kills,1);
+    assert.ok(first.ownedWeapons.includes('prism'));
+    const c=await open();const restored=await c.emitWithAck('room:resume',seat);
+    const rejoined=restored.room.players.find((p:any)=>p.id===first.id);
+    assert.equal(rejoined.kills,1);
+    assert.ok(rejoined.ownedWeapons.includes('prism'));
+    assert.deepEqual(unlocks,[first.id]);
+    finishRound(server.io,room,'timeout');
+    assert.deepEqual(await c.emitWithAck('game:again'),{ok:true});
+    assert.deepEqual(first.ownedWeapons,['ar']);assert.equal(first.kills,0);assert.equal(second.kills,0);
+    assert.equal(room.prismOrbs?.size,0);
+  }finally{for(const socket of sockets)socket.disconnect();server.close();}
+});
+
 test('network: empty AR auto reloads without input; snapshots and reconnect retain weapon state',async()=>{
   const server=createGameServer();await new Promise<void>(resolve=>server.http.listen(0,'127.0.0.1',resolve));
   const address=server.http.address();assert.ok(address&&typeof address!=='string');
